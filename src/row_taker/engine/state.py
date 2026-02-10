@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -18,13 +16,13 @@ class Card:
 @dataclass(slots=True)
 class Player:
     name: str
-    hand: list[Card] = field(default_factory=list)
+    hand: list[Card] = field(default_factory=lambda: [])
     score: int = 0
 
 
 @dataclass(slots=True)
 class Row:
-    cards: list[Card] = field(default_factory=list)
+    cards: list[Card] = field(default_factory=lambda: [])
 
     def last_value(self) -> int:
         return self.cards[-1].value
