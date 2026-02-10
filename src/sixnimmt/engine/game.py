@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .rules import place_card, take_row, target_row_index
 from .state import Card, ChooseRowFn, GameState, Player, Row
 
 
-def make_deck() -> List[Card]:
+def make_deck() -> list[Card]:
     return [Card(v) for v in range(1, 105)]
 
 
 def setup_game(
     player_names: Sequence[str],
     *,
-    rng: Optional[random.Random] = None,
+    rng: random.Random | None = None,
     hand_size: int = 10,
 ) -> GameState:
     """Erstellt einen neuen Spielzustand und teilt aus (erste Runde)."""
@@ -64,9 +64,9 @@ class StepResult:
 
 def resolve_round(
     state: GameState,
-    selections: Dict[int, Card],
+    selections: dict[int, Card],
     choose_row: ChooseRowFn,
-) -> List[StepResult]:
+) -> list[StepResult]:
     """Löst eine Runde auf.
 
     `selections`: mapping player_index -> chosen Card (muss in deren Hand gewesen sein).
@@ -85,7 +85,7 @@ def resolve_round(
         hand.pop(idx)
 
     order = sorted(selections.items(), key=lambda kv: kv[1].value)
-    results: List[StepResult] = []
+    results: list[StepResult] = []
 
     for player_index, card in order:
         idx = target_row_index(state.rows, card)
@@ -132,7 +132,7 @@ def resolve_round(
     return results
 
 
-def start_next_round_if_needed(state: GameState, *, rng: Optional[random.Random] = None) -> bool:
+def start_next_round_if_needed(state: GameState, *, rng: random.Random | None = None) -> bool:
     """Wenn alle Hände leer sind, wird eine neue Runde ausgeteilt.
 
     Rückgabe: True wenn neue Runde gestartet wurde.

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Dict, List
 
 from sixnimmt.engine.game import resolve_round, setup_game, start_next_round_if_needed
 from sixnimmt.engine.state import Card, GameState
@@ -71,7 +70,7 @@ def main() -> None:
 
     while True:
         # Runde: jeder wählt eine Karte (verdeckt, Hotseat)
-        selections: Dict[int, Card] = {}
+        selections: dict[int, Card] = {}
         for i in range(len(state.players)):
             selections[i] = choose_card_from_hand(state, i)
 
@@ -85,9 +84,13 @@ def main() -> None:
             if r.action == "placed":
                 print(f"- {p.name} legt {r.card.value} an Reihe {r.row_index}.")
             elif r.action == "took_row_small":
-                print(f"- {p.name} nimmt Reihe {r.row_index} ({r.points_gained} Punkte) und startet mit {r.card.value}.")
+                print(
+                    f"- {p.name} nimmt Reihe {r.row_index} ({r.points_gained} Punkte) und startet mit {r.card.value}."
+                )
             else:
-                print(f"- {p.name} füllt Reihe {r.row_index} (nimmt {r.points_gained} Punkte) und startet mit {r.card.value}.")
+                print(
+                    f"- {p.name} füllt Reihe {r.row_index} (nimmt {r.points_gained} Punkte) und startet mit {r.card.value}."
+                )
 
         # Neue Runde?
         started = start_next_round_if_needed(state)

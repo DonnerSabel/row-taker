@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, List, Sequence
 
 from .scoring import bullheads
 
@@ -18,13 +18,13 @@ class Card:
 @dataclass(slots=True)
 class Player:
     name: str
-    hand: List[Card] = field(default_factory=list)
+    hand: list[Card] = field(default_factory=list)
     score: int = 0
 
 
 @dataclass(slots=True)
 class Row:
-    cards: List[Card] = field(default_factory=list)
+    cards: list[Card] = field(default_factory=list)
 
     def last_value(self) -> int:
         return self.cards[-1].value
@@ -35,9 +35,9 @@ class Row:
 
 @dataclass(slots=True)
 class GameState:
-    players: List[Player]
-    rows: List[Row]
-    deck: List[Card]
+    players: list[Player]
+    rows: list[Row]
+    deck: list[Card]
     hand_size: int = 10
     round_no: int = 1
 

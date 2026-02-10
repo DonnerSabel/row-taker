@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+from collections.abc import Sequence
 
 from .state import Card, Row
 
 
-def target_row_index(rows: Sequence[Row], card: Card) -> Optional[int]:
+def target_row_index(rows: Sequence[Row], card: Card) -> int | None:
     """Gibt die Zielreihe für `card` zurück.
 
     Zielreihe = Reihe mit der größten letzten Karte, die noch < card.value ist.
     Falls keine Reihe passt (card ist kleiner als alle letzten Karten): None.
     """
-    best_idx: Optional[int] = None
+    best_idx: int | None = None
     best_last = -1
 
     for i, row in enumerate(rows):
@@ -24,7 +23,7 @@ def target_row_index(rows: Sequence[Row], card: Card) -> Optional[int]:
     return best_idx
 
 
-def take_row(rows: List[Row], row_index: int) -> Tuple[int, List[Card]]:
+def take_row(rows: list[Row], row_index: int) -> tuple[int, list[Card]]:
     """Nimmt eine Reihe: liefert (punkte, genommene_karten)."""
     row = rows[row_index]
     taken = list(row.cards)
@@ -33,7 +32,7 @@ def take_row(rows: List[Row], row_index: int) -> Tuple[int, List[Card]]:
     return points, taken
 
 
-def place_card(rows: List[Row], row_index: int, card: Card) -> Tuple[int, Optional[List[Card]]]:
+def place_card(rows: list[Row], row_index: int, card: Card) -> tuple[int, list[Card] | None]:
     """Legt eine Karte in die Zielreihe.
 
     Wenn die Reihe dadurch 6 Karten hätte, werden die bisherigen 5 Karten genommen.

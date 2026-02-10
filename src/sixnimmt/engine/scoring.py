@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 def bullheads(card_value: int) -> int:
     """Berechnet die Strafpunkte (Bullheads) für einen Kartenwert.
 
