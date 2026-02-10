@@ -2,10 +2,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run CLI (sixnimmt)",
+      "name": "Run CLI (row_taker)",
       "type": "python",
       "request": "launch",
-      "module": "sixnimmt.cli",
+      "module": "row_taker.cli",
       "justMyCode": true,
       "console": "integratedTerminal"
     },

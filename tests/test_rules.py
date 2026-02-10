@@ -1,5 +1,5 @@
-from sixnimmt.engine.rules import place_card, target_row_index
-from sixnimmt.engine.state import Card, Row
+from row_taker.engine.rules import place_card, target_row_index
+from row_taker.engine.state import Card, Row
 
 
 def test_target_row_index():

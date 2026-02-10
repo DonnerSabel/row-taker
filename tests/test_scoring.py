@@ -1,6 +1,6 @@
 import pytest
 
-from sixnimmt.engine.scoring import bullheads
+from row_taker.engine.scoring import bullheads
 
 
 def test_bullheads_basic():

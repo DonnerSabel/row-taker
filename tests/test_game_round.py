@@ -1,7 +1,7 @@
 import random
 
-from sixnimmt.engine.game import resolve_round, setup_game
-from sixnimmt.engine.state import Card
+from row_taker.engine.game import resolve_round, setup_game
+from row_taker.engine.state import Card
 
 
 def test_resolve_round_small_card_forces_take():

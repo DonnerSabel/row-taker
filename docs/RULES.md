@@ -1,4 +1,4 @@
-# Regeln (Kurzfassung) – 6 nimmt!
+# Regeln (Kurzfassung) – Row-Taker
 
 Diese Kurzfassung reicht als „Single Source of Truth“ fürs Projekt.
 

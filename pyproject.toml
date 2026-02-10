@@ -3,10 +3,11 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sixnimmt"
+name = "row-taker"
 version = "0.1.0"
-description = "Unterrichtsprojekt: 6 nimmt! in Python (CLI zuerst, GUI/Netzwerk später)."
+description = "Unterrichtsprojekt: Row-Taker in Python (CLI zuerst, GUI/Netzwerk später)."
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = []
 

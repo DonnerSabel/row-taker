@@ -5,12 +5,12 @@
 - Später kann ein Netzwerk-Frontend dieselbe Engine verwenden.
 
 ## Module
-- `sixnimmt.engine.rules` – Regelkern (Zielreihe, Einfügen, Reihen nehmen)
-- `sixnimmt.engine.scoring` – Strafpunkte
-- `sixnimmt.engine.state` – Dataclasses für Zustand
-- `sixnimmt.engine.game` – Ablauf: Setup, Deal, Round-Resolution
+- `row_taker.engine.rules` – Regelkern (Zielreihe, Einfügen, Reihen nehmen)
+- `row_taker.engine.scoring` – Strafpunkte
+- `row_taker.engine.state` – Dataclasses für Zustand
+- `row_taker.engine.game` – Ablauf: Setup, Deal, Round-Resolution
 
 ## Erweiterbarkeit
-- pygame: neues Paket `sixnimmt.pygame_ui` (oder `sixnimmt.ui_pygame`)
-- Netzwerk: neues Paket `sixnimmt.net` + Protokoll (JSON Messages)
-- Bots/KI: optional `sixnimmt.ai` (z.B. RandomBot, HeuristikBot)
+- pygame: neues Paket `row_taker.pygame_ui` (oder `row_taker.ui_pygame`)
+- Netzwerk: neues Paket `row_taker.net` + Protokoll (JSON Messages)
+- Bots/KI: optional `row_taker.ai` (z.B. RandomBot, HeuristikBot)

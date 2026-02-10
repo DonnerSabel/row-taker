@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 import sys
 
-from sixnimmt.engine.game import resolve_round, setup_game, start_next_round_if_needed
-from sixnimmt.engine.state import Card, GameState
+from row_taker.engine.game import resolve_round, setup_game, start_next_round_if_needed
+from row_taker.engine.state import Card, GameState
 
 
 def clear_screen() -> None:
@@ -58,7 +58,7 @@ def choose_card_from_hand(state: GameState, player_index: int) -> Card:
 
 def main() -> None:
     clear_screen()
-    print("6 nimmt! – CLI (Hotseat)")
+    print("Row-Taker – CLI (Hotseat)")
     print()
     names = input("Spielernamen (kommagetrennt, 2-6) > ").strip()
     player_names = [n.strip() for n in names.split(",") if n.strip()]
