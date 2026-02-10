@@ -1,0 +1,85 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup venv + dev deps (editable)",
+      "type": "shell",
+      "group": "build",
+      "command": "",
+      "problemMatcher": [],
+      "windows": {
+        "command": "if not exist .venv (py -3 -m venv .venv) && .\\.venv\\Scripts\\python -m pip install -U pip && .\\.venv\\Scripts\\python -m pip install -e \".[dev]\""
+      },
+      "linux": {
+        "command": "test -d .venv || python3 -m venv .venv; ./.venv/bin/python -m pip install -U pip; ./.venv/bin/python -m pip install -e '.[dev]'"
+      },
+      "osx": {
+        "command": "test -d .venv || python3 -m venv .venv; ./.venv/bin/python -m pip install -U pip; ./.venv/bin/python -m pip install -e '.[dev]'"
+      }
+    },
+    {
+      "label": "Pytest",
+      "type": "shell",
+      "group": "test",
+      "command": "",
+      "problemMatcher": [],
+      "windows": {
+        "command": ".\\.venv\\Scripts\\python -m pytest -q"
+      },
+      "linux": {
+        "command": "./.venv/bin/python -m pytest -q"
+      },
+      "osx": {
+        "command": "./.venv/bin/python -m pytest -q"
+      }
+    },
+    {
+      "label": "Ruff: format",
+      "type": "shell",
+      "group": "test",
+      "command": "",
+      "problemMatcher": [],
+      "windows": {
+        "command": ".\\.venv\\Scripts\\python -m ruff format ."
+      },
+      "linux": {
+        "command": "./.venv/bin/python -m ruff format ."
+      },
+      "osx": {
+        "command": "./.venv/bin/python -m ruff format ."
+      }
+    },
+    {
+      "label": "Ruff: lint",
+      "type": "shell",
+      "group": "test",
+      "command": "",
+      "problemMatcher": [],
+      "windows": {
+        "command": ".\\.venv\\Scripts\\python -m ruff check ."
+      },
+      "linux": {
+        "command": "./.venv/bin/python -m ruff check ."
+      },
+      "osx": {
+        "command": "./.venv/bin/python -m ruff check ."
+      }
+    },
+    {
+      "label": "Run CLI",
+      "type": "shell",
+      "group": "none",
+      "command": "",
+      "problemMatcher": [],
+      "windows": {
+        "command": ".\\.venv\\Scripts\\python -m sixnimmt.cli"
+      },
+      "linux": {
+        "command": "./.venv/bin/python -m sixnimmt.cli"
+      },
+      "osx": {
+        "command": "./.venv/bin/python -m sixnimmt.cli"
+      }
+    }
+  ]
+}

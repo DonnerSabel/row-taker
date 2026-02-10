@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run CLI (sixnimmt)",
+      "type": "python",
+      "request": "launch",
+      "module": "sixnimmt.cli",
+      "justMyCode": true,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Pytest (current project)",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-q"
+      ],
+      "justMyCode": true,
+      "console": "integratedTerminal"
+    }
+  ]
+}

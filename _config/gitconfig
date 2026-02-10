@@ -1,0 +1,103 @@
+# -------------------------------------------------------------
+# 🧩 Projektweite Git-Konfiguration
+# -------------------------------------------------------------
+# Einbindung (aus Repo-Root):
+#   git config --local include.path "../_config/gitconfig"
+#
+# Ziele:
+# - Rebase-Workflow statt Merge-Commits
+# - Konfliktlösungen wiederverwenden (rerere)
+# - Sicheres Updaten/Pushing bei Arbeit auf zwei Rechnern
+# -------------------------------------------------------------
+
+[pull]
+    rebase = true
+    ff = only
+
+[rebase]
+    autoStash = true
+    # autoMergeStrategy = ours
+    # ⚠️ Entfernt: "ours" kann Konflikte still und ggf. falsch lösen.
+    # Lieber Konflikte bewusst lösen + rerere nutzt die Lösung dann beim nächsten Mal.
+
+[merge]
+    conflictStyle = diff3
+
+[rerere]
+    enabled = true
+    # optional, wenn ihr auch aufgezeichnete Auflösungen automatisch anwenden wollt:
+    # autoupdate = true
+
+[alias]
+    lg = log --oneline --graph --decorate --all
+
+    # Updatet den aktuellen Branch sicher in einem Zwei-Rechner-Setup:
+    # 1) fetch
+    # 2) erst auf Upstream (origin/<branch>) rebasen (holt Remote-Commits rein)
+    # 3) dann auf origin/HEAD (main oder master automatisch)
+    # 4) push mit --force-with-lease
+    #
+    # Sicherheitsgurt:
+    # - bricht ab auf main/master
+    # - bricht ab, wenn kein Upstream gesetzt ist
+    # - bricht ab, wenn Upstream nicht origin/<branch> ist
+    upmaster = "!f(){ set -e; \
+      b=$(git rev-parse --abbrev-ref HEAD); \
+      if [ \"$b\" = master ] || [ \"$b\" = main ]; then \
+        echo \"ERROR: upmaster nicht auf '$b' ausfuehren.\"; exit 1; \
+      fi; \
+      u=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null) || { \
+        echo \"ERROR: Kein Upstream gesetzt. Setze ihn mit: git push -u origin $b\"; exit 1; }; \
+      if [ \"$u\" != \"origin/$b\" ]; then \
+        echo \"ERROR: Upstream ist '$u', erwartet 'origin/$b'.\"; exit 1; \
+      fi; \
+      git fetch origin; \
+      git rebase @{u}; \
+      git rebase origin/HEAD; \
+      git push --force-with-lease origin HEAD:refs/heads/$b; \
+    }; f"
+
+    reset-to-remote = "!f(){ set -e; \
+      b=\"$1\"; \
+      if [ -z \"$b\" ]; then b=$(git rev-parse --abbrev-ref HEAD); fi; \
+      if [ \"$b\" = master ] || [ \"$b\" = main ]; then \
+        echo \"ERROR: reset-to-remote nicht auf '$b' ausfuehren.\"; exit 1; \
+      fi; \
+      git fetch --all --prune; \
+      git switch \"$b\"; \
+      git show-ref --verify --quiet \"refs/remotes/origin/$b\" || { \
+        echo \"ERROR: origin/$b nicht gefunden.\"; exit 1; }; \
+      git reset --hard \"origin/$b\"; \
+    }; f"
+
+    abort-op = "!f(){ \
+      set +e; \
+      try(){ \
+        op=\"$1\"; shift; \
+        \"$@\" >/dev/null 2>&1; \
+        rc=$?; \
+        if [ $rc -eq 0 ]; then \
+          echo \"OK: aborted $op\"; \
+          exit 0; \
+        fi; \
+      }; \
+      \
+      bisect_active(){ \
+        BISECT_LOG=$(git rev-parse --git-path BISECT_LOG 2>/dev/null) || return 1; \
+        [ -f \"$BISECT_LOG\" ] || return 1; \
+        git rev-parse -q --verify BISECT_HEAD >/dev/null 2>&1 || return 1; \
+        return 0; \
+      }; \
+      \
+      try rebase      git rebase --abort; \
+      try merge       git merge --abort; \
+      try cherry-pick git cherry-pick --abort; \
+      try revert      git revert --abort; \
+      try am          git am --abort; \
+      \
+      if bisect_active; then \
+        try bisect git bisect reset; \
+      fi; \
+      \
+      echo \"INFO: no in-progress operation detected.\"; \
+    }; f"
