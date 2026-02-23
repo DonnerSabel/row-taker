@@ -46,7 +46,7 @@ def choose_card_from_hand(state: GameState, player_index: int) -> Card:
         clear_screen()
         render_state(state)
         print(f"{p.name}: Deine Handkarten:")
-        print("  " + " ".join(f"{c.value}" for c in p.hand))
+        print("  " + " ".join(f"|{c.value} {c.points * '🐮'}|" for c in p.hand))
         s = input("Wähle eine Karte (Zahl) > ").strip()
         if s.isdigit():
             v = int(s)
