@@ -16,17 +16,19 @@ def render_state(state: GameState) -> None:
     print(f"Runde: {state.round_no}")
     print()
     print("Reihen:")
-    for i, row in enumerate(
-        sorted(state.rows, key=lambda row: row.cards[-1].value if row.cards else 0)
-    ):
+    sorted_rows = sorted(state.rows, key=lambda row: row.cards[-1].value if row.cards else 0)
+    for display_index, row in enumerate(sorted_rows):
         vals = " ".join(f"{c.value:>3}" for c in row.cards)
         pts = sum(c.points for c in row.cards)
-        print(f"  [{i}] {vals:<25}  ({pts} Punkte)")
+        print(f"  [{display_index}] {vals:<25}  ({pts} Punkte)")
     print()
     print("Scores:")
     for i, p in enumerate(state.players):
         print(f"  ({i}) {p.name}: {p.score}")
     print()
+
+    # Update von state.rows auf sorted_rows, damit display_index mit der tatsächlichen Reihenfolge übereinstimmt.
+    state.rows = sorted_rows
 
 
 def choose_row_cli(state: GameState, player_index: int, played_card: Card) -> int:
