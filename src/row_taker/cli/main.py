@@ -108,3 +108,11 @@ def main() -> None:
     render_state(state)
     winner = min(state.players, key=lambda p: p.score)
     print(f"Gewonnen hat: {winner.name} (wenigste Punkte)")
+
+
+try:
+    main()
+except KeyboardInterrupt:
+    clear_screen()
+    print("Abbruch mit Strg+C!")
+    sys.exit(0)
