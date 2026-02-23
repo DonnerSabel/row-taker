@@ -16,7 +16,9 @@ def render_state(state: GameState) -> None:
     print(f"Runde: {state.round_no}")
     print()
     print("Reihen:")
-    for i, row in enumerate(sorted(state.rows, key=lambda row: row.cards[-1].value if row.cards else 0)):
+    for i, row in enumerate(
+        sorted(state.rows, key=lambda row: row.cards[-1].value if row.cards else 0)
+    ):
         vals = " ".join(f"{c.value:>3}" for c in row.cards)
         pts = sum(c.points for c in row.cards)
         print(f"  [{i}] {vals:<25}  ({pts} Punkte)")
