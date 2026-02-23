@@ -2,6 +2,7 @@
   "editor.formatOnSave": true,
   "files.autoSave": "onFocusChange",
   "git.openRepositoryInParentFolders": "always",
+
   "python.analysis.typeCheckingMode": "strict",
   "python.analysis.diagnosticMode": "workspace",
   "python.analysis.autoImportCompletions": true,
@@ -9,14 +10,15 @@
   "python.analysis.autoSearchPaths": true,
   "python.analysis.inlayHints.variableTypes": true,
   "python.analysis.inlayHints.functionReturnTypes": true,
+
   "python.terminal.activateEnvironment": true,
   "python.venvPath": "${workspaceFolder}",
   "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestArgs": [
-    "-q"
-  ],
+  "python.testing.pytestArgs": ["-q"],
+
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,
@@ -26,11 +28,36 @@
     }
   },
   "ruff.organizeImports": true,
+
   "python-envs.pythonProjects": [
     {
       "path": "",
       "envManager": "ms-python.python:venv",
       "packageManager": "ms-python.python:pip"
     }
-  ]
+  ],
+
+  // --- Terminal-Profile mit Auto-Venv-Aktivierung (Windows) ---
+  "terminal.integrated.profiles.windows": {
+    "PowerShell (venv)": {
+      "source": "PowerShell",
+      "args": [
+        "-NoExit",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "& { if (Test-Path .\\.venv\\Scripts\\Activate.ps1) { . .\\.venv\\Scripts\\Activate.ps1 } }"
+      ]
+    },
+    "cmd (venv)": {
+      "path": "C:\\Windows\\System32\\cmd.exe",
+      "args": ["/K", ".\\.venv\\Scripts\\activate.bat"]
+    },
+    "Git Bash (venv)": {
+      "path": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["-lc", "source .venv/Scripts/activate && exec bash -l"]
+    }
+  },
+
+  "terminal.integrated.defaultProfile.windows": "PowerShell (venv)"
 }
