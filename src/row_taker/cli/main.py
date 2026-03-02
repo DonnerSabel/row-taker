@@ -8,7 +8,10 @@ from row_taker.engine.state import Card, GameState
 
 
 def clear_screen() -> None:
-    # Simple cross-platform clear
+    if not sys.stdout.isatty():
+        return
+    if os.name != "nt" and not os.environ.get("TERM"):
+        return
     os.system("cls" if os.name == "nt" else "clear")
 
 
@@ -114,9 +117,11 @@ def main() -> None:
     print(f"Gewonnen hat: {winner.name} (wenigste Punkte)")
 
 
-try:
-    main()
-except KeyboardInterrupt:
-    clear_screen()
-    print("Abbruch mit Strg+C!")
-    sys.exit(0)
+def run() -> int:
+    try:
+        main()
+        return 0
+    except KeyboardInterrupt:
+        clear_screen()
+        print("Abbruch mit Strg+C!")
+        return 0
