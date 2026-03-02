@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 
+from row_taker.cli.bot import bot_choose_random, create_players_with_bots
 from row_taker.engine.game import resolve_round, setup_game, start_next_round_if_needed
 from row_taker.engine.state import Card, GameState
 
@@ -60,19 +61,23 @@ def main() -> None:
     clear_screen()
     print("Row-Taker – CLI (Hotseat)")
     print()
-    names = input("Spielernamen (kommagetrennt, 2-6) > ").strip()
+    names = input("Spielernamen (kommagetrennt, 1-6) > ").strip()
     player_names = [n.strip() for n in names.split(",") if n.strip()]
-    if not (2 <= len(player_names) <= 6):
-        print("Bitte 2-6 Spielernamen angeben.")
+    if not (1 <= len(player_names) <= 6):
+        print("Bitte 1-6 Spielernamen angeben.")
         sys.exit(2)
 
-    state = setup_game(player_names)
+    player_list = create_players_with_bots(player_names)
+
+    state = setup_game(player_list)
 
     while True:
         # Runde: jeder wählt eine Karte (verdeckt, Hotseat)
         selections: dict[int, Card] = {}
-        for i in range(len(state.players)):
+        for i in range(len(player_names)):
             selections[i] = choose_card_from_hand(state, i)
+        for i in range(len(player_list) - len(player_names)):
+            selections[len(player_names) + i] = bot_choose_random(state, len(player_names) + i)
 
         clear_screen()
         results = resolve_round(state, selections, choose_row_cli)
