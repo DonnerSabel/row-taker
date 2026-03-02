@@ -13,7 +13,7 @@ def make_deck() -> list[Card]:
 
 
 def setup_game(
-    player_names: Sequence[str],
+    player_list: Sequence[str],
     *,
     rng: random.Random | None = None,
     hand_size: int = 10,
@@ -22,13 +22,13 @@ def setup_game(
     if rng is None:
         rng = random.Random()
 
-    if not (2 <= len(player_names) <= 6):
+    if not (2 <= len(player_list) <= 6):
         raise ValueError("player count must be 2..6")
 
     deck = make_deck()
     rng.shuffle(deck)
 
-    players = [Player(name=n) for n in player_names]
+    players = [Player(name=n) for n in player_list]
     rows = [Row([]) for _ in range(4)]
 
     state = GameState(players=players, rows=rows, deck=deck, hand_size=hand_size, round_no=1)
