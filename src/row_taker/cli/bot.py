@@ -1,4 +1,5 @@
 from random import choice
+
 from row_taker.engine.state import Card, GameState
 
 
