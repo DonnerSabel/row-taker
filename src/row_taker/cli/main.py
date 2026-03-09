@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import random
 import sys
 
 from row_taker.cli.bot import bot_choose_random, create_players_with_bots
@@ -40,12 +41,15 @@ def choose_row_cli(state: GameState, player_index: int, played_card: Card) -> in
         render_state(state)
         p = state.players[player_index]
         print(f"{p.name}: Deine Karte {played_card.value} ist kleiner als alle Reihen.")
-        s = input("Welche Reihe willst du nehmen? (0-3) > ").strip()
-        if s.isdigit():
-            idx = int(s)
-            if 0 <= idx < 4:
-                return idx
-        print("Ungültig. Bitte 0-3 eingeben.")
+        if player_index >= len(player_names):
+            return random.randint(0, 3)
+        else:
+            s = input("Welche Reihe willst du nehmen? (0-3) > ").strip()
+            if s.isdigit():
+                idx = int(s)
+                if 0 <= idx < 4:
+                    return idx
+            print("Ungültig. Bitte 0-3 eingeben.")
 
 
 def choose_card_from_hand(state: GameState, player_index: int) -> Card:
@@ -69,6 +73,7 @@ def main() -> None:
     print("Row-Taker – CLI (Hotseat)")
     print()
     names = input("Spielernamen (kommagetrennt, 1-6) > ").strip()
+    global player_names
     player_names = [n.strip() for n in names.split(",") if n.strip()]
     if not (1 <= len(player_names) <= 6):
         print("Bitte 1-6 Spielernamen angeben.")
