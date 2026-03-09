@@ -1,17 +1,16 @@
 import socket
-
-server= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind(("0.0.0.0", 5555)) #
+import json
+import threading
 
 def start_server():
+    server= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("0.0.0.0", 5555)) #binding the server to localhost and port 5555
     server.listen()     #server waiting for connection op port 5555
-
-
+    print("Server is listening on port 5555...")
     client_socket, addr = server.accept() #accepting the connection from client and storing the client socket and address in variables
     print(f"Connection from {addr} has been established.")
     with client_socket:
         client_socket.send(bytes("Welcome to the server!", "utf-8"))#sending a welcome message to the client
-        client_socket.close() #closing the client socket after sending the message
         while True:
             data = client_socket.recv(1024) #receiving data from the client
             if not data:
@@ -34,4 +33,5 @@ def client():
 
     client_socket.close() #closing the client socket when done
 
-client()
+
+start_server() #starting the server
