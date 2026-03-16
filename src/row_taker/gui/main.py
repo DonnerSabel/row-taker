@@ -9,7 +9,7 @@ pygame.init()
 # Aktuelle Bildschirmgröße ermitteln
 width, height = pygame.display.Info().current_w, pygame.display.Info().current_h
 # Fenster erzeugen mit Bildschirmgröße, Taskleiste sichtbar und Fensterrand
-screen = pygame.display.set_mode((width, height - 50), pygame.RESIZABLE | pygame.SCALED)
+screen = pygame.display.set_mode((width, height - 55), pygame.RESIZABLE | pygame.SCALED)
 # Uhr für FPS-Steuerung
 clock = pygame.time.Clock()
 # Fenstertitel
