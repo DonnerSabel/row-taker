@@ -22,9 +22,6 @@ def setup_game(
     if rng is None:
         rng = random.Random()
 
-    if not (2 <= len(player_list) <= 6):
-        raise ValueError("player count must be 2..6")
-
     deck = make_deck()
     rng.shuffle(deck)
 

@@ -1,18 +1,7 @@
 from random import choice
 
+from row_taker.engine.player_config import get_player_count
 from row_taker.engine.state import Card, GameState
-
-
-def get_player_count():
-    """Abfrage der Spieleranzahl aus der Konsole."""
-    while True:
-        try:
-            count = int(input("Anzahl der Spieler: "))
-            if count > 2:
-                return count
-            print("Bitte geben Sie eine Zahl größer als 2 ein.")
-        except ValueError:
-            print("Ungültige Eingabe. Bitte geben Sie eine Zahl ein.")
 
 
 def create_players_with_bots(player_names: list[str]) -> list[str]:

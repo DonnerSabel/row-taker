@@ -5,7 +5,12 @@ import random
 import sys
 
 from row_taker.cli.bot import bot_choose_random, create_players_with_bots
-from row_taker.engine.game import resolve_round, setup_game, start_next_round_if_needed
+from row_taker.engine.game import (
+    resolve_round,
+    setup_game,
+    start_next_round_if_needed,
+)
+from row_taker.engine.player_config import get_player_names
 from row_taker.engine.state import Card, GameState
 
 
@@ -72,13 +77,9 @@ def main() -> None:
     clear_screen()
     print("Row-Taker – CLI (Hotseat)")
     print()
-    names = input("Spielernamen (kommagetrennt, 1-6) > ").strip()
-    global player_names
-    player_names = [n.strip() for n in names.split(",") if n.strip()]
-    if not (1 <= len(player_names) <= 6):
-        print("Bitte 1-6 Spielernamen angeben.")
-        sys.exit(2)
 
+    global player_names
+    player_names = get_player_names()
     player_list = create_players_with_bots(player_names)
 
     state = setup_game(player_list)
