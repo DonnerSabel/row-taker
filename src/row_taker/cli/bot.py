@@ -27,7 +27,7 @@ def create_players_with_bots(player_names: list[str]) -> list[str]:
         for i in range(num_bots):
             player_list.append(f"Bot_{i + 1}")
     elif num_bots < 0:
-        print(f"Warnung: Mehr Namen (${num_human_players}) als Spieler (${player_count}).")
+        print(f"Warnung: Mehr Namen ({num_human_players}) als Spieler ({player_count}).")
         player_list = player_list[:player_count]
 
     return player_list
