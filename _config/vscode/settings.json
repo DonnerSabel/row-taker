@@ -2,7 +2,7 @@
   "editor.formatOnSave": true,
   "files.autoSave": "onFocusChange",
   "git.openRepositoryInParentFolders": "always",
-  "python.analysis.typeCheckingMode": "strict",
+  "python.analysis.typeCheckingMode": "basic",
   "python.analysis.diagnosticMode": "workspace",
   "python.analysis.autoImportCompletions": true,
   "python.analysis.useLibraryCodeForTypes": true,
