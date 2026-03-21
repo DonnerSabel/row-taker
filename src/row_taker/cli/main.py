@@ -1,12 +1,11 @@
-from __future__ import annotations
-
 import os
 import random
 import sys
 
 from row_taker.cli.bot import bot_choose_random, create_players_with_bots
+from row_taker.cli.row_display import build_row_display_mapping, format_results_for_cli
 from row_taker.engine.game import resolve_round, setup_game, start_next_round_if_needed
-from row_taker.engine.state import Card, GameState, Row
+from row_taker.engine.state import Card, GameState
 
 
 def clear_screen() -> None:
