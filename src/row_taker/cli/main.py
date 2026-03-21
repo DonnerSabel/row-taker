@@ -1,6 +1,7 @@
 import os
 import random
 import sys
+from copy import deepcopy
 
 from row_taker.cli.bot import bot_choose_random, create_players_with_bots
 from row_taker.cli.row_display import build_row_display_mapping, format_results_for_cli
@@ -16,24 +17,18 @@ def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def get_sorted_row_view(state: GameState) -> list[tuple[int, Row]]:
-    return sorted(
-        enumerate(state.rows),
-        key=lambda pair: pair[1].cards[-1].value if pair[1].cards else 0,
-    )
-
-
 def render_state(state: GameState) -> None:
     print(f"Runde: {state.round_no}")
     print()
     print("Reihen:")
 
-    sorted_view = get_sorted_row_view(state)
+    mapping = build_row_display_mapping(state)
 
-    for cli_index, (_, row) in enumerate(sorted_view, start=1):
+    for cli_row, state_row_index in enumerate(mapping.row_order, start=1):
+        row = state.rows[state_row_index]
         vals = " ".join(f"{c.value:>3}" for c in row.cards)
-        pts = sum(c.points for c in row.cards)
-        print(f"  Reihe {cli_index}: {vals:<25}  ({pts} Punkte)")
+        pts = row.points()
+        print(f"  Reihe {cli_row}: {vals:<25}  ({pts} Punkte)")
 
     print()
     print("Scores:")
@@ -48,21 +43,19 @@ def choose_row_cli(state: GameState, player_index: int, played_card: Card) -> in
         p = state.players[player_index]
         print(f"{p.name}: Deine Karte {played_card.value} ist kleiner als alle Reihen.")
 
-        sorted_view = get_sorted_row_view(state)
+        mapping = build_row_display_mapping(state)
 
         if player_index >= len(player_names):
-            cli_choice = random.randint(1, len(sorted_view))
-            real_index, _ = sorted_view[cli_choice - 1]
-            return real_index
+            cli_choice = random.randint(1, mapping.max_cli_row())
+            return mapping.to_state_index(cli_choice)
 
-        max_choice = len(sorted_view)
+        max_choice = mapping.max_cli_row()
         s = input(f"Welche Reihe willst du nehmen? (1-{max_choice}) > ").strip()
 
         if s.isdigit():
             cli_choice = int(s)
             if 1 <= cli_choice <= max_choice:
-                real_index, _ = sorted_view[cli_choice - 1]
-                return real_index
+                return mapping.to_state_index(cli_choice)
 
         print(f"Ungültig. Bitte 1-{max_choice} eingeben.")
 
@@ -95,36 +88,26 @@ def main() -> None:
         sys.exit(2)
 
     player_list = create_players_with_bots(player_names)
-
     state = setup_game(player_list)
 
     while True:
-        # Runde: jeder wählt eine Karte (verdeckt, Hotseat)
         selections: dict[int, Card] = {}
+
         for i in range(len(player_names)):
             selections[i] = choose_card_from_hand(state, i)
         for i in range(len(player_list) - len(player_names)):
             selections[len(player_names) + i] = bot_choose_random(state, len(player_names) + i)
 
         clear_screen()
+        state_before_round = deepcopy(state)
         results = resolve_round(state, selections, choose_row_cli)
+        result_lines = format_results_for_cli(state_before_round, results)
 
         render_state(state)
         print("Auflösung:")
-        for r in results:
-            p = state.players[r.player_index]
-            if r.action == "placed":
-                print(f"- {p.name} legt {r.card.value} an Reihe {r.row_index}.")
-            elif r.action == "took_row_small":
-                print(
-                    f"- {p.name} nimmt Reihe {r.row_index} ({r.points_gained} Punkte) und startet mit {r.card.value}."
-                )
-            else:
-                print(
-                    f"- {p.name} füllt Reihe {r.row_index} (nimmt {r.points_gained} Punkte) und startet mit {r.card.value}."
-                )
+        for line in result_lines:
+            print(line)
 
-        # Neue Runde?
         started = start_next_round_if_needed(state)
         if started:
             print()
