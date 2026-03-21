@@ -6,7 +6,7 @@ import sys
 
 from row_taker.cli.bot import bot_choose_random, create_players_with_bots
 from row_taker.engine.game import resolve_round, setup_game, start_next_round_if_needed
-from row_taker.engine.state import Card, GameState
+from row_taker.engine.state import Card, GameState, Row
 
 
 def clear_screen() -> None:
@@ -17,23 +17,30 @@ def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
 
+def get_sorted_row_view(state: GameState) -> list[tuple[int, Row]]:
+    return sorted(
+        enumerate(state.rows),
+        key=lambda pair: pair[1].cards[-1].value if pair[1].cards else 0,
+    )
+
+
 def render_state(state: GameState) -> None:
     print(f"Runde: {state.round_no}")
     print()
     print("Reihen:")
-    sorted_rows = sorted(state.rows, key=lambda row: row.cards[-1].value if row.cards else 0)
-    for display_index, row in enumerate(sorted_rows):
+
+    sorted_view = get_sorted_row_view(state)
+
+    for cli_index, (_, row) in enumerate(sorted_view, start=1):
         vals = " ".join(f"{c.value:>3}" for c in row.cards)
         pts = sum(c.points for c in row.cards)
-        print(f"  [{display_index}] {vals:<25}  ({pts} Punkte)")
+        print(f"  Reihe {cli_index}: {vals:<25}  ({pts} Punkte)")
+
     print()
     print("Scores:")
     for i, p in enumerate(state.players):
         print(f"  ({i}) {p.name}: {p.score}")
     print()
-
-    # Update von state.rows auf sorted_rows, damit display_index mit der tatsächlichen Reihenfolge übereinstimmt.
-    state.rows = sorted_rows
 
 
 def choose_row_cli(state: GameState, player_index: int, played_card: Card) -> int:
@@ -41,15 +48,24 @@ def choose_row_cli(state: GameState, player_index: int, played_card: Card) -> in
         render_state(state)
         p = state.players[player_index]
         print(f"{p.name}: Deine Karte {played_card.value} ist kleiner als alle Reihen.")
+
+        sorted_view = get_sorted_row_view(state)
+
         if player_index >= len(player_names):
-            return random.randint(0, 3)
-        else:
-            s = input("Welche Reihe willst du nehmen? (0-3) > ").strip()
-            if s.isdigit():
-                idx = int(s)
-                if 0 <= idx < 4:
-                    return idx
-            print("Ungültig. Bitte 0-3 eingeben.")
+            cli_choice = random.randint(1, len(sorted_view))
+            real_index, _ = sorted_view[cli_choice - 1]
+            return real_index
+
+        max_choice = len(sorted_view)
+        s = input(f"Welche Reihe willst du nehmen? (1-{max_choice}) > ").strip()
+
+        if s.isdigit():
+            cli_choice = int(s)
+            if 1 <= cli_choice <= max_choice:
+                real_index, _ = sorted_view[cli_choice - 1]
+                return real_index
+
+        print(f"Ungültig. Bitte 1-{max_choice} eingeben.")
 
 
 def choose_card_from_hand(state: GameState, player_index: int) -> Card:
