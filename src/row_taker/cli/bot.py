@@ -1,9 +1,4 @@
-from random import choice
-
-from row_taker.engine.state import Card, GameState
-
-
-def get_player_count():
+def get_player_count() -> int:
     """Abfrage der Spieleranzahl aus der Konsole."""
     while True:
         try:
@@ -31,9 +26,3 @@ def create_players_with_bots(player_names: list[str]) -> list[str]:
         player_list = player_list[:player_count]
 
     return player_list
-
-
-def bot_choose_random(state: GameState, player_index: int) -> Card:
-    """Einfacher Bot: wählt zufällig eine Karte aus der Hand."""
-    p = state.players[player_index]
-    return choice(p.hand)
