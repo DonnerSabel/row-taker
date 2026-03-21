@@ -7,6 +7,9 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+#wegen Donner auf NixOS
+.nix-python
+
 # venv
 .venv/
 venv/
