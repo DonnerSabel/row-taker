@@ -4,10 +4,10 @@ import sys
 from copy import deepcopy
 
 from row_taker.cli.bot import create_players_with_bots
-from row_taker.engine_random.bot import bot_choose_random
 from row_taker.cli.row_display import build_row_display_mapping, format_results_for_cli
 from row_taker.engine.game import resolve_round, setup_game, start_next_round_if_needed
 from row_taker.engine.state import Card, GameState
+from row_taker.engine_random.bot import bot_choose_random
 
 
 def clear_screen() -> None:
