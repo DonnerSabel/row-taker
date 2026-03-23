@@ -20,7 +20,7 @@ python -m venv .venv
 # Linux/macOS:
 source .venv/bin/activate
 
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 pytest -q
 python -m row_taker.cli
 ```
