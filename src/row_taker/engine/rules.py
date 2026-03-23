@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .state import Card, Row
+from .models import Card, Row
 
 
 def target_row_index(rows: Sequence[Row], card: Card) -> int | None:
-    """Gibt die Zielreihe für `card` zurück.
+    """Return the target row index for ``card``.
 
-    Zielreihe = Reihe mit der größten letzten Karte, die noch < card.value ist.
-    Falls keine Reihe passt (card ist kleiner als alle letzten Karten): None.
+    Target row = row with the greatest last card value that is still < card.value.
+    If no row fits (card is smaller than all last row cards): return None.
     """
     best_idx: int | None = None
     best_last = -1
@@ -24,27 +24,37 @@ def target_row_index(rows: Sequence[Row], card: Card) -> int | None:
 
 
 def take_row(rows: list[Row], row_index: int) -> tuple[int, list[Card]]:
-    """Nimmt eine Reihe: liefert (punkte, genommene_karten)."""
+    """Take a row and return ``(points, taken_cards)``.
+
+    The row object keeps its ``row_id`` and becomes empty.
+    """
     row = rows[row_index]
     taken = list(row.cards)
-    points = sum(c.points for c in taken)
-    rows[row_index] = Row(cards=[])
+    points = sum(card.points for card in taken)
+    rows[row_index] = Row(row_id=row.row_id, cards=[])
     return points, taken
 
 
-def place_card(rows: list[Row], row_index: int, card: Card) -> tuple[int, list[Card] | None]:
-    """Legt eine Karte in die Zielreihe.
+def place_card(
+    rows: list[Row],
+    row_index: int,
+    card: Card,
+    *,
+    row_capacity: int = 5,
+) -> tuple[int, list[Card] | None]:
+    """Place a card into the chosen row.
 
-    Wenn die Reihe dadurch 6 Karten hätte, werden die bisherigen 5 Karten genommen.
-    Rückgabe: (punkte, ggf. genommene_karten oder None).
+    If the row already contains ``row_capacity`` cards, those cards are taken and
+    the played card becomes the new first card of the row.
+
+    Return ``(points_gained, taken_cards_or_none)``.
     """
     row = rows[row_index]
 
-    # Wenn schon 5 Karten liegen und wir die 6. hinzufügen würden:
-    if len(row.cards) >= 5:
+    if len(row.cards) >= row_capacity:
         taken_points = sum(c.points for c in row.cards)
         taken_cards = list(row.cards)
-        rows[row_index] = Row(cards=[card])
+        rows[row_index] = Row(row_id=row.row_id, cards=[card])
         return taken_points, taken_cards
 
     row.cards.append(card)

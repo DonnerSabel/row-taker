@@ -1,147 +1,312 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
+from .commands import ChooseRowCommand, PlayCardCommand
+from .models import Card, Player, PlayerID, Row, RowID
+from .phases import Phase, PhaseInfo
 from .rules import place_card, take_row, target_row_index
-from .state import Card, ChooseRowFn, GameState, Player, Row
+from .state import GameState, MatchConfig
+
+
+ChooseRowFn = Callable[[GameState, PlayerID, Card], RowID | ChooseRowCommand]
 
 
 def make_deck() -> list[Card]:
     return [Card(v) for v in range(1, 105)]
 
 
+def _find_player(state: GameState, player_id: PlayerID) -> Player:
+    for player in state.players:
+        if player.player_id == player_id:
+            return player
+    raise ValueError(f"unknown player_id: {player_id!r}")
+
+
+def _player_index_by_id(state: GameState, player_id: PlayerID) -> int:
+    for index, player in enumerate(state.players):
+        if player.player_id == player_id:
+            return index
+    raise ValueError(f"unknown player_id: {player_id!r}")
+
+
+def _row_index_by_id(state: GameState, row_id: RowID) -> int:
+    for index, row in enumerate(state.rows):
+        if row.row_id == row_id:
+            return index
+    raise ValueError(f"unknown row_id: {row_id!r}")
+
+
+def _normalize_play_command(
+    player_id: PlayerID,
+    cmd: Card | PlayCardCommand,
+) -> Card:
+    if isinstance(cmd, Card):
+        return cmd
+
+    if isinstance(cmd, PlayCardCommand):
+        if cmd.player_id != player_id:
+            raise ValueError(
+                f"PlayCardCommand player_id mismatch: expected {player_id!r}, got {cmd.player_id!r}"
+            )
+        return Card(cmd.card_value)
+
+    raise TypeError(f"unsupported play selection type: {type(cmd)!r}")
+
+
+def _normalize_choose_row_result(
+    state: GameState,
+    expected_player_id: PlayerID,
+    result: RowID | ChooseRowCommand,
+) -> RowID:
+    if isinstance(result, ChooseRowCommand):
+        if result.player_id != expected_player_id:
+            raise ValueError(
+                f"ChooseRowCommand player_id mismatch: expected {expected_player_id!r}, got {result.player_id!r}"
+            )
+        return result.row_id
+
+    return result
+
+
 def setup_game(
     player_list: Sequence[str],
     *,
     rng: random.Random | None = None,
-    hand_size: int = 10,
+    config: MatchConfig | None = None,
+    hand_size: int | None = None,
 ) -> GameState:
-    """Erstellt einen neuen Spielzustand und teilt aus (erste Runde)."""
+    """Create a new game state and deal the first round.
+
+    ``hand_size`` is kept as an optional override for compatibility/convenience.
+    If given, it overrides ``config.hand_size``.
+    """
     if rng is None:
         rng = random.Random()
 
     if not (2 <= len(player_list) <= 6):
         raise ValueError("player count must be 2..6")
 
+    if config is None:
+        config = MatchConfig()
+
+    if hand_size is not None and hand_size != config.hand_size:
+        config = MatchConfig(
+            hand_size=hand_size,
+            row_count=config.row_count,
+            row_capacity=config.row_capacity,
+            end_score=config.end_score,
+        )
+
     deck = make_deck()
     rng.shuffle(deck)
 
-    players = [Player(name=n) for n in player_list]
-    rows = [Row([]) for _ in range(4)]
+    players = [
+        Player(
+            player_id=PlayerID(f"player-{index}"),
+            name=name,
+        )
+        for index, name in enumerate(player_list)
+    ]
+    rows = [
+        Row(row_id=RowID(f"row-{index}"))
+        for index in range(config.row_count)
+    ]
 
-    state = GameState(players=players, rows=rows, deck=deck, hand_size=hand_size, round_no=1)
+    state = GameState(
+        config=config,
+        players=players,
+        rows=rows,
+        deck=deck,
+        round_no=1,
+        trick_no=1,
+        phase_info=PhaseInfo(
+            phase=Phase.ROUND_SETUP,
+            message="Preparing first round.",
+        ),
+    )
     _deal_new_round(state)
     return state
 
 
 def _deal_new_round(state: GameState) -> None:
-    """Teilt eine neue Runde aus: 4 Startkarten in Reihen + Handkarten."""
-    # Reihen initialisieren
+    """Deal a new round: one start card per row and fresh hands."""
     for row in state.rows:
         row.cards.clear()
 
-    for i in range(4):
+    for i in range(state.config.row_count):
         state.rows[i].cards.append(state.deck.pop())
 
-    # Hände
-    for p in state.players:
-        p.hand.clear()
-        for _ in range(state.hand_size):
-            p.hand.append(state.deck.pop())
-        p.hand.sort(key=lambda c: c.value)
+    for player in state.players:
+        player.hand.clear()
+        for _ in range(state.config.hand_size):
+            player.hand.append(state.deck.pop())
+        player.hand.sort(key=lambda card: card.value)
+
+    state.trick_no = 1
+    state.selected_cards.clear()
+    state.resolve_order.clear()
+    state.phase_info = PhaseInfo(
+        phase=Phase.CHOOSE_CARD,
+        message="Choose one card.",
+    )
 
 
 @dataclass(slots=True)
 class StepResult:
-    player_index: int
+    player_id: PlayerID
     card: Card
     action: str  # "placed" | "took_row_small" | "took_row_overflow"
-    row_index: int
+    row_id: RowID
     points_gained: int
 
 
 def resolve_round(
     state: GameState,
-    selections: dict[int, Card],
+    selections: dict[PlayerID, Card | PlayCardCommand],
     choose_row: ChooseRowFn,
 ) -> list[StepResult]:
-    """Löst eine Runde auf.
+    """Resolve one trick.
 
-    `selections`: mapping player_index -> chosen Card (muss in deren Hand gewesen sein).
-    Reihenfolge: Kartenwert aufsteigend.
+    ``selections`` must contain exactly one selection for every player.
+    Cards are resolved in ascending card-value order.
     """
-    if set(selections.keys()) != set(range(len(state.players))):
-        raise ValueError("selections must contain one card for every player index")
+    expected_player_ids = {player.player_id for player in state.players}
+    if set(selections.keys()) != expected_player_ids:
+        raise ValueError("selections must contain one card for every player_id")
 
-    # Validierung + Karte aus Hand entfernen
-    for pi, card in selections.items():
-        hand = state.players[pi].hand
+    state.phase_info = PhaseInfo(
+        phase=Phase.REVEAL_AND_RESOLVE,
+        message="Revealing cards and resolving trick.",
+    )
+
+    normalized: dict[PlayerID, Card] = {
+        player_id: _normalize_play_command(player_id, selection)
+        for player_id, selection in selections.items()
+    }
+
+    # Validate ownership and remove chosen cards from hands.
+    for player_id, card in normalized.items():
+        player = _find_player(state, player_id)
         try:
-            idx = next(i for i, c in enumerate(hand) if c.value == card.value)
-        except StopIteration as e:
-            raise ValueError(f"player {pi} does not have card {card.value}") from e
-        hand.pop(idx)
+            hand_index = next(
+                index for index, hand_card in enumerate(player.hand)
+                if hand_card.value == card.value
+            )
+        except StopIteration as exc:
+            raise ValueError(
+                f"player {player_id!r} does not have card {card.value}"
+            ) from exc
+        player.hand.pop(hand_index)
 
-    order = sorted(selections.items(), key=lambda kv: kv[1].value)
+    state.selected_cards = dict(normalized)
+
+    ordered = sorted(normalized.items(), key=lambda item: item[1].value)
+    state.resolve_order = [player_id for player_id, _card in ordered]
+
     results: list[StepResult] = []
 
-    for player_index, card in order:
-        idx = target_row_index(state.rows, card)
+    for player_id, card in ordered:
+        row_index = target_row_index(state.rows, card)
 
-        if idx is None:
-            # Karte ist kleiner als alle letzten Karten → Spieler wählt eine Reihe, nimmt sie, Karte startet dort.
-            chosen = choose_row(state, player_index, card)
-            if not (0 <= chosen < len(state.rows)):
-                raise ValueError("choose_row returned invalid row index")
+        if row_index is None:
+            selectable_row_ids = tuple(row.row_id for row in state.rows)
+            state.phase_info = PhaseInfo(
+                phase=Phase.CHOOSE_ROW,
+                active_player_id=player_id,
+                pending_card=card,
+                selectable_row_ids=selectable_row_ids,
+                message="Choose a row to take.",
+            )
 
-            points, _taken = take_row(state.rows, chosen)
-            state.players[player_index].score += points
-            # Karte startet die Reihe
-            state.rows[chosen].cards = [card]
+            chosen = choose_row(state, player_id, card)
+            chosen_row_id = _normalize_choose_row_result(
+                state,
+                player_id,
+                chosen,
+            )
+            chosen_index = _row_index_by_id(state, chosen_row_id)
+
+            points, _taken = take_row(state.rows, chosen_index)
+            _find_player(state, player_id).score += points
+            state.rows[chosen_index].cards = [card]
 
             results.append(
                 StepResult(
-                    player_index=player_index,
+                    player_id=player_id,
                     card=card,
                     action="took_row_small",
-                    row_index=chosen,
+                    row_id=chosen_row_id,
                     points_gained=points,
                 )
             )
             continue
 
-        points, taken = place_card(state.rows, idx, card)
+        target_row = state.rows[row_index]
+        points, taken = place_card(
+            state.rows,
+            row_index,
+            card,
+            row_capacity=state.config.row_capacity,
+        )
+
         if taken is not None:
-            state.players[player_index].score += points
+            _find_player(state, player_id).score += points
             action = "took_row_overflow"
         else:
             action = "placed"
 
         results.append(
             StepResult(
-                player_index=player_index,
+                player_id=player_id,
                 card=card,
                 action=action,
-                row_index=idx,
+                row_id=target_row.row_id,
                 points_gained=points,
             )
+        )
+
+    state.selected_cards.clear()
+    state.resolve_order.clear()
+
+    if any(player.hand for player in state.players):
+        state.trick_no += 1
+        state.phase_info = PhaseInfo(
+            phase=Phase.CHOOSE_CARD,
+            message="Choose one card.",
+        )
+    else:
+        state.phase_info = PhaseInfo(
+            phase=Phase.ROUND_SCORING,
+            message="Round complete.",
         )
 
     return results
 
 
 def start_next_round_if_needed(state: GameState, *, rng: random.Random | None = None) -> bool:
-    """Wenn alle Hände leer sind, wird eine neue Runde ausgeteilt.
+    """Start a new round when all hands are empty.
 
-    Rückgabe: True wenn neue Runde gestartet wurde.
+    Return ``True`` if a new round was dealt.
     """
-    if any(p.hand for p in state.players):
+    if any(player.hand for player in state.players):
         return False
 
-    # Falls das Deck zu klein ist, könnte man hier enden – für Unterrichtsversion reicht:
-    if len(state.deck) < 4 + len(state.players) * state.hand_size:
+    if any(player.score >= state.config.end_score for player in state.players):
+        state.phase_info = PhaseInfo(
+            phase=Phase.GAME_OVER,
+            message="Game over.",
+        )
+        return False
+
+    needed_cards = state.config.row_count + len(state.players) * state.config.hand_size
+    if len(state.deck) < needed_cards:
+        state.phase_info = PhaseInfo(
+            phase=Phase.GAME_OVER,
+            message="Game over: not enough cards for another round.",
+        )
         return False
 
     state.round_no += 1
