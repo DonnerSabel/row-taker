@@ -1,6 +1,5 @@
-import pygame
 import os
-from typing import List, Tuple
+import pygame
 
 
 pygame.init()
@@ -23,7 +22,7 @@ class Card:
         self.rect = pygame.Rect(x, y, width, height)
         self.enlarged_image = pygame.transform.scale(image, (width + 30, height + 40))
 
-    def draw(self, screen: pygame.Surface, mouse_pos: Tuple[int, int]) -> None:
+    def draw(self, screen: pygame.Surface, mouse_pos: tuple[int, int]) -> None:
         if self.rect.collidepoint(mouse_pos):
             screen.blit(self.enlarged_image, (self.rect.x - 15, self.rect.y - 20))
         else:
@@ -32,7 +31,7 @@ class Card:
     @staticmethod
     def load_cards_from_folder(
         folder_path: str, start_x: int = 50, start_y: int = 50, spacing: int = 160
-    ) -> List["Card"]:
+    ) -> list["Card"]:
         """
         Loads card images from a specified folder and creates Card objects for each image.
 
