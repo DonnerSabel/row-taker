@@ -3,14 +3,13 @@ from __future__ import annotations
 import os
 import random
 import sys
-from copy import deepcopy
 
 from row_taker.cli.bot import create_players_with_bots
 from row_taker.cli.row_display import build_row_display_mapping, format_results_for_cli
 from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.engine.game import resolve_round, setup_game, start_next_round_if_needed
 from row_taker.engine.models import Card, PlayerID, RowID
-from row_taker.engine.state import GameState, PlayerState
+from row_taker.engine.state import PlayerState
 from row_taker.engine.views import build_player_state
 from row_taker.engine_random.bot import choose_card_random, choose_row_random
 
@@ -23,19 +22,26 @@ def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def _find_player_index_by_id(state: GameState, player_id: PlayerID) -> int:
-    for index, player in enumerate(state.players):
-        if player.player_id == player_id:
-            return index
-    raise ValueError(f"unknown player_id: {player_id!r}")
+def _choose_display_player_id(state) -> PlayerID:
+    return state.players[0].player_id
 
 
-def _is_human_player(state: GameState, player_id: PlayerID, num_human_players: int) -> bool:
-    player_index = _find_player_index_by_id(state, player_id)
-    return player_index < num_human_players
+def _build_public_player_state(state) -> PlayerState:
+    return build_player_state(state, _choose_display_player_id(state))
 
 
-def render_state(state: GameState) -> None:
+def _build_human_player_ids(state, num_human_players: int) -> set[PlayerID]:
+    return {
+        player.player_id
+        for player in state.players[:num_human_players]
+    }
+
+
+def _is_human_player(player_id: PlayerID, human_player_ids: set[PlayerID]) -> bool:
+    return player_id in human_player_ids
+
+
+def render_public_state(state: PlayerState) -> None:
     print(f"Runde: {state.round_no}")
     print(f"Stich: {state.trick_no}")
     print()
@@ -61,10 +67,15 @@ def render_player_state(state: PlayerState) -> None:
     print(f"Stich: {state.trick_no}")
     print()
     print("Reihen:")
-    for index, row in enumerate(state.rows, start=1):
+
+    mapping = build_row_display_mapping(state)
+
+    for cli_row, state_row_index in enumerate(mapping.row_order, start=1):
+        row = state.rows[state_row_index]
         vals = " ".join(f"{c.value:>3}" for c in row.cards)
         pts = row.points()
-        print(f"  Reihe {index}: {vals:<25}  ({pts} Punkte)")
+        print(f"  Reihe {cli_row}: {vals:<25}  ({pts} Punkte)")
+
     print()
     print("Scores:")
     for i, p in enumerate(state.players):
@@ -98,6 +109,8 @@ def choose_card_cli(state: PlayerState) -> PlayCardCommand:
 
 
 def choose_row_cli_from_player_state(state: PlayerState) -> ChooseRowCommand:
+    mapping = build_row_display_mapping(state)
+
     while True:
         clear_screen()
         render_player_state(state)
@@ -115,13 +128,14 @@ def choose_row_cli_from_player_state(state: PlayerState) -> ChooseRowCommand:
         )
 
         allowed_row_ids = set(state.phase_info.selectable_row_ids)
-        max_choice = len(state.rows)
+        max_choice = mapping.max_cli_row()
         s = input(f"Welche Reihe willst du nehmen? (1-{max_choice}) > ").strip()
 
         if s.isdigit():
             cli_choice = int(s)
             if 1 <= cli_choice <= max_choice:
-                row_id = state.rows[cli_choice - 1].row_id
+                state_row_index = mapping.to_state_index(cli_choice)
+                row_id = state.rows[state_row_index].row_id
                 if row_id in allowed_row_ids:
                     return ChooseRowCommand(
                         player_id=state.self_player_id,
@@ -133,25 +147,25 @@ def choose_row_cli_from_player_state(state: PlayerState) -> ChooseRowCommand:
 
 
 def _choose_row_adapter(
-    state: GameState,
+    state,
     player_id: PlayerID,
     played_card: Card,
     *,
-    num_human_players: int,
+    human_player_ids: set[PlayerID],
     rng: random.Random,
 ) -> RowID | ChooseRowCommand:
     player_state = build_player_state(state, player_id)
 
-    if _is_human_player(state, player_id, num_human_players):
+    if _is_human_player(player_id, human_player_ids):
         return choose_row_cli_from_player_state(player_state)
 
     return choose_row_random(player_state, rng)
 
 
 def _collect_selections_for_trick(
-    state: GameState,
+    state,
     *,
-    num_human_players: int,
+    human_player_ids: set[PlayerID],
     rng: random.Random,
 ) -> dict[PlayerID, PlayCardCommand]:
     selections: dict[PlayerID, PlayCardCommand] = {}
@@ -159,7 +173,7 @@ def _collect_selections_for_trick(
     for player in state.players:
         player_state = build_player_state(state, player.player_id)
 
-        if _is_human_player(state, player.player_id, num_human_players):
+        if _is_human_player(player.player_id, human_player_ids):
             cmd = choose_card_cli(player_state)
         else:
             cmd = choose_card_random(player_state, rng)
@@ -187,17 +201,18 @@ def main() -> None:
         sys.exit(2)
 
     state = setup_game(player_list, rng=rng)
-    num_human_players = len(player_names)
+    human_player_ids = _build_human_player_ids(state, len(player_names))
 
     while True:
         selections = _collect_selections_for_trick(
             state,
-            num_human_players=num_human_players,
+            human_player_ids=human_player_ids,
             rng=rng,
         )
 
         clear_screen()
-        state_before_round = deepcopy(state)
+        public_state_before_round = _build_public_player_state(state)
+
         results = resolve_round(
             state,
             selections,
@@ -205,13 +220,14 @@ def main() -> None:
                 current_state,
                 player_id,
                 played_card,
-                num_human_players=num_human_players,
+                human_player_ids=human_player_ids,
                 rng=rng,
             ),
         )
-        result_lines = format_results_for_cli(state_before_round, results)
 
-        render_state(state)
+        result_lines = format_results_for_cli(public_state_before_round, results)
+        render_public_state(_build_public_player_state(state))
+
         print("Auflösung:")
         for line in result_lines:
             print(line)
@@ -228,7 +244,7 @@ def main() -> None:
 
     print()
     print("Endstand:")
-    render_state(state)
+    render_public_state(_build_public_player_state(state))
     winner = min(state.players, key=lambda p: p.score)
     print(f"Gewonnen hat: {winner.name} (wenigste Punkte)")
 

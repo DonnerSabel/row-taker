@@ -4,7 +4,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 from row_taker.engine.game import StepResult
-from row_taker.engine.state import GameState
+from row_taker.engine.models import PublicPlayerInfo
+from row_taker.engine.state import PlayerState
 
 
 @dataclass(slots=True, frozen=True)
@@ -23,7 +24,7 @@ class RowDisplayMapping:
         return self.state_to_cli[state_row_index]
 
 
-def build_row_display_mapping(state: GameState) -> RowDisplayMapping:
+def build_row_display_mapping(state: PlayerState) -> RowDisplayMapping:
     row_order = sorted(
         range(len(state.rows)),
         key=lambda row_index: (
@@ -47,21 +48,35 @@ def build_row_display_mapping(state: GameState) -> RowDisplayMapping:
     )
 
 
-def _find_row_index_by_id(state: GameState, row_id: str) -> int:
+def _find_row_index_by_id(state: PlayerState, row_id: str) -> int:
     for index, row in enumerate(state.rows):
         if row.row_id == row_id:
             return index
     raise ValueError(f"unknown row_id: {row_id!r}")
 
 
-def _find_player_index_by_id(state: GameState, player_id: str) -> int:
+def _find_player_index_by_id(state: PlayerState, player_id: str) -> int:
     for index, player in enumerate(state.players):
         if player.player_id == player_id:
             return index
     raise ValueError(f"unknown player_id: {player_id!r}")
 
 
-def apply_result_to_shadow_state(state: GameState, result: StepResult) -> None:
+def _replace_public_player_score(
+    state: PlayerState,
+    player_index: int,
+    points_delta: int,
+) -> None:
+    old_player = state.players[player_index]
+    state.players[player_index] = PublicPlayerInfo(
+        player_id=old_player.player_id,
+        name=old_player.name,
+        score=old_player.score + points_delta,
+        hand_count=old_player.hand_count,
+    )
+
+
+def apply_result_to_shadow_state(state: PlayerState, result: StepResult) -> None:
     row_index = _find_row_index_by_id(state, result.row_id)
     player_index = _find_player_index_by_id(state, result.player_id)
     row = state.rows[row_index]
@@ -72,13 +87,13 @@ def apply_result_to_shadow_state(state: GameState, result: StepResult) -> None:
 
     if result.action in {"took_row_small", "took_row_overflow"}:
         row.cards = [result.card]
-        state.players[player_index].score += result.points_gained
+        _replace_public_player_score(state, player_index, result.points_gained)
         return
 
     raise ValueError(f"Unbekannte Aktion: {result.action}")
 
 
-def format_results_for_cli(before_state: GameState, results: list[StepResult]) -> list[str]:
+def format_results_for_cli(before_state: PlayerState, results: list[StepResult]) -> list[str]:
     shadow_state = deepcopy(before_state)
     lines: list[str] = []
 
