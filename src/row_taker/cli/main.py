@@ -62,7 +62,7 @@ def choose_row_cli(state: GameState, player_index: int, played_card: Card) -> in
 
 
 def choose_card_from_hand(state: GameState, player_index: int) -> Card:
-    p = state.players[player_index]
+    p = state.players[player_index]  # <-------
     while True:
         clear_screen()
         render_state(state)
