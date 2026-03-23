@@ -1,46 +1,47 @@
-from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from .scoring import bullheads
+from .models import Card, Player, PlayerID, PublicPlayerInfo, Row
+from .phases import Phase, PhaseInfo
 
 
 @dataclass(frozen=True, slots=True)
-class Card:
-    value: int
-
-    @property
-    def points(self) -> int:
-        return bullheads(self.value)
-
-
-@dataclass(slots=True)
-class Player:
-    name: str
-    hand: list[Card] = field(default_factory=lambda: [])
-    score: int = 0
-
-
-@dataclass(slots=True)
-class Row:
-    cards: list[Card] = field(default_factory=lambda: [])
-
-    def last_value(self) -> int:
-        return self.cards[-1].value
-
-    def points(self) -> int:
-        return sum(c.points for c in self.cards)
+class MatchConfig:
+    hand_size: int = 10
+    row_count: int = 4
+    row_capacity: int = 5
+    end_score: int = 66
 
 
 @dataclass(slots=True)
 class GameState:
+    config: MatchConfig
     players: list[Player]
     rows: list[Row]
     deck: list[Card]
-    hand_size: int = 10
+
     round_no: int = 1
+    trick_no: int = 1
+
+    phase_info: PhaseInfo = field(
+        default_factory=lambda: PhaseInfo(phase=Phase.ROUND_SETUP)
+    )
+
+    # Verdeckte Auswahl der aktuellen Stichphase:
+    selected_cards: dict[PlayerID, Card] = field(default_factory=dict)
+
+    # Reihenfolge der Auflösung (optional, aber praktisch):
+    resolve_order: list[PlayerID] = field(default_factory=list)
 
 
-# Callback-Typ: Wenn eine Karte kleiner als alle Reihen ist,
-# muss der Spieler eine Reihe zum Nehmen auswählen.
-ChooseRowFn = Callable[[GameState, int, Card], int]
-"""(state, player_index, played_card) -> row_index"""
+@dataclass(frozen=True, slots=True)
+class PlayerState:
+    config: MatchConfig
+    self_player_id: PlayerID
+
+    players: list[PublicPlayerInfo]
+    rows: list[Row]
+    hand: list[Card]
+
+    round_no: int
+    trick_no: int
+    phase_info: PhaseInfo
