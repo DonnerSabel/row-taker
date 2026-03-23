@@ -61,7 +61,3 @@ def run() -> int:
         return 0
     finally:
         pygame.quit()
-
-
-if __name__ == "__main__":
-    exit(run())
