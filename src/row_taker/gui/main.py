@@ -52,9 +52,8 @@ def run() -> int:
             else:
                 spielfeld.draw(screen)
 
-            mouse_pos = pygame.mouse.get_pos()  # aktuelle Mausposition
             for card in deck:
-                card.draw(screen, mouse_pos)      # Mausposition übergeben
+                card.draw(screen)
 
             pygame.display.flip()
             clock.tick(FPS)
