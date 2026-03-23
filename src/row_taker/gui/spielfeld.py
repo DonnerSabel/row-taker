@@ -3,12 +3,7 @@ from pathlib import Path
 import pygame
 
 from row_taker.gui.constants import (
-    BACKGROUND_COLOR,
-    CARD_GAP,
-    DEMO_CARD_VALUES,
-    FPS,
     WINDOW_HEIGHT,
-    WINDOW_TITLE,
     WINDOW_WIDTH,
 )
 
