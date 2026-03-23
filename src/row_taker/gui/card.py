@@ -1,7 +1,5 @@
 from pathlib import Path
-
 import pygame
-
 from row_taker.gui.constants import CARD_ASPECT_RATIO, CARD_SCALE
 
 
