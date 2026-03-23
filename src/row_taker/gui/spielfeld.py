@@ -2,6 +2,16 @@ from pathlib import Path
 
 import pygame
 
+from row_taker.gui.constants import (
+    BACKGROUND_COLOR,
+    CARD_GAP,
+    DEMO_CARD_VALUES,
+    FPS,
+    WINDOW_HEIGHT,
+    WINDOW_TITLE,
+    WINDOW_WIDTH,
+)
+
 
 class Spielfeld:
     """Hintergrundbild des Spielfelds."""
@@ -24,7 +34,7 @@ class Spielfeld:
     def get_image_size(self) -> tuple[int, int]:
         if self.image is not None:
             return self.image.get_size()
-        return (800, 600)
+        return (WINDOW_WIDTH, WINDOW_HEIGHT)
 
     def draw(self, screen: pygame.Surface) -> None:
         if self.image is not None and self.rect is not None:

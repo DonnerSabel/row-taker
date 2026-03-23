@@ -32,13 +32,12 @@ def create_demo_cards(window_width: int, window_height: int) -> list[Card]:
 
 def run() -> int:
     pygame.init()
+    spielfeld = Spielfeld()
+    spielfeld.load_image()
     try:
-        screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        screen = pygame.display.set_mode(spielfeld.get_image_size())
         pygame.display.set_caption(WINDOW_TITLE)
         clock = pygame.time.Clock()
-
-        spielfeld = Spielfeld()
-        spielfeld.load_image()
 
         deck = create_demo_cards(WINDOW_WIDTH, WINDOW_HEIGHT)
 
@@ -62,3 +61,7 @@ def run() -> int:
         return 0
     finally:
         pygame.quit()
+
+
+if __name__ == "__main__":
+    exit(run())
