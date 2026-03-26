@@ -47,13 +47,15 @@ def run() -> int:
                 if event.type == pygame.QUIT:
                     running = False
 
+            mouse_pos = pygame.mouse.get_pos()  # ✅ Mausposition
+
             if spielfeld.image is None:
                 screen.fill(BACKGROUND_COLOR)
             else:
                 spielfeld.draw(screen)
 
             for card in deck:
-                card.draw(screen)
+                card.draw(screen, mouse_pos)  # ✅ Hover funktioniert
 
             pygame.display.flip()
             clock.tick(FPS)
