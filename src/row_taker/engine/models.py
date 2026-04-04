@@ -1,20 +1,11 @@
 from dataclasses import dataclass, field
 from typing import NewType
 
-from .scoring import bullheads
+from .cards import Card
 
 
 PlayerID = NewType("PlayerID", str)
 RowID = NewType("RowID", str)
-
-
-@dataclass(frozen=True, slots=True)
-class Card:
-    value: int
-
-    @property
-    def points(self) -> int:
-        return bullheads(self.value)
 
 
 @dataclass(slots=True)

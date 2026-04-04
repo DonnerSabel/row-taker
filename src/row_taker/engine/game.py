@@ -5,7 +5,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from .commands import ChooseRowCommand, PlayCardCommand
-from .models import Card, Player, PlayerID, Row, RowID
+from .cards import Card, Deck
+from .models import Player, PlayerID, Row, RowID
 from .phases import Phase, PhaseInfo
 from .rules import place_card, take_row, target_row_index
 from .state import GameState, RulesConfig
@@ -15,7 +16,7 @@ ChooseRowFn = Callable[[GameState, PlayerID, Card], RowID | ChooseRowCommand]
 
 
 def make_deck() -> list[Card]:
-    return [Card(v) for v in range(1, 105)]
+    return Deck.create_standard_deck().cards
 
 
 def _normalize_play_command(

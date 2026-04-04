@@ -1,4 +1,5 @@
-from row_taker.engine.models import Card, Row, RowID
+from row_taker.engine.cards import Card
+from row_taker.engine.models import Row, RowID
 from row_taker.engine.rules import place_card, target_row_index
 
 

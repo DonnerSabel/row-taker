@@ -1,6 +1,7 @@
 import pygame
 
-from row_taker.gui.card import Card
+from row_taker.engine.cards import Card
+from row_taker.gui.card import CardSprite
 from row_taker.gui.constants import (
     BACKGROUND_COLOR,
     BOARD_PLAY_AREA_HEIGHT_RATIO,
@@ -16,7 +17,7 @@ from row_taker.gui.constants import (
 from row_taker.gui.spielfeld import Spielfeld
 
 
-def create_demo_cards(window_width: int, window_height: int) -> tuple[list[Card], list[Card]]:
+def create_demo_cards(window_width: int, window_height: int) -> tuple[list[CardSprite], list[CardSprite]]:
     board_rows = 6
     board_columns = 4
     hand_columns = 10
@@ -30,10 +31,13 @@ def create_demo_cards(window_width: int, window_height: int) -> tuple[list[Card]
     # Hand area below play area
     hand_y = play_area_y + play_area_height + CARD_GAP
 
-    deck = [Card(value) for value in range(1, board_rows * board_columns + hand_columns + 1)]
+    deck = [
+        CardSprite(Card(value))
+        for value in range(1, board_rows * board_columns + hand_columns + 1)
+    ]
 
-    for card in deck:
-        card.scale(window_width)
+    for card_sprite in deck:
+        card_sprite.scale(window_width)
 
     if deck and deck[0].image is not None:
         # Calculate target dimensions to fit the board play area
@@ -48,8 +52,8 @@ def create_demo_cards(window_width: int, window_height: int) -> tuple[list[Card]
         effective_window_width = int(target_width / CARD_SCALE)
 
         # Rescale cards
-        for card in deck:
-            card.scale(effective_window_width)
+        for card_sprite in deck:
+            card_sprite.scale(effective_window_width)
 
     card_width = (
         deck[0].image.get_width()
@@ -67,24 +71,29 @@ def create_demo_cards(window_width: int, window_height: int) -> tuple[list[Card]
     total_height = board_rows * card_height + (board_rows + 1) * CARD_GAP
     y_start = play_area_y + max(CARD_GAP, (play_area_height - total_height) // 2)
 
-    for index, card in enumerate(board_cards):
-        if card.image is None:
+    for index, card_sprite in enumerate(board_cards):
+        if card_sprite.image is None:
             continue
 
         row = index // board_columns
         column = index % board_columns
-        card.x = play_area_x + CARD_GAP + column * (card_width + CARD_GAP)
-        card.y = y_start + row * (card_height + CARD_GAP)
+        card_sprite.move_to(
+            play_area_x + CARD_GAP + column * (card_width + CARD_GAP),
+            y_start + row * (card_height + CARD_GAP),
+        )
 
     # Hand cards
     hand_cards = deck[board_rows * board_columns :]
     hand_y_start = hand_y + CARD_GAP
-    for index, card in enumerate(hand_cards):
-        if card.image is None:
+
+    for index, card_sprite in enumerate(hand_cards):
+        if card_sprite.image is None:
             continue
 
-        card.x = play_area_x + CARD_GAP + index * (card_width + CARD_GAP)
-        card.y = hand_y_start
+        card_sprite.move_to(
+            play_area_x + CARD_GAP + index * (card_width + CARD_GAP),
+            hand_y_start,
+        )
 
     return board_cards, hand_cards
 
@@ -93,6 +102,7 @@ def run() -> int:
     pygame.init()
     spielfeld = Spielfeld()
     spielfeld.load_image()
+
     try:
         screen = pygame.display.set_mode(spielfeld.get_image_size())
         pygame.display.set_caption(WINDOW_TITLE)
@@ -107,27 +117,28 @@ def run() -> int:
                     running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     mouse_pos = pygame.mouse.get_pos()
-                    for card in hand_cards:
-                        if card.is_mouse_over(mouse_pos):
-                            card.selected = not card.selected
-                            break  # Only select one at a time?
+                    for card_sprite in hand_cards:
+                        if card_sprite.is_mouse_over(mouse_pos):
+                            card_sprite.selected = not card_sprite.selected
+                            break
 
-            mouse_pos = pygame.mouse.get_pos()  # ✅ Mausposition
+            mouse_pos = pygame.mouse.get_pos()
 
             if spielfeld.image is None:
                 screen.fill(BACKGROUND_COLOR)
             else:
                 spielfeld.draw(screen)
 
-            for card in board_cards:
-                card.draw(screen, mouse_pos)  # ✅ Hover funktioniert
+            for card_sprite in board_cards:
+                card_sprite.draw(screen, mouse_pos)
 
-            for card in hand_cards:
-                card.draw(screen, mouse_pos)  # Hand cards also hover
+            for card_sprite in hand_cards:
+                card_sprite.draw(screen, mouse_pos)
 
             pygame.display.flip()
             clock.tick(FPS)
 
         return 0
+
     finally:
         pygame.quit()

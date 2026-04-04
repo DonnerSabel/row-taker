@@ -1,6 +1,7 @@
 from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.engine.game import resolve_round
-from row_taker.engine.models import Card, Player, PlayerID, Row, RowID
+from row_taker.engine.cards import Card
+from row_taker.engine.models import Player, PlayerID, Row, RowID
 from row_taker.engine.phases import Phase, PhaseInfo
 from row_taker.engine.state import GameState, RulesConfig
 

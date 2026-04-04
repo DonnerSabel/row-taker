@@ -6,7 +6,7 @@ import sys
 from row_taker.cli.render import render_player_state
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
-from row_taker.engine.models import Card
+from row_taker.engine.cards import Card
 from row_taker.engine.state import PlayerState
 
 
