@@ -79,17 +79,31 @@ class GameState:
 
 
 @dataclass(frozen=True, slots=True)
-class PlayerState:
+class PublicState:
     config: RulesConfig
-    self_player_id: PlayerID
-
     players: list[PublicPlayerInfo]
     rows: list[Row]
-    hand: list[Card]
-
     round_no: int
     trick_no: int
     phase_info: PhaseInfo
+
+    def validate_row_id(self, row_id: RowID) -> None:
+        if all(row.row_id != row_id for row in self.rows):
+            raise ValueError(f"unknown row_id: {row_id!r}")
+
+    def get_row_index(self, row_id: RowID) -> int:
+        self.validate_row_id(row_id)
+        for index, row in enumerate(self.rows):
+            if row.row_id == row_id:
+                return index
+        raise AssertionError('validate_row_id accepted an unknown row_id')
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerState:
+    public_state: PublicState
+    self_player_id: PlayerID
+    hand: list[Card]
 
     def validate_phase(self, expected_phase: str) -> None:
         if self.phase_info.phase != expected_phase:
@@ -106,15 +120,10 @@ class PlayerState:
             raise ValueError(f"player does not have card {card.value}")
 
     def validate_row_id(self, row_id: RowID) -> None:
-        if all(row.row_id != row_id for row in self.rows):
-            raise ValueError(f"unknown row_id: {row_id!r}")
+        self.public_state.validate_row_id(row_id)
 
     def get_row_index(self, row_id: RowID) -> int:
-        self.validate_row_id(row_id)
-        for index, row in enumerate(self.rows):
-            if row.row_id == row_id:
-                return index
-        raise AssertionError('validate_row_id accepted an unknown row_id')
+        return self.public_state.get_row_index(row_id)
 
     def get_selectable_row_ids_for_choose_row(self) -> tuple[RowID, ...]:
         selectable_row_ids = tuple(self.phase_info.selectable_row_ids)
@@ -126,3 +135,27 @@ class PlayerState:
         selectable_row_ids = self.get_selectable_row_ids_for_choose_row()
         if row_id not in selectable_row_ids:
             raise ValueError(f"row_id {row_id!r} is not selectable in the current state")
+
+    @property
+    def config(self) -> RulesConfig:
+        return self.public_state.config
+
+    @property
+    def players(self) -> list[PublicPlayerInfo]:
+        return self.public_state.players
+
+    @property
+    def rows(self) -> list[Row]:
+        return self.public_state.rows
+
+    @property
+    def round_no(self) -> int:
+        return self.public_state.round_no
+
+    @property
+    def trick_no(self) -> int:
+        return self.public_state.trick_no
+
+    @property
+    def phase_info(self) -> PhaseInfo:
+        return self.public_state.phase_info

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import os
-import sys
 from dataclasses import dataclass
 
 from row_taker.cli.render import render_player_state
 from row_taker.cli.row_display import build_row_display_mapping
+from row_taker.cli.terminal import clear_screen
 from row_taker.engine.cards import Card
 from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.engine.state import PlayerState
@@ -15,14 +14,8 @@ from row_taker.engine.state import PlayerState
 class CliParticipant:
     def on_choose_card_request(self, state: PlayerState) -> PlayCardCommand:
         while True:
-            self._clear_screen()
+            clear_screen()
             render_player_state(state)
-
-            own_name = next(
-                player.name for player in state.players if player.player_id == state.self_player_id
-            )
-            print(f'{own_name}: Deine Handkarten:')
-            print('  ' + ' '.join(f'|{card.value} {card.bullheads * "🐮"}|' for card in state.hand))
 
             value = input('Wähle eine Karte (Zahl) > ').strip()
             if value.isdigit():
@@ -40,10 +33,10 @@ class CliParticipant:
             input('Ungültige Wahl. Enter...')
 
     def on_choose_row_request(self, state: PlayerState) -> ChooseRowCommand:
-        mapping = build_row_display_mapping(state)
+        mapping = build_row_display_mapping(state.public_state)
 
         while True:
-            self._clear_screen()
+            clear_screen()
             render_player_state(state)
 
             own_name = next(
@@ -78,11 +71,3 @@ class CliParticipant:
 
             print(f'Ungültig. Bitte 1-{max_choice} eingeben.')
             input('Enter...')
-
-    @staticmethod
-    def _clear_screen() -> None:
-        if not sys.stdout.isatty():
-            return
-        if os.name != 'nt' and not os.environ.get('TERM'):
-            return
-        os.system('cls' if os.name == 'nt' else 'clear')

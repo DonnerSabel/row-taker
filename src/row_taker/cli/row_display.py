@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from row_taker.engine.game import StepResult
 from row_taker.engine.models import PublicPlayerInfo
-from row_taker.engine.state import PlayerState
+from row_taker.engine.state import PublicState
 
 
 @dataclass(slots=True, frozen=True)
@@ -24,7 +24,7 @@ class RowDisplayMapping:
         return self.state_to_cli[state_row_index]
 
 
-def build_row_display_mapping(state: PlayerState) -> RowDisplayMapping:
+def build_row_display_mapping(state: PublicState) -> RowDisplayMapping:
     row_order = sorted(
         range(len(state.rows)),
         key=lambda row_index: (
@@ -48,14 +48,14 @@ def build_row_display_mapping(state: PlayerState) -> RowDisplayMapping:
     )
 
 
-def _find_row_index_by_id(state: PlayerState, row_id: str) -> int:
+def _find_row_index_by_id(state: PublicState, row_id: str) -> int:
     for index, row in enumerate(state.rows):
         if row.row_id == row_id:
             return index
     raise ValueError(f"unknown row_id: {row_id!r}")
 
 
-def _find_player_index_by_id(state: PlayerState, player_id: str) -> int:
+def _find_player_index_by_id(state: PublicState, player_id: str) -> int:
     for index, player in enumerate(state.players):
         if player.player_id == player_id:
             return index
@@ -63,7 +63,7 @@ def _find_player_index_by_id(state: PlayerState, player_id: str) -> int:
 
 
 def _replace_public_player_score(
-    state: PlayerState,
+    state: PublicState,
     player_index: int,
     bullheads_delta: int,
 ) -> None:
@@ -76,7 +76,7 @@ def _replace_public_player_score(
     )
 
 
-def apply_result_to_shadow_state(state: PlayerState, result: StepResult) -> None:
+def apply_result_to_shadow_state(state: PublicState, result: StepResult) -> None:
     row_index = _find_row_index_by_id(state, result.row_id)
     player_index = _find_player_index_by_id(state, result.player_id)
     row = state.rows[row_index]
@@ -93,7 +93,7 @@ def apply_result_to_shadow_state(state: PlayerState, result: StepResult) -> None
     raise ValueError(f"Unbekannte Aktion: {result.action}")
 
 
-def format_results_for_cli(before_state: PlayerState, results: list[StepResult]) -> list[str]:
+def format_results_for_cli(before_state: PublicState, results: list[StepResult]) -> list[str]:
     shadow_state = deepcopy(before_state)
     lines: list[str] = []
 

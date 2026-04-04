@@ -1,24 +1,15 @@
 from __future__ import annotations
 
-import os
 import random
-import sys
 
 from row_taker.cli.create_match_config import create_match_config
 from row_taker.cli.render import render_public_state, render_trick_result
+from row_taker.cli.terminal import clear_screen
 from row_taker.engine.game import setup_game
 from row_taker.hub.match_config import ParticipantKind
 from row_taker.hub.match_hub import MatchHub
 from row_taker.participants.cli_participant import CliParticipant
 from row_taker.participants.random_bot_participant import RandomBotParticipant
-
-
-def clear_screen() -> None:
-    if not sys.stdout.isatty():
-        return
-    if os.name != 'nt' and not os.environ.get('TERM'):
-        return
-    os.system('cls' if os.name == 'nt' else 'clear')
 
 
 def main() -> None:
@@ -62,7 +53,7 @@ def main() -> None:
 
     print()
     print('Endstand:')
-    render_public_state(hub.build_public_player_state())
+    render_public_state(hub.build_public_state())
     winner = min(hub.state.players, key=lambda p: p.score)
     print(f'Gewonnen hat: {winner.name} (wenigste Hornochsen)')
 

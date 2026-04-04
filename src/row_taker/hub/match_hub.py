@@ -5,16 +5,16 @@ from dataclasses import dataclass
 from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.engine.game import StepResult, resolve_round, start_next_round_if_needed
 from row_taker.engine.models import PlayerID
-from row_taker.engine.state import GameState, PlayerState
-from row_taker.engine.views import build_player_state
+from row_taker.engine.state import GameState, PlayerState, PublicState
+from row_taker.engine.views import build_player_state, build_public_state
 from row_taker.hub.hub_participant import HubParticipant
 
 
 @dataclass(slots=True)
 class TrickResult:
-    public_state_before: PlayerState
+    public_state_before: PublicState
     resolution: list[StepResult]
-    public_state_after: PlayerState
+    public_state_after: PublicState
     new_round_started: bool
     game_finished: bool
 
@@ -26,7 +26,7 @@ class MatchHub:
 
     def play_trick(self) -> TrickResult:
         selections = self._collect_card_selections()
-        public_state_before = self.build_public_player_state()
+        public_state_before = self.build_public_state()
 
         results = resolve_round(
             self.state,
@@ -39,7 +39,7 @@ class MatchHub:
         return TrickResult(
             public_state_before=public_state_before,
             resolution=results,
-            public_state_after=self.build_public_player_state(),
+            public_state_after=self.build_public_state(),
             new_round_started=new_round_started,
             game_finished=self.is_finished(),
         )
@@ -47,8 +47,8 @@ class MatchHub:
     def is_finished(self) -> bool:
         return self.state.phase_info.phase == 'game_over'
 
-    def build_public_player_state(self) -> PlayerState:
-        return build_player_state(self.state, self.state.players[0].player_id)
+    def build_public_state(self) -> PublicState:
+        return build_public_state(self.state)
 
     def build_player_state_for(self, player_id: PlayerID) -> PlayerState:
         return build_player_state(self.state, player_id)
