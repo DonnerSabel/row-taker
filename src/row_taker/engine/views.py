@@ -3,14 +3,7 @@ from .state import GameState, PlayerState
 
 
 def build_player_state(game_state: GameState, self_player_id: PlayerID) -> PlayerState:
-    self_player = None
-    for player in game_state.players:
-        if player.player_id == self_player_id:
-            self_player = player
-            break
-
-    if self_player is None:
-        raise ValueError(f"unknown player_id: {self_player_id!r}")
+    self_player = game_state.get_player_by_id(self_player_id)
 
     public_players = [
         PublicPlayerInfo(

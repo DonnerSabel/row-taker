@@ -18,21 +18,8 @@ def make_deck() -> list[Card]:
     return [Card(v) for v in range(1, 105)]
 
 
-def _find_player(state: GameState, player_id: PlayerID) -> Player:
-    for player in state.players:
-        if player.player_id == player_id:
-            return player
-    raise ValueError(f"unknown player_id: {player_id!r}")
-
-
-def _row_index_by_id(state: GameState, row_id: RowID) -> int:
-    for index, row in enumerate(state.rows):
-        if row.row_id == row_id:
-            return index
-    raise ValueError(f"unknown row_id: {row_id!r}")
-
-
 def _normalize_play_command(
+    state: GameState,
     player_id: PlayerID,
     cmd: Card | PlayCardCommand,
 ) -> Card:
@@ -40,10 +27,7 @@ def _normalize_play_command(
         return cmd
 
     if isinstance(cmd, PlayCardCommand):
-        if cmd.player_id != player_id:
-            raise ValueError(
-                f"PlayCardCommand player_id mismatch: expected {player_id!r}, got {cmd.player_id!r}"
-            )
+        state.validate_play_command_player_id(player_id, cmd)
         return Card(cmd.card_value)
 
     raise TypeError(f"unsupported play selection type: {type(cmd)!r}")
@@ -55,10 +39,7 @@ def _normalize_choose_row_result(
     result: RowID | ChooseRowCommand,
 ) -> RowID:
     if isinstance(result, ChooseRowCommand):
-        if result.player_id != expected_player_id:
-            raise ValueError(
-                f"ChooseRowCommand player_id mismatch: expected {expected_player_id!r}, got {result.player_id!r}"
-            )
+        state.validate_choose_row_command_player_id(expected_player_id, result)
         return result.row_id
 
     return result
@@ -74,8 +55,7 @@ def setup_game(
     if rng is None:
         rng = random.Random()
 
-    if not (2 <= len(player_list) <= 6):
-        raise ValueError("player count must be 2..6")
+    RulesConfig.validate_player_count(len(player_list))
 
     if config is None:
         config = RulesConfig()
@@ -112,7 +92,7 @@ def setup_game(
         trick_no=1,
         phase_info=PhaseInfo(
             phase=Phase.ROUND_SETUP,
-            message="Preparing first round.",
+            message='Preparing first round.',
         ),
     )
     _deal_new_round(state)
@@ -137,7 +117,7 @@ def _deal_new_round(state: GameState) -> None:
     state.resolve_order.clear()
     state.phase_info = PhaseInfo(
         phase=Phase.CHOOSE_CARD,
-        message="Choose one card.",
+        message='Choose one card.',
     )
 
 
@@ -155,31 +135,27 @@ def resolve_round(
     selections: dict[PlayerID, Card | PlayCardCommand],
     choose_row: ChooseRowFn,
 ) -> list[StepResult]:
-    expected_player_ids = {player.player_id for player in state.players}
-    if set(selections.keys()) != expected_player_ids:
-        raise ValueError("selections must contain one card for every player_id")
+    state.validate_complete_play_selections(selections)
 
     state.phase_info = PhaseInfo(
         phase=Phase.REVEAL_AND_RESOLVE,
-        message="Revealing cards and resolving trick.",
+        message='Revealing cards and resolving trick.',
     )
 
     normalized: dict[PlayerID, Card] = {
-        player_id: _normalize_play_command(player_id, selection)
+        player_id: _normalize_play_command(state, player_id, selection)
         for player_id, selection in selections.items()
     }
 
     for player_id, card in normalized.items():
-        player = _find_player(state, player_id)
-        try:
-            hand_index = next(
-                index for index, hand_card in enumerate(player.hand)
-                if hand_card.value == card.value
-            )
-        except StopIteration as exc:
-            raise ValueError(
-                f"player {player_id!r} does not have card {card.value}"
-            ) from exc
+        state.validate_player_has_card(player_id, card)
+
+    for player_id, card in normalized.items():
+        player = state.get_player_by_id(player_id)
+        hand_index = next(
+            index for index, hand_card in enumerate(player.hand)
+            if hand_card.value == card.value
+        )
         player.hand.pop(hand_index)
 
     state.selected_cards = dict(normalized)
@@ -199,7 +175,7 @@ def resolve_round(
                 active_player_id=player_id,
                 pending_card=card,
                 selectable_row_ids=selectable_row_ids,
-                message="Choose a row to take.",
+                message='Choose a row to take.',
             )
 
             chosen = choose_row(state, player_id, card)
@@ -208,17 +184,17 @@ def resolve_round(
                 player_id,
                 chosen,
             )
-            chosen_index = _row_index_by_id(state, chosen_row_id)
+            chosen_index = state.get_row_index(chosen_row_id)
 
             points, _taken = take_row(state.rows, chosen_index)
-            _find_player(state, player_id).score += points
+            state.get_player_by_id(player_id).score += points
             state.rows[chosen_index].cards = [card]
 
             results.append(
                 StepResult(
                     player_id=player_id,
                     card=card,
-                    action="took_row_small",
+                    action='took_row_small',
                     row_id=chosen_row_id,
                     points_gained=points,
                 )
@@ -234,10 +210,10 @@ def resolve_round(
         )
 
         if taken is not None:
-            _find_player(state, player_id).score += points
-            action = "took_row_overflow"
+            state.get_player_by_id(player_id).score += points
+            action = 'took_row_overflow'
         else:
-            action = "placed"
+            action = 'placed'
 
         results.append(
             StepResult(
@@ -251,7 +227,7 @@ def resolve_round(
 
     state.phase_info = PhaseInfo(
         phase=Phase.ROUND_SCORING,
-        message="Trick finished.",
+        message='Trick finished.',
     )
     state.selected_cards.clear()
     state.resolve_order.clear()
@@ -263,14 +239,14 @@ def start_next_round_if_needed(state: GameState) -> bool:
         state.trick_no += 1
         state.phase_info = PhaseInfo(
             phase=Phase.CHOOSE_CARD,
-            message="Choose one card.",
+            message='Choose one card.',
         )
         return False
 
     if any(player.score >= state.config.end_score for player in state.players):
         state.phase_info = PhaseInfo(
             phase=Phase.GAME_OVER,
-            message="Game over.",
+            message='Game over.',
         )
         return False
 

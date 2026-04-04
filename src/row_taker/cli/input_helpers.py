@@ -6,6 +6,7 @@ import sys
 from row_taker.cli.render import render_player_state
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
+from row_taker.engine.models import Card
 from row_taker.engine.state import PlayerState
 
 
@@ -30,13 +31,16 @@ def choose_card_cli(state: PlayerState) -> PlayCardCommand:
 
         s = input('Wähle eine Karte (Zahl) > ').strip()
         if s.isdigit():
-            v = int(s)
-            for c in state.hand:
-                if c.value == v:
-                    return PlayCardCommand(
-                        player_id=state.self_player_id,
-                        card_value=c.value,
-                    )
+            card = Card(int(s))
+            try:
+                state.validate_has_card(card)
+            except ValueError:
+                pass
+            else:
+                return PlayCardCommand(
+                    player_id=state.self_player_id,
+                    card_value=card.value,
+                )
 
         input('Ungültige Wahl. Enter...')
 
@@ -60,7 +64,6 @@ def choose_row_cli_from_player_state(state: PlayerState) -> ChooseRowCommand:
             f'{own_name}: Deine Karte {pending_card_value} ist kleiner als alle Reihen.'
         )
 
-        allowed_row_ids = set(state.phase_info.selectable_row_ids)
         max_choice = mapping.max_cli_row()
         s = input(f'Welche Reihe willst du nehmen? (1-{max_choice}) > ').strip()
 
@@ -69,7 +72,11 @@ def choose_row_cli_from_player_state(state: PlayerState) -> ChooseRowCommand:
             if 1 <= cli_choice <= max_choice:
                 state_row_index = mapping.to_state_index(cli_choice)
                 row_id = state.rows[state_row_index].row_id
-                if row_id in allowed_row_ids:
+                try:
+                    state.validate_selectable_row_id(row_id)
+                except ValueError:
+                    pass
+                else:
                     return ChooseRowCommand(
                         player_id=state.self_player_id,
                         row_id=row_id,
