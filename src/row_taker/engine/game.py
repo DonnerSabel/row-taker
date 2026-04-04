@@ -8,7 +8,7 @@ from .commands import ChooseRowCommand, PlayCardCommand
 from .models import Card, Player, PlayerID, Row, RowID
 from .phases import Phase, PhaseInfo
 from .rules import place_card, take_row, target_row_index
-from .state import GameState, MatchConfig
+from .state import GameState, RulesConfig
 
 
 ChooseRowFn = Callable[[GameState, PlayerID, Card], RowID | ChooseRowCommand]
@@ -22,13 +22,6 @@ def _find_player(state: GameState, player_id: PlayerID) -> Player:
     for player in state.players:
         if player.player_id == player_id:
             return player
-    raise ValueError(f"unknown player_id: {player_id!r}")
-
-
-def _player_index_by_id(state: GameState, player_id: PlayerID) -> int:
-    for index, player in enumerate(state.players):
-        if player.player_id == player_id:
-            return index
     raise ValueError(f"unknown player_id: {player_id!r}")
 
 
@@ -75,14 +68,9 @@ def setup_game(
     player_list: Sequence[str],
     *,
     rng: random.Random | None = None,
-    config: MatchConfig | None = None,
+    config: RulesConfig | None = None,
     hand_size: int | None = None,
 ) -> GameState:
-    """Create a new game state and deal the first round.
-
-    ``hand_size`` is kept as an optional override for compatibility/convenience.
-    If given, it overrides ``config.hand_size``.
-    """
     if rng is None:
         rng = random.Random()
 
@@ -90,10 +78,10 @@ def setup_game(
         raise ValueError("player count must be 2..6")
 
     if config is None:
-        config = MatchConfig()
+        config = RulesConfig()
 
     if hand_size is not None and hand_size != config.hand_size:
-        config = MatchConfig(
+        config = RulesConfig(
             hand_size=hand_size,
             row_count=config.row_count,
             row_capacity=config.row_capacity,
@@ -132,7 +120,6 @@ def setup_game(
 
 
 def _deal_new_round(state: GameState) -> None:
-    """Deal a new round: one start card per row and fresh hands."""
     for row in state.rows:
         row.cards.clear()
 
@@ -158,7 +145,7 @@ def _deal_new_round(state: GameState) -> None:
 class StepResult:
     player_id: PlayerID
     card: Card
-    action: str  # "placed" | "took_row_small" | "took_row_overflow"
+    action: str
     row_id: RowID
     points_gained: int
 
@@ -168,11 +155,6 @@ def resolve_round(
     selections: dict[PlayerID, Card | PlayCardCommand],
     choose_row: ChooseRowFn,
 ) -> list[StepResult]:
-    """Resolve one trick.
-
-    ``selections`` must contain exactly one selection for every player.
-    Cards are resolved in ascending card-value order.
-    """
     expected_player_ids = {player.player_id for player in state.players}
     if set(selections.keys()) != expected_player_ids:
         raise ValueError("selections must contain one card for every player_id")
@@ -187,7 +169,6 @@ def resolve_round(
         for player_id, selection in selections.items()
     }
 
-    # Validate ownership and remove chosen cards from hands.
     for player_id, card in normalized.items():
         player = _find_player(state, player_id)
         try:
@@ -268,44 +249,28 @@ def resolve_round(
             )
         )
 
+    state.phase_info = PhaseInfo(
+        phase=Phase.ROUND_SCORING,
+        message="Trick finished.",
+    )
     state.selected_cards.clear()
     state.resolve_order.clear()
+    return results
 
+
+def start_next_round_if_needed(state: GameState) -> bool:
     if any(player.hand for player in state.players):
         state.trick_no += 1
         state.phase_info = PhaseInfo(
             phase=Phase.CHOOSE_CARD,
             message="Choose one card.",
         )
-    else:
-        state.phase_info = PhaseInfo(
-            phase=Phase.ROUND_SCORING,
-            message="Round complete.",
-        )
-
-    return results
-
-
-def start_next_round_if_needed(state: GameState, *, rng: random.Random | None = None) -> bool:
-    """Start a new round when all hands are empty.
-
-    Return ``True`` if a new round was dealt.
-    """
-    if any(player.hand for player in state.players):
         return False
 
     if any(player.score >= state.config.end_score for player in state.players):
         state.phase_info = PhaseInfo(
             phase=Phase.GAME_OVER,
             message="Game over.",
-        )
-        return False
-
-    needed_cards = state.config.row_count + len(state.players) * state.config.hand_size
-    if len(state.deck) < needed_cards:
-        state.phase_info = PhaseInfo(
-            phase=Phase.GAME_OVER,
-            message="Game over: not enough cards for another round.",
         )
         return False
 

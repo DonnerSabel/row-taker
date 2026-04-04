@@ -2,12 +2,12 @@ from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.engine.game import resolve_round
 from row_taker.engine.models import Card, Player, PlayerID, Row, RowID
 from row_taker.engine.phases import Phase, PhaseInfo
-from row_taker.engine.state import GameState, MatchConfig
+from row_taker.engine.state import GameState, RulesConfig
 
 
 def _make_state(*, p0_hand: list[int], p1_hand: list[int], rows: list[list[int]]) -> GameState:
     return GameState(
-        config=MatchConfig(hand_size=10, row_count=4, row_capacity=5, end_score=66),
+        config=RulesConfig(hand_size=10, row_count=4, row_capacity=5, end_score=66),
         players=[
             Player(
                 player_id=PlayerID("player-0"),

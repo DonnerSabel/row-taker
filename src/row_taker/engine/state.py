@@ -5,7 +5,7 @@ from .phases import Phase, PhaseInfo
 
 
 @dataclass(frozen=True, slots=True)
-class MatchConfig:
+class RulesConfig:
     hand_size: int = 10
     row_count: int = 4
     row_capacity: int = 5
@@ -14,7 +14,7 @@ class MatchConfig:
 
 @dataclass(slots=True)
 class GameState:
-    config: MatchConfig
+    config: RulesConfig
     players: list[Player]
     rows: list[Row]
     deck: list[Card]
@@ -26,16 +26,13 @@ class GameState:
         default_factory=lambda: PhaseInfo(phase=Phase.ROUND_SETUP)
     )
 
-    # Verdeckte Auswahl der aktuellen Stichphase:
     selected_cards: dict[PlayerID, Card] = field(default_factory=dict)
-
-    # Reihenfolge der Auflösung (optional, aber praktisch):
     resolve_order: list[PlayerID] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
 class PlayerState:
-    config: MatchConfig
+    config: RulesConfig
     self_player_id: PlayerID
 
     players: list[PublicPlayerInfo]
