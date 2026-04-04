@@ -65,13 +65,13 @@ def _find_player_index_by_id(state: PlayerState, player_id: str) -> int:
 def _replace_public_player_score(
     state: PlayerState,
     player_index: int,
-    points_delta: int,
+    bullheads_delta: int,
 ) -> None:
     old_player = state.players[player_index]
     state.players[player_index] = PublicPlayerInfo(
         player_id=old_player.player_id,
         name=old_player.name,
-        score=old_player.score + points_delta,
+        score=old_player.score + bullheads_delta,
         hand_count=old_player.hand_count,
     )
 
@@ -87,7 +87,7 @@ def apply_result_to_shadow_state(state: PlayerState, result: StepResult) -> None
 
     if result.action in {"took_row_small", "took_row_overflow"}:
         row.cards = [result.card]
-        _replace_public_player_score(state, player_index, result.points_gained)
+        _replace_public_player_score(state, player_index, result.bullheads_gained)
         return
 
     raise ValueError(f"Unbekannte Aktion: {result.action}")
@@ -109,12 +109,12 @@ def format_results_for_cli(before_state: PlayerState, results: list[StepResult])
             lines.append(f"- {player.name} legt {result.card.value} an Reihe {cli_row}.")
         elif result.action == "took_row_small":
             lines.append(
-                f"- {player.name} nimmt Reihe {cli_row} ({result.points_gained} Punkte) "
+                f"- {player.name} nimmt Reihe {cli_row} ({result.bullheads_gained} Hornochsen) "
                 f"und startet mit {result.card.value}."
             )
         elif result.action == "took_row_overflow":
             lines.append(
-                f"- {player.name} füllt Reihe {cli_row} (nimmt {result.points_gained} Punkte) "
+                f"- {player.name} füllt Reihe {cli_row} (nimmt {result.bullheads_gained} Hornochsen) "
                 f"und startet mit {result.card.value}."
             )
         else:

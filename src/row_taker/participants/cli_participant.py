@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
+import sys
 from dataclasses import dataclass
 
-from row_taker.cli.input_helpers import choose_card_cli, choose_row_cli_from_player_state
+from row_taker.cli.render import render_player_state
+from row_taker.cli.row_display import build_row_display_mapping
+from row_taker.engine.cards import Card
 from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.engine.state import PlayerState
 
@@ -10,7 +14,75 @@ from row_taker.engine.state import PlayerState
 @dataclass(slots=True)
 class CliParticipant:
     def on_choose_card_request(self, state: PlayerState) -> PlayCardCommand:
-        return choose_card_cli(state)
+        while True:
+            self._clear_screen()
+            render_player_state(state)
+
+            own_name = next(
+                player.name for player in state.players if player.player_id == state.self_player_id
+            )
+            print(f'{own_name}: Deine Handkarten:')
+            print('  ' + ' '.join(f'|{card.value} {card.bullheads * "🐮"}|' for card in state.hand))
+
+            value = input('Wähle eine Karte (Zahl) > ').strip()
+            if value.isdigit():
+                card = Card(int(value))
+                try:
+                    state.validate_has_card(card)
+                except ValueError:
+                    pass
+                else:
+                    return PlayCardCommand(
+                        player_id=state.self_player_id,
+                        card_value=card.value,
+                    )
+
+            input('Ungültige Wahl. Enter...')
 
     def on_choose_row_request(self, state: PlayerState) -> ChooseRowCommand:
-        return choose_row_cli_from_player_state(state)
+        mapping = build_row_display_mapping(state)
+
+        while True:
+            self._clear_screen()
+            render_player_state(state)
+
+            own_name = next(
+                player.name for player in state.players if player.player_id == state.self_player_id
+            )
+            pending_card_value = (
+                state.phase_info.pending_card.value
+                if state.phase_info.pending_card is not None
+                else '?'
+            )
+            print(
+                f'{own_name}: Deine Karte {pending_card_value} ist kleiner als alle Reihen.'
+            )
+
+            max_choice = mapping.max_cli_row()
+            value = input(f'Welche Reihe willst du nehmen? (1-{max_choice}) > ').strip()
+
+            if value.isdigit():
+                cli_choice = int(value)
+                if 1 <= cli_choice <= max_choice:
+                    state_row_index = mapping.to_state_index(cli_choice)
+                    row_id = state.rows[state_row_index].row_id
+                    try:
+                        state.validate_selectable_row_id(row_id)
+                    except ValueError:
+                        pass
+                    else:
+                        return ChooseRowCommand(
+                            player_id=state.self_player_id,
+                            row_id=row_id,
+                        )
+
+            print(f'Ungültig. Bitte 1-{max_choice} eingeben.')
+            input('Enter...')
+
+    @staticmethod
+    def _clear_screen() -> None:
+        if not sys.stdout.isatty():
+            return
+        if os.name != 'nt' and not os.environ.get('TERM'):
+            return
+        os.system('cls' if os.name == 'nt' else 'clear')

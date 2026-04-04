@@ -53,10 +53,6 @@ class CardSprite:
     def bullheads(self) -> int:
         return self.card.bullheads
 
-    @property
-    def points(self) -> int:
-        return self.card.points
-
     def move_to(self, x: float, y: float) -> None:
         self.x = x
         self.y = y

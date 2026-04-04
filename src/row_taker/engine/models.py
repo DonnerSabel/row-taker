@@ -16,8 +16,8 @@ class Row:
     def last_value(self) -> int:
         return self.cards[-1].value
 
-    def points(self) -> int:
-        return sum(card.points for card in self.cards)
+    def bullheads(self) -> int:
+        return sum(card.bullheads for card in self.cards)
 
 
 @dataclass(slots=True)

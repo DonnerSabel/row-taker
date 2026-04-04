@@ -16,8 +16,8 @@ def render_public_state(state: PlayerState) -> None:
     for cli_row, state_row_index in enumerate(mapping.row_order, start=1):
         row = state.rows[state_row_index]
         vals = ' '.join(f'{c.value:>3}' for c in row.cards)
-        pts = row.points()
-        print(f'  Reihe {cli_row}: {vals:<25}  ({pts} Punkte)')
+        bullheads = row.bullheads()
+        print(f'  Reihe {cli_row}: {vals:<25}  ({bullheads} Hornochsen)')
 
     print()
     print('Scores:')
@@ -37,8 +37,8 @@ def render_player_state(state: PlayerState) -> None:
     for cli_row, state_row_index in enumerate(mapping.row_order, start=1):
         row = state.rows[state_row_index]
         vals = ' '.join(f'{c.value:>3}' for c in row.cards)
-        pts = row.points()
-        print(f'  Reihe {cli_row}: {vals:<25}  ({pts} Punkte)')
+        bullheads = row.bullheads()
+        print(f'  Reihe {cli_row}: {vals:<25}  ({bullheads} Hornochsen)')
 
     print()
     print('Scores:')

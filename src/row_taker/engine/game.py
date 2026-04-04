@@ -128,7 +128,7 @@ class StepResult:
     card: Card
     action: str
     row_id: RowID
-    points_gained: int
+    bullheads_gained: int
 
 
 def resolve_round(
@@ -187,8 +187,8 @@ def resolve_round(
             )
             chosen_index = state.get_row_index(chosen_row_id)
 
-            points, _taken = take_row(state.rows, chosen_index)
-            state.get_player_by_id(player_id).score += points
+            bullheads, _taken = take_row(state.rows, chosen_index)
+            state.get_player_by_id(player_id).score += bullheads
             state.rows[chosen_index].cards = [card]
 
             results.append(
@@ -197,13 +197,13 @@ def resolve_round(
                     card=card,
                     action='took_row_small',
                     row_id=chosen_row_id,
-                    points_gained=points,
+                    bullheads_gained=bullheads,
                 )
             )
             continue
 
         target_row = state.rows[row_index]
-        points, taken = place_card(
+        bullheads, taken = place_card(
             state.rows,
             row_index,
             card,
@@ -211,7 +211,7 @@ def resolve_round(
         )
 
         if taken is not None:
-            state.get_player_by_id(player_id).score += points
+            state.get_player_by_id(player_id).score += bullheads
             action = 'took_row_overflow'
         else:
             action = 'placed'
@@ -222,7 +222,7 @@ def resolve_round(
                 card=card,
                 action=action,
                 row_id=target_row.row_id,
-                points_gained=points,
+                bullheads_gained=bullheads,
             )
         )
 

@@ -38,7 +38,7 @@ def test_place_card_takes_row_when_row_is_full() -> None:
 
     points, taken = place_card(rows, 0, Card(15), row_capacity=5)
 
-    assert points == sum(card.points for card in [Card(10), Card(11), Card(12), Card(13), Card(14)])
+    assert points == sum(card.bullheads for card in [Card(10), Card(11), Card(12), Card(13), Card(14)])
     assert taken is not None
     assert [card.value for card in taken] == [10, 11, 12, 13, 14]
     assert [card.value for card in rows[0].cards] == [15]

@@ -24,15 +24,15 @@ def target_row_index(rows: Sequence[Row], card: Card) -> int | None:
 
 
 def take_row(rows: list[Row], row_index: int) -> tuple[int, list[Card]]:
-    """Take a row and return ``(points, taken_cards)``.
+    """Take a row and return ``(bullheads, taken_cards)``.
 
     The row object keeps its ``row_id`` and becomes empty.
     """
     row = rows[row_index]
     taken = list(row.cards)
-    points = sum(card.points for card in taken)
+    bullheads = sum(card.bullheads for card in taken)
     rows[row_index] = Row(row_id=row.row_id, cards=[])
-    return points, taken
+    return bullheads, taken
 
 
 def place_card(
@@ -47,15 +47,15 @@ def place_card(
     If the row already contains ``row_capacity`` cards, those cards are taken and
     the played card becomes the new first card of the row.
 
-    Return ``(points_gained, taken_cards_or_none)``.
+    Return ``(bullheads_gained, taken_cards_or_none)``.
     """
     row = rows[row_index]
 
     if len(row.cards) >= row_capacity:
-        taken_points = sum(c.points for c in row.cards)
+        taken_bullheads = sum(c.bullheads for c in row.cards)
         taken_cards = list(row.cards)
         rows[row_index] = Row(row_id=row.row_id, cards=[card])
-        return taken_points, taken_cards
+        return taken_bullheads, taken_cards
 
     row.cards.append(card)
     return 0, None

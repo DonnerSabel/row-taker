@@ -1,1 +1,1 @@
-__all__ = ["bot_choose_random"]
+__all__: list[str] = []

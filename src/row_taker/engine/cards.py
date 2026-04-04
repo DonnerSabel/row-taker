@@ -25,10 +25,6 @@ class Card:
     def bullheads(self) -> int:
         return bullheads(self.value)
 
-    @property
-    def points(self) -> int:
-        return self.bullheads
-
 
 @dataclass(slots=True)
 class Deck:
