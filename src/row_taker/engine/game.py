@@ -1,49 +1,18 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 
-from .commands import ChooseRowCommand, PlayCardCommand
 from .cards import Card, Deck
+from .commands import ChooseRowCommand, PlayCardCommand
 from .models import Player, PlayerID, Row, RowID
-from .phases import Phase, PhaseInfo, StepAction
+from .phases import Phase, PhaseInfo
 from .rules import place_card, take_row, target_row_index
-from .state import GameState, RulesConfig
-
-
-ChooseRowFn = Callable[[GameState, PlayerID, Card], RowID | ChooseRowCommand]
+from .state import DeltaPublicState, GameState, RulesConfig
 
 
 def make_deck() -> list[Card]:
     return Deck.create_standard_deck().cards
-
-
-def _normalize_play_command(
-    state: GameState,
-    player_id: PlayerID,
-    cmd: Card | PlayCardCommand,
-) -> Card:
-    if isinstance(cmd, Card):
-        return cmd
-
-    if isinstance(cmd, PlayCardCommand):
-        state.validate_play_command_player_id(player_id, cmd)
-        return Card(cmd.card_value)
-
-    raise TypeError(f"unsupported play selection type: {type(cmd)!r}")
-
-
-def _normalize_choose_row_result(
-    state: GameState,
-    expected_player_id: PlayerID,
-    result: RowID | ChooseRowCommand,
-) -> RowID:
-    if isinstance(result, ChooseRowCommand):
-        state.validate_choose_row_command_player_id(expected_player_id, result)
-        return result.row_id
-
-    return result
 
 
 def setup_game(
@@ -122,36 +91,31 @@ def _deal_new_round(state: GameState) -> None:
     )
 
 
-@dataclass(slots=True)
-class StepResult:
-    player_id: PlayerID
-    card: Card
-    action: StepAction
-    row_id: RowID
-    bullheads_gained: int
+def submit_play_card(state: GameState, command: PlayCardCommand) -> None:
+    if state.phase_info.phase != Phase.CHOOSE_CARD:
+        raise ValueError(f'invalid phase for submit_play_card: {state.phase_info.phase!r}')
+
+    state.validate_player_id(command.player_id)
+    state.validate_no_selected_card_for_player(command.player_id)
+    card = Card(command.card_value)
+    state.validate_player_has_card(command.player_id, card)
+    state.selected_cards[command.player_id] = card
 
 
-def resolve_round(
-    state: GameState,
-    selections: dict[PlayerID, Card | PlayCardCommand],
-    choose_row: ChooseRowFn,
-) -> list[StepResult]:
-    state.validate_complete_play_selections(selections)
+def all_cards_selected(state: GameState) -> bool:
+    expected_player_ids = {player.player_id for player in state.players}
+    return set(state.selected_cards.keys()) == expected_player_ids
+
+
+def begin_trick_resolution(state: GameState) -> None:
+    state.validate_complete_play_selections()
 
     state.phase_info = PhaseInfo(
         phase=Phase.REVEAL_AND_RESOLVE,
         message='Revealing cards and resolving trick.',
     )
 
-    normalized: dict[PlayerID, Card] = {
-        player_id: _normalize_play_command(state, player_id, selection)
-        for player_id, selection in selections.items()
-    }
-
-    for player_id, card in normalized.items():
-        state.validate_player_has_card(player_id, card)
-
-    for player_id, card in normalized.items():
+    for player_id, card in state.selected_cards.items():
         player = state.get_player_by_id(player_id)
         hand_index = next(
             index for index, hand_card in enumerate(player.hand)
@@ -159,80 +123,109 @@ def resolve_round(
         )
         player.hand.pop(hand_index)
 
-    state.selected_cards = dict(normalized)
-
-    ordered = sorted(normalized.items(), key=lambda item: item[1].value)
+    ordered = sorted(state.selected_cards.items(), key=lambda item: item[1].value)
     state.resolve_order = [player_id for player_id, _card in ordered]
 
-    results: list[StepResult] = []
 
-    for player_id, card in ordered:
-        row_index = target_row_index(state.rows, card)
+def has_pending_row_choice(state: GameState) -> bool:
+    return state.phase_info.phase == Phase.CHOOSE_ROW
 
-        if row_index is None:
-            selectable_row_ids = tuple(row.row_id for row in state.rows)
-            state.phase_info = PhaseInfo(
-                phase=Phase.CHOOSE_ROW,
-                active_player_id=player_id,
-                pending_card=card,
-                selectable_row_ids=selectable_row_ids,
-                message='Choose a row to take.',
-            )
 
-            chosen = choose_row(state, player_id, card)
-            chosen_row_id = _normalize_choose_row_result(
-                state,
-                player_id,
-                chosen,
-            )
-            chosen_index = state.get_row_index(chosen_row_id)
+def has_pending_resolution_step(state: GameState) -> bool:
+    return bool(state.resolve_order) and state.phase_info.phase != Phase.CHOOSE_ROW
 
-            bullheads, _taken = take_row(state.rows, chosen_index)
-            state.get_player_by_id(player_id).score += bullheads
-            state.rows[chosen_index].cards = [card]
 
-            results.append(
-                StepResult(
-                    player_id=player_id,
-                    card=card,
-                    action=StepAction.TOOK_ROW_SMALL,
-                    row_id=chosen_row_id,
-                    bullheads_gained=bullheads,
-                )
-            )
-            continue
+def resolve_next_delta_public_state(state: GameState) -> DeltaPublicState | None:
+    if not state.resolve_order:
+        return None
+    if state.phase_info.phase == Phase.CHOOSE_ROW:
+        return None
 
-        target_row = state.rows[row_index]
-        bullheads, taken = place_card(
-            state.rows,
-            row_index,
-            card,
-            row_capacity=state.config.row_capacity,
+    player_id = state.resolve_order.pop(0)
+    card = state.selected_cards[player_id]
+    row_index = target_row_index(state.rows, card)
+
+    if row_index is None:
+        selectable_row_ids = tuple(row.row_id for row in state.rows)
+        state.phase_info = PhaseInfo(
+            phase=Phase.CHOOSE_ROW,
+            active_player_id=player_id,
+            pending_card=card,
+            selectable_row_ids=selectable_row_ids,
+            message='Choose a row to take.',
+        )
+        return None
+
+    target_row = state.rows[row_index]
+    bullheads, taken = place_card(
+        state.rows,
+        row_index,
+        card,
+        row_capacity=state.config.row_capacity,
+    )
+    if taken is not None:
+        state.get_player_by_id(player_id).score += bullheads
+
+    state.phase_info = PhaseInfo(
+        phase=Phase.REVEAL_AND_RESOLVE,
+        message='Revealing cards and resolving trick.',
+    )
+
+    return DeltaPublicState(
+        player_id=player_id,
+        played_card=card,
+        affected_row_id=target_row.row_id,
+        new_row_cards=list(target_row.cards),
+    )
+
+
+def submit_choose_row(state: GameState, command: ChooseRowCommand) -> DeltaPublicState:
+    if state.phase_info.phase != Phase.CHOOSE_ROW:
+        raise ValueError(f'invalid phase for submit_choose_row: {state.phase_info.phase!r}')
+
+    expected_player_id = state.phase_info.active_player_id
+    pending_card = state.phase_info.pending_card
+    if expected_player_id is None or pending_card is None:
+        raise ValueError('missing pending choose-row context')
+    if command.player_id != expected_player_id:
+        raise ValueError(
+            f'ChooseRowCommand player_id mismatch: expected {expected_player_id!r}, got {command.player_id!r}'
         )
 
-        if taken is not None:
-            state.get_player_by_id(player_id).score += bullheads
-            action = StepAction.TOOK_ROW_OVERFLOW
-        else:
-            action = StepAction.PLACED
+    selectable_row_ids = tuple(state.phase_info.selectable_row_ids)
+    if selectable_row_ids and command.row_id not in selectable_row_ids:
+        raise ValueError(f'row_id {command.row_id!r} is not selectable in the current state')
 
-        results.append(
-            StepResult(
-                player_id=player_id,
-                card=card,
-                action=action,
-                row_id=target_row.row_id,
-                bullheads_gained=bullheads,
-            )
-        )
+    chosen_index = state.get_row_index(command.row_id)
+    bullheads, _taken = take_row(state.rows, chosen_index)
+    state.get_player_by_id(command.player_id).score += bullheads
+    state.rows[chosen_index].cards = [pending_card]
 
+    state.phase_info = PhaseInfo(
+        phase=Phase.REVEAL_AND_RESOLVE,
+        message='Revealing cards and resolving trick.',
+    )
+
+    return DeltaPublicState(
+        player_id=command.player_id,
+        played_card=pending_card,
+        affected_row_id=command.row_id,
+        new_row_cards=list(state.rows[chosen_index].cards),
+    )
+
+
+def trick_resolution_finished(state: GameState) -> bool:
+    return not state.resolve_order and state.phase_info.phase != Phase.CHOOSE_ROW
+
+
+def finish_trick(state: GameState) -> bool:
     state.phase_info = PhaseInfo(
         phase=Phase.ROUND_SCORING,
         message='Trick finished.',
     )
     state.selected_cards.clear()
     state.resolve_order.clear()
-    return results
+    return start_next_round_if_needed(state)
 
 
 def start_next_round_if_needed(state: GameState) -> bool:

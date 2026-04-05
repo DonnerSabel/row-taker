@@ -1,9 +1,17 @@
 from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
-from row_taker.engine.game import resolve_round
+from row_taker.engine.game import (
+    all_cards_selected,
+    begin_trick_resolution,
+    resolve_next_delta_public_state,
+    submit_choose_row,
+    submit_play_card,
+    trick_resolution_finished,
+)
 from row_taker.engine.cards import Card
 from row_taker.engine.models import Player, PlayerID, Row, RowID
-from row_taker.engine.phases import Phase, PhaseInfo, StepAction
-from row_taker.engine.state import GameState, RulesConfig
+from row_taker.engine.phases import Phase, PhaseInfo
+from row_taker.engine.state import DeltaPublicState, GameState, RulesConfig
+from row_taker.engine.views import apply_delta_public_state
 
 
 def _make_state(*, p0_hand: list[int], p1_hand: list[int], rows: list[list[int]]) -> GameState:
@@ -34,61 +42,57 @@ def _make_state(*, p0_hand: list[int], p1_hand: list[int], rows: list[list[int]]
     )
 
 
-def test_resolve_round_places_cards_in_ascending_order() -> None:
+def test_resolution_in_steps_places_cards_in_ascending_order() -> None:
     state = _make_state(
         p0_hand=[42],
         p1_hand=[35],
         rows=[[10], [20], [30], [40]],
     )
 
-    results = resolve_round(
-        state,
-        {
-            PlayerID("player-0"): PlayCardCommand(PlayerID("player-0"), 42),
-            PlayerID("player-1"): PlayCardCommand(PlayerID("player-1"), 35),
-        },
-        lambda _state, _player_id, _card: ChooseRowCommand(PlayerID("player-0"), RowID("row-0")),
-    )
+    submit_play_card(state, PlayCardCommand(PlayerID("player-0"), 42))
+    submit_play_card(state, PlayCardCommand(PlayerID("player-1"), 35))
+    assert all_cards_selected(state)
 
-    assert [result.card.value for result in results] == [35, 42]
+    begin_trick_resolution(state)
+    delta_1 = resolve_next_delta_public_state(state)
+    delta_2 = resolve_next_delta_public_state(state)
+
+    assert delta_1 is not None
+    assert delta_2 is not None
+    assert [delta_1.played_card.value, delta_2.played_card.value] == [35, 42]
     assert [card.value for card in state.rows[2].cards] == [30, 35]
     assert [card.value for card in state.rows[3].cards] == [40, 42]
-    assert state.phase_info.phase == Phase.ROUND_SCORING
+    assert trick_resolution_finished(state)
 
 
-def test_resolve_round_requires_choose_row_for_small_card() -> None:
+def test_resolution_requires_choose_row_for_small_card() -> None:
     state = _make_state(
         p0_hand=[1],
         p1_hand=[90],
         rows=[[10], [20], [30], [40]],
     )
 
-    called: list[tuple[str, int]] = []
+    submit_play_card(state, PlayCardCommand(PlayerID("player-0"), 1))
+    submit_play_card(state, PlayCardCommand(PlayerID("player-1"), 90))
+    begin_trick_resolution(state)
 
-    def choose_row(_state: GameState, player_id: PlayerID, played_card: Card) -> ChooseRowCommand:
-        called.append((str(player_id), played_card.value))
-        return ChooseRowCommand(player_id=player_id, row_id=RowID("row-1"))
-
-    results = resolve_round(
+    assert resolve_next_delta_public_state(state) is None
+    assert state.phase_info.phase == Phase.CHOOSE_ROW
+    delta_1 = submit_choose_row(
         state,
-        {
-            PlayerID("player-0"): PlayCardCommand(PlayerID("player-0"), 1),
-            PlayerID("player-1"): PlayCardCommand(PlayerID("player-1"), 90),
-        },
-        choose_row,
+        ChooseRowCommand(player_id=PlayerID("player-0"), row_id=RowID("row-1")),
     )
+    delta_2 = resolve_next_delta_public_state(state)
 
-    assert called == [("player-0", 1)]
-    assert results[0].action == StepAction.TOOK_ROW_SMALL
-    assert results[0].row_id == RowID("row-1")
+    assert delta_1.affected_row_id == RowID("row-1")
     assert [card.value for card in state.rows[1].cards] == [1]
     assert state.players[0].score == Card(20).bullheads
 
-    assert results[1].action == StepAction.PLACED
+    assert delta_2 is not None
     assert [card.value for card in state.rows[3].cards] == [40, 90]
 
 
-def test_resolve_round_takes_full_row_on_sixth_card() -> None:
+def test_resolution_takes_full_row_on_sixth_card() -> None:
     state = _make_state(
         p0_hand=[15],
         p1_hand=[90],
@@ -100,40 +104,45 @@ def test_resolve_round_takes_full_row_on_sixth_card() -> None:
         ],
     )
 
-    results = resolve_round(
-        state,
-        {
-            PlayerID("player-0"): PlayCardCommand(PlayerID("player-0"), 15),
-            PlayerID("player-1"): PlayCardCommand(PlayerID("player-1"), 90),
-        },
-        lambda _state, player_id, _card: ChooseRowCommand(player_id=player_id, row_id=RowID("row-0")),
-    )
+    submit_play_card(state, PlayCardCommand(PlayerID("player-0"), 15))
+    submit_play_card(state, PlayCardCommand(PlayerID("player-1"), 90))
+    begin_trick_resolution(state)
 
-    assert results[0].action == StepAction.TOOK_ROW_OVERFLOW
-    assert results[0].row_id == RowID("row-0")
+    delta_1 = resolve_next_delta_public_state(state)
+    delta_2 = resolve_next_delta_public_state(state)
+
+    assert delta_1 is not None
+    assert delta_1.affected_row_id == RowID("row-0")
     assert state.players[0].score == sum(Card(v).bullheads for v in [10, 11, 12, 13, 14])
     assert [card.value for card in state.rows[0].cards] == [15]
 
-    assert results[1].action == StepAction.PLACED
+    assert delta_2 is not None
     assert [card.value for card in state.rows[3].cards] == [40, 90]
 
 
-def test_resolve_round_rejects_incomplete_selection_map() -> None:
-    state = _make_state(
+def test_apply_delta_public_state_updates_public_scores_and_rows() -> None:
+    public_before = _make_state(
         p0_hand=[15],
         p1_hand=[90],
-        rows=[[10], [20], [30], [40]],
+        rows=[
+            [10, 11, 12, 13, 14],
+            [20],
+            [30],
+            [40],
+        ],
+    )
+    from row_taker.engine.views import build_public_state
+
+    public_state = build_public_state(public_before)
+    delta = DeltaPublicState(
+        player_id=PlayerID("player-0"),
+        played_card=Card(15),
+        affected_row_id=RowID("row-0"),
+        new_row_cards=[Card(15)],
     )
 
-    try:
-        resolve_round(
-            state,
-            {
-                PlayerID("player-0"): PlayCardCommand(PlayerID("player-0"), 15),
-            },
-            lambda _state, player_id, _card: ChooseRowCommand(player_id=player_id, row_id=RowID("row-0")),
-        )
-    except ValueError as exc:
-        assert "one card for every player_id" in str(exc)
-    else:
-        raise AssertionError("resolve_round should reject incomplete selection maps")
+    public_after = apply_delta_public_state(public_state, delta)
+
+    assert [card.value for card in public_after.rows[0].cards] == [15]
+    assert public_after.players[0].score == sum(Card(v).bullheads for v in [10, 11, 12, 13, 14])
+    assert public_after.players[0].hand_count == public_state.players[0].hand_count - 1

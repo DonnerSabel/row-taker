@@ -3,42 +3,40 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
+from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.engine.phases import Phase
-from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice
-from row_taker.participants.client import ClientMessage, HubMessage
+from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice, HubToClientMessage, ClientToHubMessage
 
 
 @dataclass(slots=True)
 class RandomBotParticipant:
     rng: random.Random = field(default_factory=random.Random)
 
-    def handle_hub_message(self, message: HubMessage) -> list[ClientMessage]:
+    def handle_hub_message(self, message: HubToClientMessage) -> ClientToHubMessage | None:
         if isinstance(message, ChooseCardRequested):
-            return [self._handle_choose_card_request(message)]
+            state = message.state
+            state.validate_phase(Phase.CHOOSE_CARD)
+            state.validate_hand_not_empty()
+
+            card = self.rng.choice(state.hand)
+            return SubmitCard(
+                command=PlayCardCommand(
+                    player_id=state.self_player_id,
+                    card_value=card.value,
+                )
+            )
 
         if isinstance(message, ChooseRowRequested):
-            return [self._handle_choose_row_request(message)]
+            state = message.state
+            state.validate_phase(Phase.CHOOSE_ROW)
 
-        return []
+            candidates = list(state.get_selectable_row_ids_for_choose_row())
+            row_id = self.rng.choice(candidates)
+            return SubmitRowChoice(
+                command=ChooseRowCommand(
+                    player_id=state.self_player_id,
+                    row_id=row_id,
+                )
+            )
 
-    def _handle_choose_card_request(self, message: ChooseCardRequested) -> SubmitCard:
-        state = message.state
-        state.validate_phase(Phase.CHOOSE_CARD)
-        state.validate_hand_not_empty()
-
-        card = self.rng.choice(state.hand)
-        return SubmitCard(
-            player_id=state.self_player_id,
-            card_value=card.value,
-        )
-
-    def _handle_choose_row_request(self, message: ChooseRowRequested) -> SubmitRowChoice:
-        state = message.state
-        state.validate_phase(Phase.CHOOSE_ROW)
-
-        candidates = list(state.get_selectable_row_ids_for_choose_row())
-        row_id = self.rng.choice(candidates)
-        return SubmitRowChoice(
-            player_id=state.self_player_id,
-            row_id=row_id,
-        )
+        return None

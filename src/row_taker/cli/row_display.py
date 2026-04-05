@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass
 
-from row_taker.engine.game import StepResult
-from row_taker.engine.models import PublicPlayerInfo
-from row_taker.engine.phases import StepAction
-from row_taker.engine.state import PublicState, get_player_index, get_row_index
+from row_taker.engine.state import DeltaPublicState, PublicState
+from row_taker.engine.views import apply_delta_public_state, classify_row_take_public_delta, score_delta_for_public_delta
 
 
 @dataclass(slots=True, frozen=True)
@@ -49,64 +46,33 @@ def build_row_display_mapping(state: PublicState) -> RowDisplayMapping:
     )
 
 
-def _replace_public_player_score(
-    state: PublicState,
-    player_index: int,
-    bullheads_delta: int,
-) -> None:
-    old_player = state.players[player_index]
-    state.players[player_index] = PublicPlayerInfo(
-        player_id=old_player.player_id,
-        name=old_player.name,
-        score=old_player.score + bullheads_delta,
-        hand_count=old_player.hand_count,
-    )
-
-
-def apply_result_to_shadow_state(state: PublicState, result: StepResult) -> None:
-    row_index = get_row_index(state.rows, result.row_id)
-    player_index = get_player_index(state.players, result.player_id)
-    row = state.rows[row_index]
-
-    if result.action == StepAction.PLACED:
-        row.cards.append(result.card)
-        return
-
-    if result.action in {StepAction.TOOK_ROW_SMALL, StepAction.TOOK_ROW_OVERFLOW}:
-        row.cards = [result.card]
-        _replace_public_player_score(state, player_index, result.bullheads_gained)
-        return
-
-    raise ValueError(f"Unbekannte Aktion: {result.action}")
-
-
-def format_results_for_cli(before_state: PublicState, results: list[StepResult]) -> list[str]:
-    shadow_state = deepcopy(before_state)
+def format_deltas_for_cli(before_state: PublicState, deltas: list[DeltaPublicState]) -> list[str]:
+    shadow_state = before_state
     lines: list[str] = []
 
-    for result in results:
-        row_index = get_row_index(shadow_state.rows, result.row_id)
-        player_index = get_player_index(shadow_state.players, result.player_id)
-
+    for delta in deltas:
+        row_index = shadow_state.get_row_index(delta.affected_row_id)
         mapping = build_row_display_mapping(shadow_state)
         cli_row = mapping.to_cli_row(row_index)
-        player = shadow_state.players[player_index]
+        player = next(player for player in shadow_state.players if player.player_id == delta.player_id)
+        transition_kind = classify_row_take_public_delta(shadow_state, delta)
+        bullheads = score_delta_for_public_delta(shadow_state, delta)
 
-        if result.action == StepAction.PLACED:
-            lines.append(f"- {player.name} legt {result.card.value} an Reihe {cli_row}.")
-        elif result.action == StepAction.TOOK_ROW_SMALL:
+        if transition_kind == 'placed':
+            lines.append(f'- {player.name} legt {delta.played_card.value} an Reihe {cli_row}.')
+        elif transition_kind == 'took_row_small':
             lines.append(
-                f"- {player.name} nimmt Reihe {cli_row} ({result.bullheads_gained} Hornochsen) "
-                f"und startet mit {result.card.value}."
+                f'- {player.name} nimmt Reihe {cli_row} ({bullheads} Hornochsen) '
+                f'und startet mit {delta.played_card.value}.'
             )
-        elif result.action == StepAction.TOOK_ROW_OVERFLOW:
+        elif transition_kind == 'took_row_overflow':
             lines.append(
-                f"- {player.name} füllt Reihe {cli_row} (nimmt {result.bullheads_gained} Hornochsen) "
-                f"und startet mit {result.card.value}."
+                f'- {player.name} füllt Reihe {cli_row} (nimmt {bullheads} Hornochsen) '
+                f'und startet mit {delta.played_card.value}.'
             )
         else:
-            raise ValueError(f"Unbekannte Aktion: {result.action}")
+            raise ValueError(f'Unbekannte Delta-Klassifikation: {transition_kind}')
 
-        apply_result_to_shadow_state(shadow_state, result)
+        shadow_state = apply_delta_public_state(shadow_state, delta)
 
     return lines

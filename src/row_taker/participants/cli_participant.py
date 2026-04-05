@@ -6,24 +6,21 @@ from row_taker.cli.render import render_player_state
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.cli.terminal import clear_screen
 from row_taker.engine.cards import Card
-from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice
-from row_taker.participants.client import ClientMessage, HubMessage
+from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
+from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice, HubToClientMessage, ClientToHubMessage
 
 
 @dataclass(slots=True)
 class CliParticipant:
-    def handle_hub_message(self, message: HubMessage) -> list[ClientMessage]:
+    def handle_hub_message(self, message: HubToClientMessage) -> ClientToHubMessage | None:
         if isinstance(message, ChooseCardRequested):
-            return [self._handle_choose_card_request(message)]
-
+            return self._handle_choose_card_requested(message)
         if isinstance(message, ChooseRowRequested):
-            return [self._handle_choose_row_request(message)]
+            return self._handle_choose_row_requested(message)
+        return None
 
-        return []
-
-    def _handle_choose_card_request(self, message: ChooseCardRequested) -> SubmitCard:
+    def _handle_choose_card_requested(self, message: ChooseCardRequested) -> SubmitCard:
         state = message.state
-
         while True:
             clear_screen()
             render_player_state(state)
@@ -37,13 +34,15 @@ class CliParticipant:
                     pass
                 else:
                     return SubmitCard(
-                        player_id=state.self_player_id,
-                        card_value=card.value,
+                        command=PlayCardCommand(
+                            player_id=state.self_player_id,
+                            card_value=card.value,
+                        )
                     )
 
             input('Ungültige Wahl. Enter...')
 
-    def _handle_choose_row_request(self, message: ChooseRowRequested) -> SubmitRowChoice:
+    def _handle_choose_row_requested(self, message: ChooseRowRequested) -> SubmitRowChoice:
         state = message.state
         mapping = build_row_display_mapping(state.public_state)
 
@@ -77,8 +76,10 @@ class CliParticipant:
                         pass
                     else:
                         return SubmitRowChoice(
-                            player_id=state.self_player_id,
-                            row_id=row_id,
+                            command=ChooseRowCommand(
+                                player_id=state.self_player_id,
+                                row_id=row_id,
+                            )
                         )
 
             print(f'Ungültig. Bitte 1-{max_choice} eingeben.')

@@ -2,21 +2,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from row_taker.engine.state import PlayerState, PublicState
-from row_taker.engine.game import StepResult
-from row_taker.engine.models import PlayerID, RowID
+from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
+from row_taker.engine.models import PlayerID
+from row_taker.engine.state import DeltaPublicState, PlayerState, PublicState
 
 
 @dataclass(frozen=True, slots=True)
 class SubmitCard:
-    player_id: PlayerID
-    card_value: int
+    command: PlayCardCommand
 
 
 @dataclass(frozen=True, slots=True)
 class SubmitRowChoice:
-    player_id: PlayerID
-    row_id: RowID
+    command: ChooseRowCommand
+
+
+ClientToHubMessage = SubmitCard | SubmitRowChoice
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +40,10 @@ class ChooseRowRequested:
 @dataclass(frozen=True, slots=True)
 class TrickResolved:
     public_state_before: PublicState
-    resolution: list[StepResult]
+    deltas: list[DeltaPublicState]
     public_state_after: PublicState
     new_round_started: bool
     game_finished: bool
+
+
+HubToClientMessage = StateUpdated | ChooseCardRequested | ChooseRowRequested | TrickResolved

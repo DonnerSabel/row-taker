@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from row_taker.cli.row_display import build_row_display_mapping, format_results_for_cli
+from row_taker.cli.row_display import build_row_display_mapping, format_deltas_for_cli
 from row_taker.engine.state import PlayerState, PublicState
 from row_taker.hub.messages import TrickResolved
 
@@ -47,7 +47,7 @@ def render_player_state(state: PlayerState) -> None:
 
 
 def render_trick_result(result: TrickResolved) -> None:
-    result_lines = format_results_for_cli(result.public_state_before, result.resolution)
+    result_lines = format_deltas_for_cli(result.public_state_before, result.deltas)
     render_public_state(result.public_state_after)
 
     print('Auflösung:')

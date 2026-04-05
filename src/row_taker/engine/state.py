@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from .commands import ChooseRowCommand, PlayCardCommand
-from .models import Card, Player, PlayerID, PublicPlayerInfo, Row, RowID
+from .cards import Card
+from .models import Player, PlayerID, PublicPlayerInfo, Row, RowID
 from .phases import Phase, PhaseInfo
 
 
@@ -33,6 +35,14 @@ class RulesConfig:
             raise ValueError(f"player count must be 2..6, got {player_count}")
 
 
+@dataclass(frozen=True, slots=True)
+class DeltaPublicState:
+    player_id: PlayerID
+    played_card: Card
+    affected_row_id: RowID
+    new_row_cards: list[Card]
+
+
 @dataclass(slots=True)
 class GameState:
     config: RulesConfig
@@ -60,9 +70,9 @@ class GameState:
     def get_row_index(self, row_id: RowID) -> int:
         return get_row_index(self.rows, row_id)
 
-    def validate_complete_play_selections(self, selections: dict[PlayerID, Card | PlayCardCommand]) -> None:
+    def validate_complete_play_selections(self) -> None:
         expected_player_ids = {player.player_id for player in self.players}
-        if set(selections.keys()) != expected_player_ids:
+        if set(self.selected_cards.keys()) != expected_player_ids:
             raise ValueError('selections must contain one card for every player_id')
 
     def validate_player_has_card(self, player_id: PlayerID, card: Card) -> None:
@@ -70,17 +80,9 @@ class GameState:
         if all(hand_card.value != card.value for hand_card in player.hand):
             raise ValueError(f"player {player_id!r} does not have card {card.value}")
 
-    def validate_play_command_player_id(self, expected_player_id: PlayerID, command: PlayCardCommand) -> None:
-        if command.player_id != expected_player_id:
-            raise ValueError(
-                f"PlayCardCommand player_id mismatch: expected {expected_player_id!r}, got {command.player_id!r}"
-            )
-
-    def validate_choose_row_command_player_id(self, expected_player_id: PlayerID, command: ChooseRowCommand) -> None:
-        if command.player_id != expected_player_id:
-            raise ValueError(
-                f"ChooseRowCommand player_id mismatch: expected {expected_player_id!r}, got {command.player_id!r}"
-            )
+    def validate_no_selected_card_for_player(self, player_id: PlayerID) -> None:
+        if player_id in self.selected_cards:
+            raise ValueError(f"player {player_id!r} has already selected a card")
 
 
 @dataclass(frozen=True, slots=True)

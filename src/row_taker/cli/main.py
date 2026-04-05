@@ -8,10 +8,42 @@ from row_taker.cli.terminal import clear_screen
 from row_taker.engine.game import setup_game
 from row_taker.hub.match_config import ParticipantKind
 from row_taker.hub.match_hub import MatchHub
-from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, TrickResolved
+from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, StateUpdated, TrickResolved
 from row_taker.participants.cli_participant import CliParticipant
 from row_taker.participants.client import Client
 from row_taker.participants.random_bot_participant import RandomBotParticipant
+
+
+def _dispatch_hub_messages(hub: MatchHub, clients_by_player_id: dict, *, interactive: bool = True) -> None:
+    while True:
+        messages = hub.drain_outbox()
+        if not messages:
+            return
+
+        for message in messages:
+            if isinstance(message, TrickResolved):
+                clear_screen()
+                render_trick_result(message)
+                if message.game_finished:
+                    continue
+                if interactive:
+                    print()
+                    cont = input("Enter für nächsten Stich, 'q' zum Beenden > ").strip().lower()
+                    if cont == 'q':
+                        raise KeyboardInterrupt
+                continue
+
+            if isinstance(message, StateUpdated):
+                continue
+
+            if isinstance(message, (ChooseCardRequested, ChooseRowRequested)):
+                client: Client = clients_by_player_id[message.player_id]
+                response = client.handle_hub_message(message)
+                if response is not None:
+                    hub.handle_client_message(response)
+                continue
+
+            raise TypeError(f'unsupported hub message type: {type(message)!r}')
 
 
 def main() -> None:
@@ -25,7 +57,7 @@ def main() -> None:
     player_names = [seat.name for seat in match_config.seats]
     state = setup_game(player_names, rng=rng)
 
-    clients_by_player_id: dict[object, Client] = {}
+    clients_by_player_id = {}
     for seat, player in zip(match_config.seats, state.players, strict=True):
         if seat.kind == ParticipantKind.HUMAN:
             clients_by_player_id[player.player_id] = CliParticipant()
@@ -35,46 +67,14 @@ def main() -> None:
             raise ValueError(f'unsupported participant kind: {seat.kind!r}')
 
     hub = MatchHub(state=state)
-
-    while True:
-        hub.start_trick()
-        trick_result = _run_trick_until_resolved(hub, clients_by_player_id)
-
-        clear_screen()
-        render_trick_result(trick_result)
-
-        if trick_result.game_finished:
-            break
-
-        print()
-        cont = input("Enter für nächsten Stich, 'q' zum Beenden > ").strip().lower()
-        if cont == 'q':
-            break
+    hub.start_match()
+    _dispatch_hub_messages(hub, clients_by_player_id)
 
     print()
     print('Endstand:')
     render_public_state(hub.build_public_state())
     winner = min(hub.state.players, key=lambda p: p.score)
     print(f'Gewonnen hat: {winner.name} (wenigste Hornochsen)')
-
-
-def _run_trick_until_resolved(
-    hub: MatchHub,
-    clients_by_player_id: dict[object, Client],
-) -> TrickResolved:
-    while True:
-        messages = hub.drain_outbox()
-        if not messages:
-            raise ValueError('hub outbox unexpectedly empty before trick was resolved')
-
-        for message in messages:
-            if isinstance(message, TrickResolved):
-                return message
-
-            if isinstance(message, (ChooseCardRequested, ChooseRowRequested)):
-                client = clients_by_player_id[message.player_id]
-                for client_message in client.handle_hub_message(message):
-                    hub.handle_client_message(client_message)
 
 
 def run() -> int:
