@@ -6,13 +6,24 @@ from row_taker.cli.render import render_player_state
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.cli.terminal import clear_screen
 from row_taker.engine.cards import Card
-from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
-from row_taker.engine.state import PlayerState
+from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice
+from row_taker.participants.client import ClientMessage, HubMessage
 
 
 @dataclass(slots=True)
 class CliParticipant:
-    def on_choose_card_request(self, state: PlayerState) -> PlayCardCommand:
+    def handle_hub_message(self, message: HubMessage) -> list[ClientMessage]:
+        if isinstance(message, ChooseCardRequested):
+            return [self._handle_choose_card_request(message)]
+
+        if isinstance(message, ChooseRowRequested):
+            return [self._handle_choose_row_request(message)]
+
+        return []
+
+    def _handle_choose_card_request(self, message: ChooseCardRequested) -> SubmitCard:
+        state = message.state
+
         while True:
             clear_screen()
             render_player_state(state)
@@ -25,14 +36,15 @@ class CliParticipant:
                 except ValueError:
                     pass
                 else:
-                    return PlayCardCommand(
+                    return SubmitCard(
                         player_id=state.self_player_id,
                         card_value=card.value,
                     )
 
             input('Ungültige Wahl. Enter...')
 
-    def on_choose_row_request(self, state: PlayerState) -> ChooseRowCommand:
+    def _handle_choose_row_request(self, message: ChooseRowRequested) -> SubmitRowChoice:
+        state = message.state
         mapping = build_row_display_mapping(state.public_state)
 
         while True:
@@ -64,7 +76,7 @@ class CliParticipant:
                     except ValueError:
                         pass
                     else:
-                        return ChooseRowCommand(
+                        return SubmitRowChoice(
                             player_id=state.self_player_id,
                             row_id=row_id,
                         )
