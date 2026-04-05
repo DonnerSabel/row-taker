@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 from .models import Card, PlayerID, RowID
 
 
-class Phase:
+class Phase(StrEnum):
     ROUND_SETUP = "round_setup"
     CHOOSE_CARD = "choose_card"
     REVEAL_AND_RESOLVE = "reveal_and_resolve"
@@ -14,9 +15,15 @@ class Phase:
     GAME_OVER = "game_over"
 
 
+class StepAction(StrEnum):
+    PLACED = "placed"
+    TOOK_ROW_SMALL = "took_row_small"
+    TOOK_ROW_OVERFLOW = "took_row_overflow"
+
+
 @dataclass(frozen=True, slots=True)
 class PhaseInfo:
-    phase: str
+    phase: Phase
 
     # Falls genau ein Spieler jetzt entscheiden muss:
     active_player_id: PlayerID | None = None

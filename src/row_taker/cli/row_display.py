@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 from row_taker.engine.game import StepResult
 from row_taker.engine.models import PublicPlayerInfo
-from row_taker.engine.state import PublicState
+from row_taker.engine.phases import StepAction
+from row_taker.engine.state import PublicState, get_player_index, get_row_index
 
 
 @dataclass(slots=True, frozen=True)
@@ -48,20 +49,6 @@ def build_row_display_mapping(state: PublicState) -> RowDisplayMapping:
     )
 
 
-def _find_row_index_by_id(state: PublicState, row_id: str) -> int:
-    for index, row in enumerate(state.rows):
-        if row.row_id == row_id:
-            return index
-    raise ValueError(f"unknown row_id: {row_id!r}")
-
-
-def _find_player_index_by_id(state: PublicState, player_id: str) -> int:
-    for index, player in enumerate(state.players):
-        if player.player_id == player_id:
-            return index
-    raise ValueError(f"unknown player_id: {player_id!r}")
-
-
 def _replace_public_player_score(
     state: PublicState,
     player_index: int,
@@ -77,15 +64,15 @@ def _replace_public_player_score(
 
 
 def apply_result_to_shadow_state(state: PublicState, result: StepResult) -> None:
-    row_index = _find_row_index_by_id(state, result.row_id)
-    player_index = _find_player_index_by_id(state, result.player_id)
+    row_index = get_row_index(state.rows, result.row_id)
+    player_index = get_player_index(state.players, result.player_id)
     row = state.rows[row_index]
 
-    if result.action == "placed":
+    if result.action == StepAction.PLACED:
         row.cards.append(result.card)
         return
 
-    if result.action in {"took_row_small", "took_row_overflow"}:
+    if result.action in {StepAction.TOOK_ROW_SMALL, StepAction.TOOK_ROW_OVERFLOW}:
         row.cards = [result.card]
         _replace_public_player_score(state, player_index, result.bullheads_gained)
         return
@@ -98,21 +85,21 @@ def format_results_for_cli(before_state: PublicState, results: list[StepResult])
     lines: list[str] = []
 
     for result in results:
-        row_index = _find_row_index_by_id(shadow_state, result.row_id)
-        player_index = _find_player_index_by_id(shadow_state, result.player_id)
+        row_index = get_row_index(shadow_state.rows, result.row_id)
+        player_index = get_player_index(shadow_state.players, result.player_id)
 
         mapping = build_row_display_mapping(shadow_state)
         cli_row = mapping.to_cli_row(row_index)
         player = shadow_state.players[player_index]
 
-        if result.action == "placed":
+        if result.action == StepAction.PLACED:
             lines.append(f"- {player.name} legt {result.card.value} an Reihe {cli_row}.")
-        elif result.action == "took_row_small":
+        elif result.action == StepAction.TOOK_ROW_SMALL:
             lines.append(
                 f"- {player.name} nimmt Reihe {cli_row} ({result.bullheads_gained} Hornochsen) "
                 f"und startet mit {result.card.value}."
             )
-        elif result.action == "took_row_overflow":
+        elif result.action == StepAction.TOOK_ROW_OVERFLOW:
             lines.append(
                 f"- {player.name} füllt Reihe {cli_row} (nimmt {result.bullheads_gained} Hornochsen) "
                 f"und startet mit {result.card.value}."

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from .commands import ChooseRowCommand, PlayCardCommand
 from .cards import Card, Deck
 from .models import Player, PlayerID, Row, RowID
-from .phases import Phase, PhaseInfo
+from .phases import Phase, PhaseInfo, StepAction
 from .rules import place_card, take_row, target_row_index
 from .state import GameState, RulesConfig
 
@@ -126,7 +126,7 @@ def _deal_new_round(state: GameState) -> None:
 class StepResult:
     player_id: PlayerID
     card: Card
-    action: str
+    action: StepAction
     row_id: RowID
     bullheads_gained: int
 
@@ -195,7 +195,7 @@ def resolve_round(
                 StepResult(
                     player_id=player_id,
                     card=card,
-                    action='took_row_small',
+                    action=StepAction.TOOK_ROW_SMALL,
                     row_id=chosen_row_id,
                     bullheads_gained=bullheads,
                 )
@@ -212,9 +212,9 @@ def resolve_round(
 
         if taken is not None:
             state.get_player_by_id(player_id).score += bullheads
-            action = 'took_row_overflow'
+            action = StepAction.TOOK_ROW_OVERFLOW
         else:
-            action = 'placed'
+            action = StepAction.PLACED
 
         results.append(
             StepResult(

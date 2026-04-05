@@ -2,7 +2,7 @@ from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.engine.game import resolve_round
 from row_taker.engine.cards import Card
 from row_taker.engine.models import Player, PlayerID, Row, RowID
-from row_taker.engine.phases import Phase, PhaseInfo
+from row_taker.engine.phases import Phase, PhaseInfo, StepAction
 from row_taker.engine.state import GameState, RulesConfig
 
 
@@ -79,12 +79,12 @@ def test_resolve_round_requires_choose_row_for_small_card() -> None:
     )
 
     assert called == [("player-0", 1)]
-    assert results[0].action == "took_row_small"
+    assert results[0].action == StepAction.TOOK_ROW_SMALL
     assert results[0].row_id == RowID("row-1")
     assert [card.value for card in state.rows[1].cards] == [1]
     assert state.players[0].score == Card(20).bullheads
 
-    assert results[1].action == "placed"
+    assert results[1].action == StepAction.PLACED
     assert [card.value for card in state.rows[3].cards] == [40, 90]
 
 
@@ -109,12 +109,12 @@ def test_resolve_round_takes_full_row_on_sixth_card() -> None:
         lambda _state, player_id, _card: ChooseRowCommand(player_id=player_id, row_id=RowID("row-0")),
     )
 
-    assert results[0].action == "took_row_overflow"
+    assert results[0].action == StepAction.TOOK_ROW_OVERFLOW
     assert results[0].row_id == RowID("row-0")
     assert state.players[0].score == sum(Card(v).bullheads for v in [10, 11, 12, 13, 14])
     assert [card.value for card in state.rows[0].cards] == [15]
 
-    assert results[1].action == "placed"
+    assert results[1].action == StepAction.PLACED
     assert [card.value for card in state.rows[3].cards] == [40, 90]
 
 

@@ -1,8 +1,23 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from .commands import ChooseRowCommand, PlayCardCommand
 from .models import Card, Player, PlayerID, PublicPlayerInfo, Row, RowID
-from .phases import PhaseInfo
+from .phases import Phase, PhaseInfo
+
+
+def get_player_index(players: Sequence[Player | PublicPlayerInfo], player_id: PlayerID) -> int:
+    for index, player in enumerate(players):
+        if player.player_id == player_id:
+            return index
+    raise ValueError(f"unknown player_id: {player_id!r}")
+
+
+def get_row_index(rows: Sequence[Row], row_id: RowID) -> int:
+    for index, row in enumerate(rows):
+        if row.row_id == row_id:
+            return index
+    raise ValueError(f"unknown row_id: {row_id!r}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,32 +43,22 @@ class GameState:
     round_no: int = 1
     trick_no: int = 1
 
-    phase_info: PhaseInfo = field(default_factory=lambda: PhaseInfo(phase='round_setup'))
+    phase_info: PhaseInfo = field(default_factory=lambda: PhaseInfo(phase=Phase.ROUND_SETUP))
 
     selected_cards: dict[PlayerID, Card] = field(default_factory=dict)
     resolve_order: list[PlayerID] = field(default_factory=list)
 
     def validate_player_id(self, player_id: PlayerID) -> None:
-        if all(player.player_id != player_id for player in self.players):
-            raise ValueError(f"unknown player_id: {player_id!r}")
+        get_player_index(self.players, player_id)
 
     def get_player_by_id(self, player_id: PlayerID) -> Player:
-        self.validate_player_id(player_id)
-        for player in self.players:
-            if player.player_id == player_id:
-                return player
-        raise AssertionError('validate_player_id accepted an unknown player_id')
+        return self.players[get_player_index(self.players, player_id)]
 
     def validate_row_id(self, row_id: RowID) -> None:
-        if all(row.row_id != row_id for row in self.rows):
-            raise ValueError(f"unknown row_id: {row_id!r}")
+        get_row_index(self.rows, row_id)
 
     def get_row_index(self, row_id: RowID) -> int:
-        self.validate_row_id(row_id)
-        for index, row in enumerate(self.rows):
-            if row.row_id == row_id:
-                return index
-        raise AssertionError('validate_row_id accepted an unknown row_id')
+        return get_row_index(self.rows, row_id)
 
     def validate_complete_play_selections(self, selections: dict[PlayerID, Card | PlayCardCommand]) -> None:
         expected_player_ids = {player.player_id for player in self.players}
@@ -88,15 +93,10 @@ class PublicState:
     phase_info: PhaseInfo
 
     def validate_row_id(self, row_id: RowID) -> None:
-        if all(row.row_id != row_id for row in self.rows):
-            raise ValueError(f"unknown row_id: {row_id!r}")
+        get_row_index(self.rows, row_id)
 
     def get_row_index(self, row_id: RowID) -> int:
-        self.validate_row_id(row_id)
-        for index, row in enumerate(self.rows):
-            if row.row_id == row_id:
-                return index
-        raise AssertionError('validate_row_id accepted an unknown row_id')
+        return get_row_index(self.rows, row_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,7 +105,7 @@ class PlayerState:
     self_player_id: PlayerID
     hand: list[Card]
 
-    def validate_phase(self, expected_phase: str) -> None:
+    def validate_phase(self, expected_phase: Phase) -> None:
         if self.phase_info.phase != expected_phase:
             raise ValueError(
                 f"invalid phase: expected {expected_phase!r}, got {self.phase_info.phase!r}"
