@@ -7,6 +7,7 @@ from row_taker.engine.game import StepResult, resolve_round, start_next_round_if
 from row_taker.engine.models import PlayerID
 from row_taker.engine.state import GameState, PlayerState, PublicState
 from row_taker.engine.views import build_player_state, build_public_state
+from row_taker.engine.phases import Phase
 from row_taker.hub.hub_participant import HubParticipant
 
 
@@ -45,7 +46,7 @@ class MatchHub:
         )
 
     def is_finished(self) -> bool:
-        return self.state.phase_info.phase == 'game_over'
+        return self.state.phase_info.phase == Phase.GAME_OVER
 
     def build_public_state(self) -> PublicState:
         return build_public_state(self.state)
