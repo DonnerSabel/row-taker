@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 
 from row_taker.cli.create_match_config import create_match_config
-from row_taker.cli.render import render_public_state, render_trick_result
+from row_taker.cli.render import render_public_state, render_trick_resolution
 from row_taker.cli.terminal import clear_screen
 from row_taker.clients.cli_client import CliClient
 from row_taker.clients.client import Client
@@ -32,7 +32,7 @@ def _dispatch_hub_messages(hub: MatchHub, clients_by_player_id: dict, *, interac
                 if latest_public_state is None:
                     raise ValueError('missing public state before trick resolution')
                 clear_screen()
-                render_trick_result(latest_public_state, message)
+                render_trick_resolution(latest_public_state, message)
                 if message.game_finished:
                     continue
                 if interactive:

@@ -3,7 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from row_taker.engine.phases import StepAction
-from row_taker.engine.public_state_ops import apply_delta_public_state, classify_public_delta, played_card_from_delta, score_delta_for_public_delta
+from row_taker.engine.public_state_ops import (
+    apply_delta_public_state,
+    classify_public_delta,
+    played_card_from_delta,
+    score_delta_for_public_delta,
+)
 from row_taker.engine.state import DeltaPublicState, PublicState
 
 
@@ -47,7 +52,7 @@ def build_row_display_mapping(state: PublicState) -> RowDisplayMapping:
     )
 
 
-def format_deltas_for_cli(before_state: PublicState, deltas: list[DeltaPublicState]) -> list[str]:
+def format_public_deltas_for_cli(before_state: PublicState, deltas: list[DeltaPublicState] | tuple[DeltaPublicState, ...]) -> list[str]:
     shadow_state = before_state
     lines: list[str] = []
 

@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "row-taker"
 version = "0.1.0"
-description = "Unterrichtsprojekt: Row-Taker in Python (CLI zuerst, GUI/Netzwerk später)."
+description = "Unterrichtsprojekt: Row-Taker in Python (CLI zuerst, weitere Clients später)."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "pygame>=2.5"
 ]
@@ -27,7 +27,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.format]
 quote-style = "double"
