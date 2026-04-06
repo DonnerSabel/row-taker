@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Final
-
 
 MIN_PLAYERS: Final[int] = 2
 MAX_PLAYERS: Final[int] = 6
@@ -37,7 +36,7 @@ class SeatConfig:
 
 @dataclass(slots=True, frozen=True)
 class MatchConfig:
-    seats: tuple[SeatConfig, ...] = field(default_factory=tuple)
+    seats: tuple[SeatConfig, ...]
 
     @staticmethod
     def from_seats(seats: list[SeatConfig] | tuple[SeatConfig, ...]) -> "MatchConfig":
@@ -54,14 +53,11 @@ class MatchConfig:
 
         seen_indices: set[int] = set()
         seen_names: set[str] = set()
-
         for seat in self.seats:
             seat.validate()
-
             if seat.seat_index in seen_indices:
                 raise ValueError(f"duplicate seat_index: {seat.seat_index}")
             seen_indices.add(seat.seat_index)
-
             normalized_name = seat.name.strip().casefold()
             if normalized_name in seen_names:
                 raise ValueError(f"duplicate player name: {seat.name!r}")

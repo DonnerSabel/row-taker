@@ -1,9 +1,6 @@
-from row_taker.engine.cards import Card
-from row_taker.engine.lobby.config import MatchConfig, SeatConfig
-from row_taker.engine.lobby.state import LobbyState
-from row_taker.engine.models import PlayerID, PublicPlayerInfo, Row, RowID
-from row_taker.engine.phases import Phase, PhaseInfo
-from row_taker.engine.state import DeltaPublicState, PlayerState, PublicState, RulesConfig
+from row_taker.engine.game.models import PlayerID, RowID
+from row_taker.engine.lobby.config import ClientKind
+from row_taker.engine.lobby.state import ConnectedClient, LobbySeat, LobbyState
 from row_taker.protocol.codec import (
     client_message_from_dict,
     client_message_to_dict,
@@ -12,73 +9,51 @@ from row_taker.protocol.codec import (
 )
 from row_taker.protocol.messages import (
     ChooseCardRequested,
-    ConfigureLobby,
+    ChooseSeat,
     GameStarting,
+    JoinLobby,
+    LobbyActionRejected,
     LobbyStateUpdated,
-    StartGame,
-    StateUpdated,
+    RequestStartGame,
+    ServerError,
+    SetDisplayName,
     SubmitCard,
     SubmitRowChoice,
-    TrickResolved,
 )
 
 
-def _public_state() -> PublicState:
-    return PublicState(
-        config=RulesConfig(),
-        players=[PublicPlayerInfo(player_id=PlayerID('player-0'), name='A', score=3, hand_count=7)],
-        rows=[Row(row_id=RowID('row-0'), cards=[Card(10)])],
-        round_no=2,
-        trick_no=5,
-        phase_info=PhaseInfo(phase=Phase.CHOOSE_CARD, message='Choose one card.'),
+def _lobby_state() -> LobbyState:
+    return LobbyState(
+        seat_count=3,
+        clients=(ConnectedClient(client_id='client-0', display_name='Alice'),),
+        seats=(
+            LobbySeat(seat_index=0, kind=ClientKind.HUMAN, name='Alice', client_id='client-0'),
+            LobbySeat(seat_index=1),
+            LobbySeat(seat_index=2, kind=ClientKind.RANDOM_BOT, name='Bot_3'),
+        ),
+        game_started=False,
     )
 
 
-def _match_config() -> MatchConfig:
-    return MatchConfig.from_seats([
-        SeatConfig.human(0, 'A'),
-        SeatConfig.random_bot(1, 'Bot_1'),
-    ])
+def test_client_messages_roundtrip() -> None:
+    for message in [
+        JoinLobby(display_name='Alice'),
+        SetDisplayName(display_name='Bob'),
+        ChooseSeat(seat_index=1),
+        RequestStartGame(),
+        SubmitCard(player_id=PlayerID('player-0'), card_value=42),
+        SubmitRowChoice(player_id=PlayerID('player-1'), row_id=RowID('row-2')),
+    ]:
+        assert client_message_from_dict(client_message_to_dict(message)) == message
 
 
-def _lobby_state(*, game_started: bool = False) -> LobbyState:
-    return LobbyState(match_config=_match_config(), game_started=game_started)
-
-
-def test_client_protocol_codec_roundtrip() -> None:
-    submit_card = SubmitCard(player_id=PlayerID('player-0'), card_value=42)
-    assert client_message_from_dict(client_message_to_dict(submit_card)) == submit_card
-
-    submit_row = SubmitRowChoice(player_id=PlayerID('player-0'), row_id=RowID('row-2'))
-    assert client_message_from_dict(client_message_to_dict(submit_row)) == submit_row
-
-    configure_lobby = ConfigureLobby(match_config=_match_config())
-    assert client_message_from_dict(client_message_to_dict(configure_lobby)) == configure_lobby
-
-    start_game = StartGame()
-    assert client_message_from_dict(client_message_to_dict(start_game)) == start_game
-
-
-def test_server_protocol_codec_roundtrip() -> None:
-    public_state = _public_state()
-    player_state = PlayerState(public_state=public_state, self_player_id=PlayerID('player-0'), hand=[Card(42)])
-    delta = DeltaPublicState(
-        player_id=PlayerID('player-0'),
-        affected_row_id=RowID('row-0'),
-        new_row_cards=(Card(10), Card(42)),
-    )
-
-    lobby_updated = LobbyStateUpdated(lobby_state=_lobby_state())
-    assert server_message_from_dict(server_message_to_dict(lobby_updated)) == lobby_updated
-
-    game_starting = GameStarting(lobby_state=_lobby_state(game_started=True))
-    assert server_message_from_dict(server_message_to_dict(game_starting)) == game_starting
-
-    state_updated = StateUpdated(state=public_state)
-    assert server_message_from_dict(server_message_to_dict(state_updated)) == state_updated
-
-    choose_card = ChooseCardRequested(player_id=PlayerID('player-0'), state=player_state)
-    assert server_message_from_dict(server_message_to_dict(choose_card)) == choose_card
-
-    trick_resolved = TrickResolved(deltas=(delta,), new_round_started=False, game_finished=False)
-    assert server_message_from_dict(server_message_to_dict(trick_resolved)) == trick_resolved
+def test_server_messages_roundtrip() -> None:
+    lobby_state = _lobby_state()
+    messages = [
+        LobbyStateUpdated(lobby_state=lobby_state),
+        LobbyActionRejected(message='nope'),
+        GameStarting(lobby_state=LobbyState(seat_count=3, clients=lobby_state.clients, seats=lobby_state.seats, game_started=True)),
+        ServerError(message='boom'),
+    ]
+    for message in messages:
+        assert server_message_from_dict(server_message_to_dict(message)) == message

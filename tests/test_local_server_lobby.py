@@ -1,25 +1,37 @@
 import random
 
-from row_taker.engine.lobby.config import MatchConfig, SeatConfig
-from row_taker.engine.lobby.state import LobbyState
-from row_taker.protocol.messages import ConfigureLobby, GameStarting, LobbyStateUpdated, StartGame, StateUpdated
+from row_taker.protocol.messages import (
+    ChooseSeat,
+    FillEmptySeatsWithBots,
+    GameStarting,
+    JoinLobby,
+    LobbyStateUpdated,
+    RequestStartGame,
+    StateUpdated,
+)
 from row_taker.server.local_server import LocalServer
 
 
-def test_local_server_starts_match_from_lobby_messages() -> None:
-    server = LocalServer(rng=random.Random(1234))
-    config = MatchConfig.from_seats([
-        SeatConfig.human(0, 'A'),
-        SeatConfig.random_bot(1, 'Bot_1'),
-    ])
+def test_local_server_starts_match_from_multiclient_lobby_messages() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=2)
 
-    server.handle_client_message(ConfigureLobby(match_config=config))
-    messages = server.drain_outbox()
-    assert messages == [LobbyStateUpdated(lobby_state=LobbyState(match_config=config, game_started=False))]
+    server.handle_client_message('client-0', JoinLobby(display_name='Alice'))
+    server.handle_client_message('client-1', JoinLobby(display_name='Bob'))
+    server.handle_client_message('client-0', ChooseSeat(seat_index=0))
+    server.handle_client_message('client-1', ChooseSeat(seat_index=1))
+    server.drain_outbox()
 
-    server.handle_client_message(StartGame())
-    messages = server.drain_outbox()
+    server.handle_client_message('client-0', RequestStartGame())
+    messages = [envelope.message for envelope in server.drain_outbox()]
 
     assert isinstance(messages[0], GameStarting)
-    assert messages[0].lobby_state == LobbyState(match_config=config, game_started=True)
     assert any(isinstance(message, StateUpdated) for message in messages)
+
+
+def test_local_server_can_fill_bots() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=2)
+    server.handle_client_message('client-0', JoinLobby(display_name='Alice'))
+    server.handle_client_message('client-0', ChooseSeat(seat_index=0))
+    server.handle_client_message('client-0', FillEmptySeatsWithBots())
+    messages = server.drain_outbox()
+    assert any(isinstance(envelope.message, LobbyStateUpdated) for envelope in messages)

@@ -4,17 +4,41 @@ from dataclasses import dataclass
 
 from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game.state import DeltaPublicState, PlayerState, PublicState
-from row_taker.engine.lobby.config import MatchConfig
 from row_taker.engine.lobby.state import LobbyState
 
 
 @dataclass(frozen=True, slots=True)
-class ConfigureLobby:
-    match_config: MatchConfig
+class JoinLobby:
+    display_name: str
 
 
 @dataclass(frozen=True, slots=True)
-class StartGame:
+class SetDisplayName:
+    display_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class ChooseSeat:
+    seat_index: int
+
+
+@dataclass(frozen=True, slots=True)
+class LeaveSeat:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class FillEmptySeatsWithBots:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class ClearBotSeats:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class RequestStartGame:
     pass
 
 
@@ -30,12 +54,27 @@ class SubmitRowChoice:
     row_id: RowID
 
 
-ClientToServerMessage = ConfigureLobby | StartGame | SubmitCard | SubmitRowChoice
+ClientToServerMessage = (
+    JoinLobby
+    | SetDisplayName
+    | ChooseSeat
+    | LeaveSeat
+    | FillEmptySeatsWithBots
+    | ClearBotSeats
+    | RequestStartGame
+    | SubmitCard
+    | SubmitRowChoice
+)
 
 
 @dataclass(frozen=True, slots=True)
 class LobbyStateUpdated:
     lobby_state: LobbyState
+
+
+@dataclass(frozen=True, slots=True)
+class LobbyActionRejected:
+    message: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +113,7 @@ class ServerError:
 
 ServerToClientMessage = (
     LobbyStateUpdated
+    | LobbyActionRejected
     | GameStarting
     | StateUpdated
     | ChooseCardRequested
