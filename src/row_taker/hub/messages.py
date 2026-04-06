@@ -40,9 +40,7 @@ class ChooseRowRequested:
 
 @dataclass(frozen=True, slots=True)
 class TrickResolved:
-    public_state_before: PublicState
-    deltas: list[DeltaPublicState]
-    public_state_after: PublicState
+    deltas: tuple[DeltaPublicState, ...]
     new_round_started: bool
     game_finished: bool
 

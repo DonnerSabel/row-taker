@@ -41,10 +41,20 @@ class DeltaPublicState:
     affected_row_id: RowID
     new_row_cards: tuple[Card, ...]
 
-    def played_card(self) -> Card:
+    def validate(self) -> None:
         if not self.new_row_cards:
             raise ValueError('delta public state must contain at least one row card')
+
+    def played_card(self) -> Card:
+        self.validate()
         return self.new_row_cards[-1]
+
+
+@dataclass(frozen=True, slots=True)
+class TrickResolutionSummary:
+    deltas: tuple[DeltaPublicState, ...]
+    new_round_started: bool
+    game_finished: bool
 
 
 @dataclass(slots=True)
@@ -61,6 +71,7 @@ class GameState:
 
     selected_cards: dict[PlayerID, Card] = field(default_factory=dict)
     resolve_order: list[PlayerID] = field(default_factory=list)
+    current_trick_deltas: list[DeltaPublicState] = field(default_factory=list)
 
     def validate_player_id(self, player_id: PlayerID) -> None:
         get_player_index(self.players, player_id)
@@ -125,6 +136,9 @@ class PlayerState:
         if all(hand_card.value != card.value for hand_card in self.hand):
             raise ValueError(f"player does not have card {card.value}")
 
+    def validate_card_value(self, card_value: int) -> None:
+        self.validate_has_card(Card(card_value))
+
     def validate_row_id(self, row_id: RowID) -> None:
         self.public_state.validate_row_id(row_id)
 
@@ -141,6 +155,20 @@ class PlayerState:
         selectable_row_ids = self.get_selectable_row_ids_for_choose_row()
         if row_id not in selectable_row_ids:
             raise ValueError(f"row_id {row_id!r} is not selectable in the current state")
+
+    def self_player(self) -> PublicPlayerInfo:
+        return self.players[get_player_index(self.players, self.self_player_id)]
+
+    def self_player_name(self) -> str:
+        return self.self_player().name
+
+    def pending_card_value(self) -> int | None:
+        if self.phase_info.pending_card is None:
+            return None
+        return self.phase_info.pending_card.value
+
+    def playable_card_values(self) -> tuple[int, ...]:
+        return tuple(card.value for card in self.hand)
 
     @property
     def config(self) -> RulesConfig:

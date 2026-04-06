@@ -4,7 +4,8 @@ import random
 from dataclasses import dataclass, field
 
 from row_taker.engine.phases import Phase
-from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice, HubToClientMessage, ClientToHubMessage
+from row_taker.engine.player_state_ops import playable_cards, selectable_row_ids
+from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, ClientToHubMessage, HubToClientMessage, SubmitCard, SubmitRowChoice
 
 
 @dataclass(slots=True)
@@ -17,7 +18,7 @@ class RandomBotClient:
             state.validate_phase(Phase.CHOOSE_CARD)
             state.validate_hand_not_empty()
 
-            card = self.rng.choice(state.hand)
+            card = self.rng.choice(playable_cards(state))
             return SubmitCard(
                 player_id=state.self_player_id,
                 card_value=card.value,
@@ -27,8 +28,7 @@ class RandomBotClient:
             state = message.state
             state.validate_phase(Phase.CHOOSE_ROW)
 
-            candidates = list(state.get_selectable_row_ids_for_choose_row())
-            row_id = self.rng.choice(candidates)
+            row_id = self.rng.choice(list(selectable_row_ids(state)))
             return SubmitRowChoice(
                 player_id=state.self_player_id,
                 row_id=row_id,

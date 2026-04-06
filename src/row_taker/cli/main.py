@@ -9,21 +9,30 @@ from row_taker.clients.cli_client import CliClient
 from row_taker.clients.client import Client
 from row_taker.clients.random_bot_client import RandomBotClient
 from row_taker.engine.game import setup_game
-from row_taker.hub.match_config import ParticipantKind
+from row_taker.engine.state import PublicState
+from row_taker.hub.match_config import ClientKind
 from row_taker.hub.match_hub import MatchHub
 from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, StateUpdated, TrickResolved
 
 
 def _dispatch_hub_messages(hub: MatchHub, clients_by_player_id: dict, *, interactive: bool = True) -> None:
+    latest_public_state: PublicState | None = None
+
     while True:
         messages = hub.drain_outbox()
         if not messages:
             return
 
         for message in messages:
+            if isinstance(message, StateUpdated):
+                latest_public_state = message.state
+                continue
+
             if isinstance(message, TrickResolved):
+                if latest_public_state is None:
+                    raise ValueError('missing public state before trick resolution')
                 clear_screen()
-                render_trick_result(message)
+                render_trick_result(latest_public_state, message)
                 if message.game_finished:
                     continue
                 if interactive:
@@ -31,9 +40,6 @@ def _dispatch_hub_messages(hub: MatchHub, clients_by_player_id: dict, *, interac
                     cont = input("Enter für nächsten Stich, 'q' zum Beenden > ").strip().lower()
                     if cont == 'q':
                         raise KeyboardInterrupt
-                continue
-
-            if isinstance(message, StateUpdated):
                 continue
 
             if isinstance(message, (ChooseCardRequested, ChooseRowRequested)):
@@ -59,12 +65,12 @@ def main() -> None:
 
     clients_by_player_id = {}
     for seat, player in zip(match_config.seats, state.players, strict=True):
-        if seat.kind == ParticipantKind.HUMAN:
+        if seat.kind == ClientKind.HUMAN:
             clients_by_player_id[player.player_id] = CliClient()
-        elif seat.kind == ParticipantKind.RANDOM_BOT:
+        elif seat.kind == ClientKind.RANDOM_BOT:
             clients_by_player_id[player.player_id] = RandomBotClient(rng=rng)
         else:
-            raise ValueError(f'unsupported participant kind: {seat.kind!r}')
+            raise ValueError(f'unsupported client kind: {seat.kind!r}')
 
     hub = MatchHub(state=state)
     hub.start_match()

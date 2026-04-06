@@ -7,7 +7,7 @@ from .cards import Card, Deck
 from .models import Player, PlayerID, Row, RowID
 from .phases import Phase, PhaseInfo
 from .rules import place_card, take_row, target_row_index
-from .state import DeltaPublicState, GameState, RulesConfig
+from .state import DeltaPublicState, GameState, RulesConfig, TrickResolutionSummary
 
 
 def make_deck() -> list[Card]:
@@ -84,6 +84,7 @@ def _deal_new_round(state: GameState) -> None:
     state.trick_no = 1
     state.selected_cards.clear()
     state.resolve_order.clear()
+    state.current_trick_deltas.clear()
     state.phase_info = PhaseInfo(
         phase=Phase.CHOOSE_CARD,
         message='Choose one card.',
@@ -108,6 +109,7 @@ def all_cards_selected(state: GameState) -> bool:
 
 def begin_trick_resolution(state: GameState) -> None:
     state.validate_complete_play_selections()
+    state.current_trick_deltas.clear()
 
     state.phase_info = PhaseInfo(
         phase=Phase.REVEAL_AND_RESOLVE,
@@ -132,6 +134,12 @@ def has_pending_row_choice(state: GameState) -> bool:
 
 def has_pending_resolution_step(state: GameState) -> bool:
     return bool(state.resolve_order) and state.phase_info.phase != Phase.CHOOSE_ROW
+
+
+def _append_current_trick_delta(state: GameState, delta: DeltaPublicState) -> DeltaPublicState:
+    delta.validate()
+    state.current_trick_deltas.append(delta)
+    return delta
 
 
 def resolve_next_delta_public_state(state: GameState) -> DeltaPublicState | None:
@@ -170,10 +178,13 @@ def resolve_next_delta_public_state(state: GameState) -> DeltaPublicState | None
         message='Revealing cards and resolving trick.',
     )
 
-    return DeltaPublicState(
-        player_id=player_id,
-        affected_row_id=target_row.row_id,
-        new_row_cards=tuple(target_row.cards),
+    return _append_current_trick_delta(
+        state,
+        DeltaPublicState(
+            player_id=player_id,
+            affected_row_id=target_row.row_id,
+            new_row_cards=tuple(target_row.cards),
+        ),
     )
 
 
@@ -204,10 +215,13 @@ def submit_choose_row(state: GameState, player_id: PlayerID, row_id: RowID) -> D
         message='Revealing cards and resolving trick.',
     )
 
-    return DeltaPublicState(
-        player_id=player_id,
-        affected_row_id=row_id,
-        new_row_cards=tuple(state.rows[chosen_index].cards),
+    return _append_current_trick_delta(
+        state,
+        DeltaPublicState(
+            player_id=player_id,
+            affected_row_id=row_id,
+            new_row_cards=tuple(state.rows[chosen_index].cards),
+        ),
     )
 
 
@@ -215,14 +229,23 @@ def trick_resolution_finished(state: GameState) -> bool:
     return not state.resolve_order and state.phase_info.phase != Phase.CHOOSE_ROW
 
 
-def finish_trick(state: GameState) -> bool:
+def finish_trick(state: GameState) -> TrickResolutionSummary:
+    deltas = tuple(state.current_trick_deltas)
+
     state.phase_info = PhaseInfo(
         phase=Phase.ROUND_SCORING,
         message='Trick finished.',
     )
     state.selected_cards.clear()
     state.resolve_order.clear()
-    return start_next_round_if_needed(state)
+    state.current_trick_deltas.clear()
+
+    new_round_started = start_next_round_if_needed(state)
+    return TrickResolutionSummary(
+        deltas=deltas,
+        new_round_started=new_round_started,
+        game_finished=state.phase_info.phase == Phase.GAME_OVER,
+    )
 
 
 def start_next_round_if_needed(state: GameState) -> bool:

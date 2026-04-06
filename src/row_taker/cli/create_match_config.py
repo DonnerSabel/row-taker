@@ -13,7 +13,7 @@ def _prompt_player_count() -> int:
         print('Bitte eine Zahl zwischen 2 und 6 eingeben.')
 
 
-def _prompt_seat_kind(seat_no: int) -> str:
+def _prompt_client_kind(seat_no: int) -> str:
     while True:
         value = input(f'Platz {seat_no} Typ [h=Human, b=Random Bot] > ').strip().lower()
         if value in {'h', 'b'}:
@@ -33,7 +33,7 @@ def create_match_config() -> MatchConfig:
 
     for seat_index in range(seat_count):
         seat_no = seat_index + 1
-        kind = _prompt_seat_kind(seat_no)
+        kind = _prompt_client_kind(seat_no)
 
         if kind == 'h':
             name = _prompt_name(f'Name für Platz {seat_no}', f'Spieler_{seat_no}')

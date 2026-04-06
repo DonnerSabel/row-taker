@@ -9,7 +9,7 @@ MIN_PLAYERS: Final[int] = 2
 MAX_PLAYERS: Final[int] = 6
 
 
-class ParticipantKind(str, Enum):
+class ClientKind(str, Enum):
     HUMAN = 'human'
     RANDOM_BOT = 'random_bot'
 
@@ -17,16 +17,16 @@ class ParticipantKind(str, Enum):
 @dataclass(slots=True, frozen=True)
 class SeatConfig:
     seat_index: int
-    kind: ParticipantKind
+    kind: ClientKind
     name: str
 
     @staticmethod
     def human(seat_index: int, name: str) -> 'SeatConfig':
-        return SeatConfig(seat_index=seat_index, kind=ParticipantKind.HUMAN, name=name)
+        return SeatConfig(seat_index=seat_index, kind=ClientKind.HUMAN, name=name)
 
     @staticmethod
     def random_bot(seat_index: int, name: str) -> 'SeatConfig':
-        return SeatConfig(seat_index=seat_index, kind=ParticipantKind.RANDOM_BOT, name=name)
+        return SeatConfig(seat_index=seat_index, kind=ClientKind.RANDOM_BOT, name=name)
 
     def validate(self) -> None:
         if self.seat_index < 0:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from row_taker.cli.row_display import build_row_display_mapping, format_deltas_for_cli
+from row_taker.engine.public_state_ops import apply_deltas_public_state
 from row_taker.engine.state import PlayerState, PublicState
 from row_taker.hub.messages import TrickResolved
 
@@ -27,10 +28,7 @@ def render_public_state(state: PublicState) -> None:
 
 
 def render_handcards(state: PlayerState) -> None:
-    own_name = next(
-        player.name for player in state.players if player.player_id == state.self_player_id
-    )
-    print(f'{own_name}: Deine Handkarten:')
+    print(f'{state.self_player_name()}: Deine Handkarten:')
     print('  ' + ' '.join(f'|{card.value} {card.bullheads * "🐮"}|' for card in state.hand))
 
 
@@ -46,9 +44,10 @@ def render_player_state(state: PlayerState) -> None:
     render_handcards(state)
 
 
-def render_trick_result(result: TrickResolved) -> None:
-    result_lines = format_deltas_for_cli(result.public_state_before, result.deltas)
-    render_public_state(result.public_state_after)
+def render_trick_result(public_state_before: PublicState, result: TrickResolved) -> None:
+    result_lines = format_deltas_for_cli(public_state_before, result.deltas)
+    public_state_after_deltas = apply_deltas_public_state(public_state_before, result.deltas)
+    render_public_state(public_state_after_deltas)
 
     print('Auflösung:')
     for line in result_lines:

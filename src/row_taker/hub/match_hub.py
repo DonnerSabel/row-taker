@@ -15,7 +15,7 @@ from row_taker.engine.game import (
 )
 from row_taker.engine.models import PlayerID
 from row_taker.engine.phases import Phase
-from row_taker.engine.state import DeltaPublicState, GameState, PlayerState, PublicState
+from row_taker.engine.state import GameState, PlayerState, PublicState
 from row_taker.engine.views import build_player_state, build_public_state
 from row_taker.hub.messages import (
     ChooseCardRequested,
@@ -33,8 +33,6 @@ from row_taker.hub.messages import (
 class MatchHub:
     state: GameState
     outbox: list[HubToClientMessage] = field(default_factory=list)
-    _current_trick_public_state_before: PublicState | None = None
-    _current_trick_deltas: list[DeltaPublicState] = field(default_factory=list)
 
     def start_match(self) -> None:
         self.outbox.append(StateUpdated(state=self.build_public_state()))
@@ -77,14 +75,11 @@ class MatchHub:
         if not all_cards_selected(self.state):
             return
 
-        self._current_trick_public_state_before = self.build_public_state()
-        self._current_trick_deltas.clear()
         begin_trick_resolution(self.state)
         self._advance_resolution_until_blocked()
 
     def _handle_submit_row_choice(self, message: SubmitRowChoice) -> None:
-        delta = submit_choose_row(self.state, message.player_id, message.row_id)
-        self._current_trick_deltas.append(delta)
+        submit_choose_row(self.state, message.player_id, message.row_id)
         self._advance_resolution_until_blocked()
 
     def _advance_resolution_until_blocked(self) -> None:
@@ -102,9 +97,7 @@ class MatchHub:
                 return
 
             if has_pending_resolution_step(self.state):
-                delta = resolve_next_delta_public_state(self.state)
-                if delta is not None:
-                    self._current_trick_deltas.append(delta)
+                resolve_next_delta_public_state(self.state)
                 continue
 
             if trick_resolution_finished(self.state):
@@ -114,27 +107,16 @@ class MatchHub:
             return
 
     def _finish_current_trick(self) -> None:
-        public_state_before = self._current_trick_public_state_before
-        if public_state_before is None:
-            raise ValueError('missing public state before trick resolution')
-
-        new_round_started = finish_trick(self.state)
-        public_state_after = self.build_public_state()
-        game_finished = self.is_finished()
-
+        result = finish_trick(self.state)
         self.outbox.append(
             TrickResolved(
-                public_state_before=public_state_before,
-                deltas=list(self._current_trick_deltas),
-                public_state_after=public_state_after,
-                new_round_started=new_round_started,
-                game_finished=game_finished,
+                deltas=result.deltas,
+                new_round_started=result.new_round_started,
+                game_finished=result.game_finished,
             )
         )
-        self.outbox.append(StateUpdated(state=public_state_after))
+        public_state = self.build_public_state()
+        self.outbox.append(StateUpdated(state=public_state))
 
-        self._current_trick_public_state_before = None
-        self._current_trick_deltas.clear()
-
-        if not game_finished:
+        if not result.game_finished:
             self._request_choose_cards_for_current_trick()

@@ -64,7 +64,7 @@ def apply_delta_public_state(public_state: PublicState, delta: DeltaPublicState)
     )
 
 
-def apply_deltas_public_state(public_state: PublicState, deltas: list[DeltaPublicState]) -> PublicState:
+def apply_deltas_public_state(public_state: PublicState, deltas: tuple[DeltaPublicState, ...] | list[DeltaPublicState]) -> PublicState:
     current_state = public_state
     for delta in deltas:
         current_state = apply_delta_public_state(current_state, delta)

@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from row_taker.cli.render import render_player_state
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.cli.terminal import clear_screen
-from row_taker.engine.cards import Card
-from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice, HubToClientMessage, ClientToHubMessage
+from row_taker.engine.player_state_ops import validate_submit_card, validate_submit_row_choice
+from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, ClientToHubMessage, HubToClientMessage, SubmitCard, SubmitRowChoice
 
 
 @dataclass(slots=True)
@@ -26,15 +26,15 @@ class CliClient:
 
             value = input('Wähle eine Karte (Zahl) > ').strip()
             if value.isdigit():
-                card = Card(int(value))
+                card_value = int(value)
                 try:
-                    state.validate_has_card(card)
+                    validate_submit_card(state, card_value)
                 except ValueError:
                     pass
                 else:
                     return SubmitCard(
                         player_id=state.self_player_id,
-                        card_value=card.value,
+                        card_value=card_value,
                     )
 
             input('Ungültige Wahl. Enter...')
@@ -47,17 +47,9 @@ class CliClient:
             clear_screen()
             render_player_state(state)
 
-            own_name = next(
-                player.name for player in state.players if player.player_id == state.self_player_id
-            )
-            pending_card_value = (
-                state.phase_info.pending_card.value
-                if state.phase_info.pending_card is not None
-                else '?'
-            )
-            print(
-                f'{own_name}: Deine Karte {pending_card_value} ist kleiner als alle Reihen.'
-            )
+            pending_card_value = state.pending_card_value()
+            pending_card_label = '?' if pending_card_value is None else str(pending_card_value)
+            print(f'{state.self_player_name()}: Deine Karte {pending_card_label} ist kleiner als alle Reihen.')
 
             max_choice = mapping.max_cli_row()
             value = input(f'Welche Reihe willst du nehmen? (1-{max_choice}) > ').strip()
@@ -68,7 +60,7 @@ class CliClient:
                     state_row_index = mapping.to_state_index(cli_choice)
                     row_id = state.rows[state_row_index].row_id
                     try:
-                        state.validate_selectable_row_id(row_id)
+                        validate_submit_row_choice(state, row_id)
                     except ValueError:
                         pass
                     else:
