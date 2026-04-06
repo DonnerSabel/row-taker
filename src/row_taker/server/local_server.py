@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 import random
 
 from row_taker.engine.game import setup_game
+from row_taker.engine.game.state import GameState, PublicState
 from row_taker.engine.lobby.rules import can_start_game, validate_lobby_state
 from row_taker.engine.lobby.state import LobbyState
-from row_taker.engine.state import GameState, PublicState
 from row_taker.hub.match_hub import MatchHub
 from row_taker.protocol.messages import (
     ClientToServerMessage,

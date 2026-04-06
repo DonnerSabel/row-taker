@@ -13,35 +13,19 @@ def _prompt_player_count() -> int:
         print("Bitte eine Zahl zwischen 2 und 6 eingeben.")
 
 
-def _prompt_client_kind(seat_no: int) -> str:
-    while True:
-        value = input(f"Platz {seat_no} Typ [h=Human, b=Random Bot] > ").strip().lower()
-        if value in {"h", "b"}:
-            return value
-        print("Bitte h oder b eingeben.")
-
-
 def _prompt_name(prompt: str, default: str) -> str:
     value = input(f"{prompt} [{default}] > ").strip()
     return value or default
 
 
-def create_match_config() -> MatchConfig:
+def create_single_human_match_config() -> MatchConfig:
     seat_count = _prompt_player_count()
-    seats: list[SeatConfig] = []
-    bot_counter = 1
+    human_name = _prompt_name("Name für den menschlichen Spieler", "Spieler_1")
+    seats: list[SeatConfig] = [SeatConfig.human(0, human_name)]
 
-    for seat_index in range(seat_count):
+    for seat_index in range(1, seat_count):
         seat_no = seat_index + 1
-        kind = _prompt_client_kind(seat_no)
-
-        if kind == "h":
-            name = _prompt_name(f"Name für Platz {seat_no}", f"Spieler_{seat_no}")
-            seats.append(SeatConfig.human(seat_index, name))
-            continue
-
-        name = _prompt_name(f"Name für Bot auf Platz {seat_no}", f"Bot_{bot_counter}")
-        bot_counter += 1
-        seats.append(SeatConfig.random_bot(seat_index, name))
+        bot_name = _prompt_name(f"Name für Bot auf Platz {seat_no}", f"Bot_{seat_no}")
+        seats.append(SeatConfig.random_bot(seat_index, bot_name))
 
     return MatchConfig.from_seats(seats)

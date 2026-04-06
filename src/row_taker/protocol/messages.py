@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from row_taker.engine.game.models import PlayerID, RowID
+from row_taker.engine.game.state import DeltaPublicState, PlayerState, PublicState
 from row_taker.engine.lobby.config import MatchConfig
 from row_taker.engine.lobby.state import LobbyState
-from row_taker.engine.models import PlayerID, RowID
-from row_taker.engine.state import DeltaPublicState, PlayerState, PublicState
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +67,11 @@ class TrickResolved:
     game_finished: bool
 
 
+@dataclass(frozen=True, slots=True)
+class ServerError:
+    message: str
+
+
 ServerToClientMessage = (
     LobbyStateUpdated
     | GameStarting
@@ -74,6 +79,7 @@ ServerToClientMessage = (
     | ChooseCardRequested
     | ChooseRowRequested
     | TrickResolved
+    | ServerError
 )
 
 GameClientMessage = SubmitCard | SubmitRowChoice

@@ -1,10 +1,9 @@
-from .cards import Card, Deck
-from .game import submit_choose_row, submit_play_card
-from .models import Player, PlayerID, PublicPlayerInfo, Row, RowID
-from .phases import Phase, PhaseInfo
-from .public_state_ops import apply_delta_public_state, apply_deltas_public_state, classify_public_delta, played_card_from_delta, score_delta_for_public_delta
-from .state import DeltaPublicState, GameState, PlayerState, PublicState, RulesConfig
-from .views import build_player_state, build_public_state
+from .game import Card, Deck, submit_choose_row, submit_play_card
+from .game.models import Player, PlayerID, PublicPlayerInfo, Row, RowID
+from .game.phases import Phase, PhaseInfo
+from .game.public_state_ops import apply_delta_public_state, apply_deltas_public_state, classify_public_delta, played_card_from_delta, score_delta_for_public_delta
+from .game.state import DeltaPublicState, GameState, PlayerState, PublicState, RulesConfig
+from .game.views import build_player_state, build_public_state
 
 __all__ = [
     "apply_delta_public_state",

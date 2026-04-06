@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from row_taker.engine.lobby.config import ClientKind, MatchConfig, SeatConfig
-from row_taker.engine.lobby.state import LobbyState
-from row_taker.engine.models import PlayerID, RowID
-from row_taker.engine.state_mappers import (
+from row_taker.engine.game.models import PlayerID, RowID
+from row_taker.engine.game.state_mappers import (
     delta_public_state_from_dict,
     delta_public_state_to_dict,
     player_state_from_dict,
@@ -11,6 +9,8 @@ from row_taker.engine.state_mappers import (
     public_state_from_dict,
     public_state_to_dict,
 )
+from row_taker.engine.lobby.config import ClientKind, MatchConfig, SeatConfig
+from row_taker.engine.lobby.state import LobbyState
 from row_taker.protocol.messages import (
     ChooseCardRequested,
     ChooseRowRequested,
@@ -18,6 +18,7 @@ from row_taker.protocol.messages import (
     ConfigureLobby,
     GameStarting,
     LobbyStateUpdated,
+    ServerError,
     ServerToClientMessage,
     StartGame,
     StateUpdated,
@@ -27,42 +28,43 @@ from row_taker.protocol.messages import (
 )
 
 
-def _match_config_to_dict(match_config: MatchConfig) -> dict[str, object]:
+def _seat_config_to_dict(seat: SeatConfig) -> dict[str, object]:
     return {
-        "seats": [
-            {
-                "seat_index": seat.seat_index,
-                "kind": seat.kind.value,
-                "name": seat.name,
-            }
-            for seat in match_config.seats
-        ]
+        "seat_index": seat.seat_index,
+        "kind": seat.kind.value,
+        "name": seat.name,
+    }
+
+
+def _seat_config_from_dict(data: object) -> SeatConfig:
+    if not isinstance(data, dict):
+        raise TypeError(f"seat config data must be a dict, got {type(data)!r}")
+    return SeatConfig(
+        seat_index=int(data["seat_index"]),
+        kind=ClientKind(str(data["kind"])),
+        name=str(data["name"]),
+    )
+
+
+def _match_config_to_dict(config: MatchConfig) -> dict[str, object]:
+    return {
+        "seats": [_seat_config_to_dict(seat) for seat in config.seats],
     }
 
 
 def _match_config_from_dict(data: object) -> MatchConfig:
     if not isinstance(data, dict):
         raise TypeError(f"match config data must be a dict, got {type(data)!r}")
-
-    seats_data = data["seats"]
-    if not isinstance(seats_data, list):
-        raise TypeError(f"match config seats must be a list, got {type(seats_data)!r}")
-
-    seats = [
-        SeatConfig(
-            seat_index=int(seat_data["seat_index"]),
-            kind=ClientKind(str(seat_data["kind"])),
-            name=str(seat_data["name"]),
-        )
-        for seat_data in seats_data
-    ]
-    return MatchConfig.from_seats(seats)
+    raw_seats = data.get("seats")
+    if not isinstance(raw_seats, list):
+        raise TypeError(f"match config seats must be a list, got {type(raw_seats)!r}")
+    return MatchConfig.from_seats([_seat_config_from_dict(seat) for seat in raw_seats])
 
 
-def _lobby_state_to_dict(lobby_state: LobbyState) -> dict[str, object]:
+def _lobby_state_to_dict(state: LobbyState) -> dict[str, object]:
     return {
-        "match_config": None if lobby_state.match_config is None else _match_config_to_dict(lobby_state.match_config),
-        "game_started": lobby_state.game_started,
+        "match_config": None if state.match_config is None else _match_config_to_dict(state.match_config),
+        "game_started": state.game_started,
     }
 
 
@@ -155,6 +157,8 @@ def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
             "new_round_started": message.new_round_started,
             "game_finished": message.game_finished,
         }
+    if isinstance(message, ServerError):
+        return {"type": "server_error", "message": message.message}
     raise TypeError(f"unsupported server message type: {type(message)!r}")
 
 
@@ -182,4 +186,6 @@ def server_message_from_dict(data: dict[str, object]) -> ServerToClientMessage:
             new_round_started=bool(data["new_round_started"]),
             game_finished=bool(data["game_finished"]),
         )
+    if message_type == "server_error":
+        return ServerError(message=str(data["message"]))
     raise ValueError(f"unsupported server message type: {message_type!r}")

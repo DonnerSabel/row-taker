@@ -13,10 +13,10 @@ from row_taker.engine.game import (
     submit_play_card,
     trick_resolution_finished,
 )
-from row_taker.engine.models import PlayerID
-from row_taker.engine.phases import Phase
-from row_taker.engine.state import GameState, PlayerState, PublicState
-from row_taker.engine.views import build_player_state, build_public_state
+from row_taker.engine.game.models import PlayerID
+from row_taker.engine.game.phases import Phase
+from row_taker.engine.game.state import GameState, PlayerState, PublicState
+from row_taker.engine.game.views import build_player_state, build_public_state
 from row_taker.protocol.messages import (
     ChooseCardRequested,
     ChooseRowRequested,
