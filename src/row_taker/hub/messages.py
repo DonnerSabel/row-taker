@@ -2,19 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
-from row_taker.engine.models import PlayerID
+from row_taker.engine.models import PlayerID, RowID
 from row_taker.engine.state import DeltaPublicState, PlayerState, PublicState
 
 
 @dataclass(frozen=True, slots=True)
 class SubmitCard:
-    command: PlayCardCommand
+    player_id: PlayerID
+    card_value: int
 
 
 @dataclass(frozen=True, slots=True)
 class SubmitRowChoice:
-    command: ChooseRowCommand
+    player_id: PlayerID
+    row_id: RowID
 
 
 ClientToHubMessage = SubmitCard | SubmitRowChoice

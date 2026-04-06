@@ -73,7 +73,7 @@ class MatchHub:
             )
 
     def _handle_submit_card(self, message: SubmitCard) -> None:
-        submit_play_card(self.state, message.command)
+        submit_play_card(self.state, message.player_id, message.card_value)
         if not all_cards_selected(self.state):
             return
 
@@ -83,7 +83,7 @@ class MatchHub:
         self._advance_resolution_until_blocked()
 
     def _handle_submit_row_choice(self, message: SubmitRowChoice) -> None:
-        delta = submit_choose_row(self.state, message.command)
+        delta = submit_choose_row(self.state, message.player_id, message.row_id)
         self._current_trick_deltas.append(delta)
         self._advance_resolution_until_blocked()
 

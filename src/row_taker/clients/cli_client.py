@@ -6,12 +6,11 @@ from row_taker.cli.render import render_player_state
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.cli.terminal import clear_screen
 from row_taker.engine.cards import Card
-from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice, HubToClientMessage, ClientToHubMessage
 
 
 @dataclass(slots=True)
-class CliParticipant:
+class CliClient:
     def handle_hub_message(self, message: HubToClientMessage) -> ClientToHubMessage | None:
         if isinstance(message, ChooseCardRequested):
             return self._handle_choose_card_requested(message)
@@ -34,10 +33,8 @@ class CliParticipant:
                     pass
                 else:
                     return SubmitCard(
-                        command=PlayCardCommand(
-                            player_id=state.self_player_id,
-                            card_value=card.value,
-                        )
+                        player_id=state.self_player_id,
+                        card_value=card.value,
                     )
 
             input('Ungültige Wahl. Enter...')
@@ -76,10 +73,8 @@ class CliParticipant:
                         pass
                     else:
                         return SubmitRowChoice(
-                            command=ChooseRowCommand(
-                                player_id=state.self_player_id,
-                                row_id=row_id,
-                            )
+                            player_id=state.self_player_id,
+                            row_id=row_id,
                         )
 
             print(f'Ungültig. Bitte 1-{max_choice} eingeben.')

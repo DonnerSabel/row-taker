@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from row_taker.engine.phases import StepAction
+from row_taker.engine.public_state_ops import apply_delta_public_state, classify_public_delta, played_card_from_delta, score_delta_for_public_delta
 from row_taker.engine.state import DeltaPublicState, PublicState
-from row_taker.engine.views import apply_delta_public_state, classify_row_take_public_delta, score_delta_for_public_delta
 
 
 @dataclass(slots=True, frozen=True)
@@ -55,20 +56,21 @@ def format_deltas_for_cli(before_state: PublicState, deltas: list[DeltaPublicSta
         mapping = build_row_display_mapping(shadow_state)
         cli_row = mapping.to_cli_row(row_index)
         player = next(player for player in shadow_state.players if player.player_id == delta.player_id)
-        transition_kind = classify_row_take_public_delta(shadow_state, delta)
+        transition_kind = classify_public_delta(shadow_state, delta)
         bullheads = score_delta_for_public_delta(shadow_state, delta)
+        played_card = played_card_from_delta(delta)
 
-        if transition_kind == 'placed':
-            lines.append(f'- {player.name} legt {delta.played_card.value} an Reihe {cli_row}.')
-        elif transition_kind == 'took_row_small':
+        if transition_kind == StepAction.PLACED:
+            lines.append(f'- {player.name} legt {played_card.value} an Reihe {cli_row}.')
+        elif transition_kind == StepAction.TOOK_ROW_SMALL:
             lines.append(
                 f'- {player.name} nimmt Reihe {cli_row} ({bullheads} Hornochsen) '
-                f'und startet mit {delta.played_card.value}.'
+                f'und startet mit {played_card.value}.'
             )
-        elif transition_kind == 'took_row_overflow':
+        elif transition_kind == StepAction.TOOK_ROW_OVERFLOW:
             lines.append(
                 f'- {player.name} füllt Reihe {cli_row} (nimmt {bullheads} Hornochsen) '
-                f'und startet mit {delta.played_card.value}.'
+                f'und startet mit {played_card.value}.'
             )
         else:
             raise ValueError(f'Unbekannte Delta-Klassifikation: {transition_kind}')

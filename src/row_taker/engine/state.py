@@ -38,9 +38,13 @@ class RulesConfig:
 @dataclass(frozen=True, slots=True)
 class DeltaPublicState:
     player_id: PlayerID
-    played_card: Card
     affected_row_id: RowID
-    new_row_cards: list[Card]
+    new_row_cards: tuple[Card, ...]
+
+    def played_card(self) -> Card:
+        if not self.new_row_cards:
+            raise ValueError('delta public state must contain at least one row card')
+        return self.new_row_cards[-1]
 
 
 @dataclass(slots=True)

@@ -3,13 +3,12 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from row_taker.engine.commands import ChooseRowCommand, PlayCardCommand
 from row_taker.engine.phases import Phase
 from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice, HubToClientMessage, ClientToHubMessage
 
 
 @dataclass(slots=True)
-class RandomBotParticipant:
+class RandomBotClient:
     rng: random.Random = field(default_factory=random.Random)
 
     def handle_hub_message(self, message: HubToClientMessage) -> ClientToHubMessage | None:
@@ -20,10 +19,8 @@ class RandomBotParticipant:
 
             card = self.rng.choice(state.hand)
             return SubmitCard(
-                command=PlayCardCommand(
-                    player_id=state.self_player_id,
-                    card_value=card.value,
-                )
+                player_id=state.self_player_id,
+                card_value=card.value,
             )
 
         if isinstance(message, ChooseRowRequested):
@@ -33,10 +30,8 @@ class RandomBotParticipant:
             candidates = list(state.get_selectable_row_ids_for_choose_row())
             row_id = self.rng.choice(candidates)
             return SubmitRowChoice(
-                command=ChooseRowCommand(
-                    player_id=state.self_player_id,
-                    row_id=row_id,
-                )
+                player_id=state.self_player_id,
+                row_id=row_id,
             )
 
         return None

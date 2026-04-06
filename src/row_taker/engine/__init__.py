@@ -1,24 +1,33 @@
 from .cards import Card, Deck
-from .commands import ChooseRowCommand, PlayCardCommand
+from .game import submit_choose_row, submit_play_card
 from .models import Player, PlayerID, PublicPlayerInfo, Row, RowID
 from .phases import Phase, PhaseInfo
-from .state import GameState, PlayerState, RulesConfig
-from .views import build_player_state
+from .public_state_ops import apply_delta_public_state, apply_deltas_public_state, classify_public_delta, played_card_from_delta, score_delta_for_public_delta
+from .state import DeltaPublicState, GameState, PlayerState, PublicState, RulesConfig
+from .views import build_player_state, build_public_state
 
 __all__ = [
+    "apply_delta_public_state",
+    "apply_deltas_public_state",
+    "build_player_state",
+    "build_public_state",
     "Card",
-    "ChooseRowCommand",
+    "classify_public_delta",
     "Deck",
+    "DeltaPublicState",
     "GameState",
     "Phase",
     "PhaseInfo",
-    "PlayCardCommand",
     "Player",
     "PlayerID",
     "PlayerState",
+    "played_card_from_delta",
     "PublicPlayerInfo",
+    "PublicState",
     "Row",
     "RowID",
     "RulesConfig",
-    "build_player_state",
+    "score_delta_for_public_delta",
+    "submit_choose_row",
+    "submit_play_card",
 ]

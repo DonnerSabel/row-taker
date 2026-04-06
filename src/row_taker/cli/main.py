@@ -5,13 +5,13 @@ import random
 from row_taker.cli.create_match_config import create_match_config
 from row_taker.cli.render import render_public_state, render_trick_result
 from row_taker.cli.terminal import clear_screen
+from row_taker.clients.cli_client import CliClient
+from row_taker.clients.client import Client
+from row_taker.clients.random_bot_client import RandomBotClient
 from row_taker.engine.game import setup_game
 from row_taker.hub.match_config import ParticipantKind
 from row_taker.hub.match_hub import MatchHub
 from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, StateUpdated, TrickResolved
-from row_taker.participants.cli_participant import CliParticipant
-from row_taker.participants.client import Client
-from row_taker.participants.random_bot_participant import RandomBotParticipant
 
 
 def _dispatch_hub_messages(hub: MatchHub, clients_by_player_id: dict, *, interactive: bool = True) -> None:
@@ -60,9 +60,9 @@ def main() -> None:
     clients_by_player_id = {}
     for seat, player in zip(match_config.seats, state.players, strict=True):
         if seat.kind == ParticipantKind.HUMAN:
-            clients_by_player_id[player.player_id] = CliParticipant()
+            clients_by_player_id[player.player_id] = CliClient()
         elif seat.kind == ParticipantKind.RANDOM_BOT:
-            clients_by_player_id[player.player_id] = RandomBotParticipant(rng=rng)
+            clients_by_player_id[player.player_id] = RandomBotClient(rng=rng)
         else:
             raise ValueError(f'unsupported participant kind: {seat.kind!r}')
 

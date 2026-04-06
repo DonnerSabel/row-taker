@@ -4,7 +4,6 @@ import random
 from collections.abc import Sequence
 
 from .cards import Card, Deck
-from .commands import ChooseRowCommand, PlayCardCommand
 from .models import Player, PlayerID, Row, RowID
 from .phases import Phase, PhaseInfo
 from .rules import place_card, take_row, target_row_index
@@ -91,15 +90,15 @@ def _deal_new_round(state: GameState) -> None:
     )
 
 
-def submit_play_card(state: GameState, command: PlayCardCommand) -> None:
+def submit_play_card(state: GameState, player_id: PlayerID, card_value: int) -> None:
     if state.phase_info.phase != Phase.CHOOSE_CARD:
         raise ValueError(f'invalid phase for submit_play_card: {state.phase_info.phase!r}')
 
-    state.validate_player_id(command.player_id)
-    state.validate_no_selected_card_for_player(command.player_id)
-    card = Card(command.card_value)
-    state.validate_player_has_card(command.player_id, card)
-    state.selected_cards[command.player_id] = card
+    state.validate_player_id(player_id)
+    state.validate_no_selected_card_for_player(player_id)
+    card = Card(card_value)
+    state.validate_player_has_card(player_id, card)
+    state.selected_cards[player_id] = card
 
 
 def all_cards_selected(state: GameState) -> bool:
@@ -173,13 +172,12 @@ def resolve_next_delta_public_state(state: GameState) -> DeltaPublicState | None
 
     return DeltaPublicState(
         player_id=player_id,
-        played_card=card,
         affected_row_id=target_row.row_id,
-        new_row_cards=list(target_row.cards),
+        new_row_cards=tuple(target_row.cards),
     )
 
 
-def submit_choose_row(state: GameState, command: ChooseRowCommand) -> DeltaPublicState:
+def submit_choose_row(state: GameState, player_id: PlayerID, row_id: RowID) -> DeltaPublicState:
     if state.phase_info.phase != Phase.CHOOSE_ROW:
         raise ValueError(f'invalid phase for submit_choose_row: {state.phase_info.phase!r}')
 
@@ -187,18 +185,18 @@ def submit_choose_row(state: GameState, command: ChooseRowCommand) -> DeltaPubli
     pending_card = state.phase_info.pending_card
     if expected_player_id is None or pending_card is None:
         raise ValueError('missing pending choose-row context')
-    if command.player_id != expected_player_id:
+    if player_id != expected_player_id:
         raise ValueError(
-            f'ChooseRowCommand player_id mismatch: expected {expected_player_id!r}, got {command.player_id!r}'
+            f'choose-row player_id mismatch: expected {expected_player_id!r}, got {player_id!r}'
         )
 
     selectable_row_ids = tuple(state.phase_info.selectable_row_ids)
-    if selectable_row_ids and command.row_id not in selectable_row_ids:
-        raise ValueError(f'row_id {command.row_id!r} is not selectable in the current state')
+    if selectable_row_ids and row_id not in selectable_row_ids:
+        raise ValueError(f'row_id {row_id!r} is not selectable in the current state')
 
-    chosen_index = state.get_row_index(command.row_id)
+    chosen_index = state.get_row_index(row_id)
     bullheads, _taken = take_row(state.rows, chosen_index)
-    state.get_player_by_id(command.player_id).score += bullheads
+    state.get_player_by_id(player_id).score += bullheads
     state.rows[chosen_index].cards = [pending_card]
 
     state.phase_info = PhaseInfo(
@@ -207,10 +205,9 @@ def submit_choose_row(state: GameState, command: ChooseRowCommand) -> DeltaPubli
     )
 
     return DeltaPublicState(
-        player_id=command.player_id,
-        played_card=pending_card,
-        affected_row_id=command.row_id,
-        new_row_cards=list(state.rows[chosen_index].cards),
+        player_id=player_id,
+        affected_row_id=row_id,
+        new_row_cards=tuple(state.rows[chosen_index].cards),
     )
 
 
