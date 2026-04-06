@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from row_taker.engine.lobby.config import MatchConfig
+from row_taker.engine.lobby.state import LobbyState
 from row_taker.engine.models import PlayerID, RowID
 from row_taker.engine.state import DeltaPublicState, PlayerState, PublicState
-from row_taker.hub.match_config import MatchConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,12 +35,12 @@ ClientToServerMessage = ConfigureLobby | StartGame | SubmitCard | SubmitRowChoic
 
 @dataclass(frozen=True, slots=True)
 class LobbyStateUpdated:
-    match_config: MatchConfig
+    lobby_state: LobbyState
 
 
 @dataclass(frozen=True, slots=True)
 class GameStarting:
-    match_config: MatchConfig
+    lobby_state: LobbyState
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,8 +1,9 @@
 from row_taker.engine.cards import Card
+from row_taker.engine.lobby.config import MatchConfig, SeatConfig
+from row_taker.engine.lobby.state import LobbyState
 from row_taker.engine.models import PlayerID, PublicPlayerInfo, Row, RowID
 from row_taker.engine.phases import Phase, PhaseInfo
 from row_taker.engine.state import DeltaPublicState, PlayerState, PublicState, RulesConfig
-from row_taker.hub.match_config import SeatConfig, MatchConfig
 from row_taker.protocol.codec import (
     client_message_from_dict,
     client_message_to_dict,
@@ -40,7 +41,11 @@ def _match_config() -> MatchConfig:
     ])
 
 
-def test_client_message_mappers_roundtrip() -> None:
+def _lobby_state(*, game_started: bool = False) -> LobbyState:
+    return LobbyState(match_config=_match_config(), game_started=game_started)
+
+
+def test_client_protocol_codec_roundtrip() -> None:
     submit_card = SubmitCard(player_id=PlayerID('player-0'), card_value=42)
     assert client_message_from_dict(client_message_to_dict(submit_card)) == submit_card
 
@@ -54,7 +59,7 @@ def test_client_message_mappers_roundtrip() -> None:
     assert client_message_from_dict(client_message_to_dict(start_game)) == start_game
 
 
-def test_server_message_mappers_roundtrip() -> None:
+def test_server_protocol_codec_roundtrip() -> None:
     public_state = _public_state()
     player_state = PlayerState(public_state=public_state, self_player_id=PlayerID('player-0'), hand=[Card(42)])
     delta = DeltaPublicState(
@@ -63,10 +68,10 @@ def test_server_message_mappers_roundtrip() -> None:
         new_row_cards=(Card(10), Card(42)),
     )
 
-    lobby_updated = LobbyStateUpdated(match_config=_match_config())
+    lobby_updated = LobbyStateUpdated(lobby_state=_lobby_state())
     assert server_message_from_dict(server_message_to_dict(lobby_updated)) == lobby_updated
 
-    game_starting = GameStarting(match_config=_match_config())
+    game_starting = GameStarting(lobby_state=_lobby_state(game_started=True))
     assert server_message_from_dict(server_message_to_dict(game_starting)) == game_starting
 
     state_updated = StateUpdated(state=public_state)
