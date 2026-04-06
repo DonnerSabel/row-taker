@@ -4,6 +4,17 @@ from dataclasses import dataclass
 
 from row_taker.engine.models import PlayerID, RowID
 from row_taker.engine.state import DeltaPublicState, PlayerState, PublicState
+from row_taker.hub.match_config import MatchConfig
+
+
+@dataclass(frozen=True, slots=True)
+class ConfigureLobby:
+    match_config: MatchConfig
+
+
+@dataclass(frozen=True, slots=True)
+class StartGame:
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,7 +29,17 @@ class SubmitRowChoice:
     row_id: RowID
 
 
-ClientToHubMessage = SubmitCard | SubmitRowChoice
+ClientToServerMessage = ConfigureLobby | StartGame | SubmitCard | SubmitRowChoice
+
+
+@dataclass(frozen=True, slots=True)
+class LobbyStateUpdated:
+    match_config: MatchConfig
+
+
+@dataclass(frozen=True, slots=True)
+class GameStarting:
+    match_config: MatchConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,4 +66,14 @@ class TrickResolved:
     game_finished: bool
 
 
-HubToClientMessage = StateUpdated | ChooseCardRequested | ChooseRowRequested | TrickResolved
+ServerToClientMessage = (
+    LobbyStateUpdated
+    | GameStarting
+    | StateUpdated
+    | ChooseCardRequested
+    | ChooseRowRequested
+    | TrickResolved
+)
+
+GameClientMessage = SubmitCard | SubmitRowChoice
+GameServerMessage = StateUpdated | ChooseCardRequested | ChooseRowRequested | TrickResolved

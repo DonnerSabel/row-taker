@@ -5,14 +5,21 @@ from dataclasses import dataclass, field
 
 from row_taker.engine.phases import Phase
 from row_taker.engine.player_state_ops import playable_cards, selectable_row_ids
-from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, ClientToHubMessage, HubToClientMessage, SubmitCard, SubmitRowChoice
+from row_taker.protocol.messages import (
+    ChooseCardRequested,
+    ChooseRowRequested,
+    ClientToServerMessage,
+    ServerToClientMessage,
+    SubmitCard,
+    SubmitRowChoice,
+)
 
 
 @dataclass(slots=True)
 class RandomBotClient:
     rng: random.Random = field(default_factory=random.Random)
 
-    def handle_hub_message(self, message: HubToClientMessage) -> ClientToHubMessage | None:
+    def handle_server_message(self, message: ServerToClientMessage) -> ClientToServerMessage | None:
         if isinstance(message, ChooseCardRequested):
             state = message.state
             state.validate_phase(Phase.CHOOSE_CARD)

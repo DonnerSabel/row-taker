@@ -1,10 +1,25 @@
 from row_taker.engine.cards import Card
-from row_taker.engine.models import PlayerID, RowID
+from row_taker.engine.models import PlayerID, PublicPlayerInfo, Row, RowID
 from row_taker.engine.phases import Phase, PhaseInfo
 from row_taker.engine.state import DeltaPublicState, PlayerState, PublicState, RulesConfig
-from row_taker.engine.models import PublicPlayerInfo, Row
-from row_taker.hub.message_mappers import client_message_from_dict, client_message_to_dict, hub_message_from_dict, hub_message_to_dict
-from row_taker.hub.messages import ChooseCardRequested, StateUpdated, SubmitCard, SubmitRowChoice, TrickResolved
+from row_taker.hub.match_config import SeatConfig, MatchConfig
+from row_taker.protocol.codec import (
+    client_message_from_dict,
+    client_message_to_dict,
+    server_message_from_dict,
+    server_message_to_dict,
+)
+from row_taker.protocol.messages import (
+    ChooseCardRequested,
+    ConfigureLobby,
+    GameStarting,
+    LobbyStateUpdated,
+    StartGame,
+    StateUpdated,
+    SubmitCard,
+    SubmitRowChoice,
+    TrickResolved,
+)
 
 
 def _public_state() -> PublicState:
@@ -18,6 +33,13 @@ def _public_state() -> PublicState:
     )
 
 
+def _match_config() -> MatchConfig:
+    return MatchConfig.from_seats([
+        SeatConfig.human(0, 'A'),
+        SeatConfig.random_bot(1, 'Bot_1'),
+    ])
+
+
 def test_client_message_mappers_roundtrip() -> None:
     submit_card = SubmitCard(player_id=PlayerID('player-0'), card_value=42)
     assert client_message_from_dict(client_message_to_dict(submit_card)) == submit_card
@@ -25,17 +47,33 @@ def test_client_message_mappers_roundtrip() -> None:
     submit_row = SubmitRowChoice(player_id=PlayerID('player-0'), row_id=RowID('row-2'))
     assert client_message_from_dict(client_message_to_dict(submit_row)) == submit_row
 
+    configure_lobby = ConfigureLobby(match_config=_match_config())
+    assert client_message_from_dict(client_message_to_dict(configure_lobby)) == configure_lobby
 
-def test_hub_message_mappers_roundtrip() -> None:
+    start_game = StartGame()
+    assert client_message_from_dict(client_message_to_dict(start_game)) == start_game
+
+
+def test_server_message_mappers_roundtrip() -> None:
     public_state = _public_state()
     player_state = PlayerState(public_state=public_state, self_player_id=PlayerID('player-0'), hand=[Card(42)])
-    delta = DeltaPublicState(player_id=PlayerID('player-0'), affected_row_id=RowID('row-0'), new_row_cards=(Card(10), Card(42)))
+    delta = DeltaPublicState(
+        player_id=PlayerID('player-0'),
+        affected_row_id=RowID('row-0'),
+        new_row_cards=(Card(10), Card(42)),
+    )
+
+    lobby_updated = LobbyStateUpdated(match_config=_match_config())
+    assert server_message_from_dict(server_message_to_dict(lobby_updated)) == lobby_updated
+
+    game_starting = GameStarting(match_config=_match_config())
+    assert server_message_from_dict(server_message_to_dict(game_starting)) == game_starting
 
     state_updated = StateUpdated(state=public_state)
-    assert hub_message_from_dict(hub_message_to_dict(state_updated)) == state_updated
+    assert server_message_from_dict(server_message_to_dict(state_updated)) == state_updated
 
     choose_card = ChooseCardRequested(player_id=PlayerID('player-0'), state=player_state)
-    assert hub_message_from_dict(hub_message_to_dict(choose_card)) == choose_card
+    assert server_message_from_dict(server_message_to_dict(choose_card)) == choose_card
 
     trick_resolved = TrickResolved(deltas=(delta,), new_round_started=False, game_finished=False)
-    assert hub_message_from_dict(hub_message_to_dict(trick_resolved)) == trick_resolved
+    assert server_message_from_dict(server_message_to_dict(trick_resolved)) == trick_resolved

@@ -3,7 +3,7 @@ from __future__ import annotations
 from row_taker.cli.row_display import build_row_display_mapping, format_public_deltas_for_cli
 from row_taker.engine.public_state_ops import apply_deltas_public_state
 from row_taker.engine.state import PlayerState, PublicState
-from row_taker.hub.messages import TrickResolved
+from row_taker.protocol.messages import TrickResolved
 
 
 def render_public_state(state: PublicState) -> None:

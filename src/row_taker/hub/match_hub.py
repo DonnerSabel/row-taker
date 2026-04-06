@@ -17,11 +17,11 @@ from row_taker.engine.models import PlayerID
 from row_taker.engine.phases import Phase
 from row_taker.engine.state import GameState, PlayerState, PublicState
 from row_taker.engine.views import build_player_state, build_public_state
-from row_taker.hub.messages import (
+from row_taker.protocol.messages import (
     ChooseCardRequested,
     ChooseRowRequested,
-    ClientToHubMessage,
-    HubToClientMessage,
+    GameClientMessage,
+    GameServerMessage,
     StateUpdated,
     SubmitCard,
     SubmitRowChoice,
@@ -32,13 +32,13 @@ from row_taker.hub.messages import (
 @dataclass(slots=True)
 class MatchHub:
     state: GameState
-    outbox: list[HubToClientMessage] = field(default_factory=list)
+    outbox: list[GameServerMessage] = field(default_factory=list)
 
     def start_match(self) -> None:
         self.outbox.append(StateUpdated(state=self.build_public_state()))
         self._request_choose_cards_for_current_trick()
 
-    def handle_client_message(self, message: ClientToHubMessage) -> None:
+    def handle_client_message(self, message: GameClientMessage) -> None:
         if isinstance(message, SubmitCard):
             self._handle_submit_card(message)
             return
@@ -47,7 +47,7 @@ class MatchHub:
             return
         raise TypeError(f'unsupported client message type: {type(message)!r}')
 
-    def drain_outbox(self) -> list[HubToClientMessage]:
+    def drain_outbox(self) -> list[GameServerMessage]:
         drained = list(self.outbox)
         self.outbox.clear()
         return drained

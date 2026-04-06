@@ -3,53 +3,14 @@ from __future__ import annotations
 import random
 
 from row_taker.cli.create_match_config import create_match_config
-from row_taker.cli.render import render_public_state, render_trick_resolution
+from row_taker.cli.render import render_public_state
 from row_taker.cli.terminal import clear_screen
 from row_taker.clients.cli_client import CliClient
-from row_taker.clients.client import Client
 from row_taker.clients.random_bot_client import RandomBotClient
-from row_taker.engine.game import setup_game
-from row_taker.engine.state import PublicState
 from row_taker.hub.match_config import ClientKind
-from row_taker.hub.match_hub import MatchHub
-from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, StateUpdated, TrickResolved
-
-
-def _dispatch_hub_messages(hub: MatchHub, clients_by_player_id: dict, *, interactive: bool = True) -> None:
-    latest_public_state: PublicState | None = None
-
-    while True:
-        messages = hub.drain_outbox()
-        if not messages:
-            return
-
-        for message in messages:
-            if isinstance(message, StateUpdated):
-                latest_public_state = message.state
-                continue
-
-            if isinstance(message, TrickResolved):
-                if latest_public_state is None:
-                    raise ValueError('missing public state before trick resolution')
-                clear_screen()
-                render_trick_resolution(latest_public_state, message)
-                if message.game_finished:
-                    continue
-                if interactive:
-                    print()
-                    cont = input("Enter für nächsten Stich, 'q' zum Beenden > ").strip().lower()
-                    if cont == 'q':
-                        raise KeyboardInterrupt
-                continue
-
-            if isinstance(message, (ChooseCardRequested, ChooseRowRequested)):
-                client: Client = clients_by_player_id[message.player_id]
-                response = client.handle_hub_message(message)
-                if response is not None:
-                    hub.handle_client_message(response)
-                continue
-
-            raise TypeError(f'unsupported hub message type: {type(message)!r}')
+from row_taker.protocol.messages import ConfigureLobby, StartGame
+from row_taker.server.local_server import LocalServer
+from row_taker.server.local_session import run_local_session
 
 
 def main() -> None:
@@ -60,26 +21,26 @@ def main() -> None:
     print()
 
     match_config = create_match_config()
-    player_names = [seat.name for seat in match_config.seats]
-    state = setup_game(player_names, rng=rng)
+    server = LocalServer(rng=rng)
+    server.handle_client_message(ConfigureLobby(match_config=match_config))
 
     clients_by_player_id = {}
-    for seat, player in zip(match_config.seats, state.players, strict=True):
+    for seat_index, seat in enumerate(match_config.seats):
+        player_id = f'player-{seat_index}'
         if seat.kind == ClientKind.HUMAN:
-            clients_by_player_id[player.player_id] = CliClient()
+            clients_by_player_id[player_id] = CliClient()
         elif seat.kind == ClientKind.RANDOM_BOT:
-            clients_by_player_id[player.player_id] = RandomBotClient(rng=rng)
+            clients_by_player_id[player_id] = RandomBotClient(rng=rng)
         else:
             raise ValueError(f'unsupported client kind: {seat.kind!r}')
 
-    hub = MatchHub(state=state)
-    hub.start_match()
-    _dispatch_hub_messages(hub, clients_by_player_id)
+    server.handle_client_message(StartGame())
+    run_local_session(server, clients_by_player_id)
 
     print()
     print('Endstand:')
-    render_public_state(hub.build_public_state())
-    winner = min(hub.state.players, key=lambda p: p.score)
+    render_public_state(server.build_public_state())
+    winner = min(server.state.players, key=lambda p: p.score)
     print(f'Gewonnen hat: {winner.name} (wenigste Hornochsen)')
 
 

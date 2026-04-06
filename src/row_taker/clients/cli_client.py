@@ -6,12 +6,19 @@ from row_taker.cli.render import render_player_state
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.cli.terminal import clear_screen
 from row_taker.engine.player_state_ops import validate_submit_card, validate_submit_row_choice
-from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, ClientToHubMessage, HubToClientMessage, SubmitCard, SubmitRowChoice
+from row_taker.protocol.messages import (
+    ChooseCardRequested,
+    ChooseRowRequested,
+    ClientToServerMessage,
+    ServerToClientMessage,
+    SubmitCard,
+    SubmitRowChoice,
+)
 
 
 @dataclass(slots=True)
 class CliClient:
-    def handle_hub_message(self, message: HubToClientMessage) -> ClientToHubMessage | None:
+    def handle_server_message(self, message: ServerToClientMessage) -> ClientToServerMessage | None:
         if isinstance(message, ChooseCardRequested):
             return self._handle_choose_card_requested(message)
         if isinstance(message, ChooseRowRequested):

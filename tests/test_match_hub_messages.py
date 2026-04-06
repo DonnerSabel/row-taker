@@ -3,7 +3,14 @@ from row_taker.engine.models import PlayerID, RowID
 from row_taker.engine.game import setup_game
 from row_taker.engine.public_state_ops import played_card_from_delta
 from row_taker.hub.match_hub import MatchHub
-from row_taker.hub.messages import ChooseCardRequested, ChooseRowRequested, StateUpdated, SubmitCard, SubmitRowChoice, TrickResolved
+from row_taker.protocol.messages import (
+    ChooseCardRequested,
+    ChooseRowRequested,
+    StateUpdated,
+    SubmitCard,
+    SubmitRowChoice,
+    TrickResolved,
+)
 
 
 def test_match_hub_drives_trick_via_messages() -> None:

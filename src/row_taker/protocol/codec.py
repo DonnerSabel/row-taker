@@ -9,11 +9,16 @@ from row_taker.engine.state_mappers import (
     public_state_from_dict,
     public_state_to_dict,
 )
-from row_taker.hub.messages import (
+from row_taker.hub.match_config import ClientKind, MatchConfig, SeatConfig
+from row_taker.protocol.messages import (
     ChooseCardRequested,
     ChooseRowRequested,
-    ClientToHubMessage,
-    HubToClientMessage,
+    ClientToServerMessage,
+    ConfigureLobby,
+    GameStarting,
+    LobbyStateUpdated,
+    ServerToClientMessage,
+    StartGame,
     StateUpdated,
     SubmitCard,
     SubmitRowChoice,
@@ -21,7 +26,48 @@ from row_taker.hub.messages import (
 )
 
 
-def client_message_to_dict(message: ClientToHubMessage) -> dict[str, object]:
+def _match_config_to_dict(match_config: MatchConfig) -> dict[str, object]:
+    return {
+        'seats': [
+            {
+                'seat_index': seat.seat_index,
+                'kind': seat.kind.value,
+                'name': seat.name,
+            }
+            for seat in match_config.seats
+        ]
+    }
+
+
+
+def _match_config_from_dict(data: object) -> MatchConfig:
+    if not isinstance(data, dict):
+        raise TypeError(f'match config data must be a dict, got {type(data)!r}')
+
+    seats_data = data['seats']
+    if not isinstance(seats_data, list):
+        raise TypeError(f'match config seats must be a list, got {type(seats_data)!r}')
+
+    seats = [
+        SeatConfig(
+            seat_index=int(seat_data['seat_index']),
+            kind=ClientKind(str(seat_data['kind'])),
+            name=str(seat_data['name']),
+        )
+        for seat_data in seats_data
+    ]
+    return MatchConfig.from_seats(seats)
+
+
+
+def client_message_to_dict(message: ClientToServerMessage) -> dict[str, object]:
+    if isinstance(message, ConfigureLobby):
+        return {
+            'type': 'configure_lobby',
+            'match_config': _match_config_to_dict(message.match_config),
+        }
+    if isinstance(message, StartGame):
+        return {'type': 'start_game'}
     if isinstance(message, SubmitCard):
         return {
             'type': 'submit_card',
@@ -37,8 +83,13 @@ def client_message_to_dict(message: ClientToHubMessage) -> dict[str, object]:
     raise TypeError(f'unsupported client message type: {type(message)!r}')
 
 
-def client_message_from_dict(data: dict[str, object]) -> ClientToHubMessage:
+
+def client_message_from_dict(data: dict[str, object]) -> ClientToServerMessage:
     message_type = str(data['type'])
+    if message_type == 'configure_lobby':
+        return ConfigureLobby(match_config=_match_config_from_dict(data['match_config']))
+    if message_type == 'start_game':
+        return StartGame()
     if message_type == 'submit_card':
         return SubmitCard(
             player_id=PlayerID(str(data['player_id'])),
@@ -52,7 +103,18 @@ def client_message_from_dict(data: dict[str, object]) -> ClientToHubMessage:
     raise ValueError(f'unsupported client message type: {message_type!r}')
 
 
-def hub_message_to_dict(message: HubToClientMessage) -> dict[str, object]:
+
+def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
+    if isinstance(message, LobbyStateUpdated):
+        return {
+            'type': 'lobby_state_updated',
+            'match_config': _match_config_to_dict(message.match_config),
+        }
+    if isinstance(message, GameStarting):
+        return {
+            'type': 'game_starting',
+            'match_config': _match_config_to_dict(message.match_config),
+        }
     if isinstance(message, StateUpdated):
         return {
             'type': 'state_updated',
@@ -77,11 +139,16 @@ def hub_message_to_dict(message: HubToClientMessage) -> dict[str, object]:
             'new_round_started': message.new_round_started,
             'game_finished': message.game_finished,
         }
-    raise TypeError(f'unsupported hub message type: {type(message)!r}')
+    raise TypeError(f'unsupported server message type: {type(message)!r}')
 
 
-def hub_message_from_dict(data: dict[str, object]) -> HubToClientMessage:
+
+def server_message_from_dict(data: dict[str, object]) -> ServerToClientMessage:
     message_type = str(data['type'])
+    if message_type == 'lobby_state_updated':
+        return LobbyStateUpdated(match_config=_match_config_from_dict(data['match_config']))
+    if message_type == 'game_starting':
+        return GameStarting(match_config=_match_config_from_dict(data['match_config']))
     if message_type == 'state_updated':
         return StateUpdated(state=public_state_from_dict(data['state']))
     if message_type == 'choose_card_requested':
@@ -100,4 +167,4 @@ def hub_message_from_dict(data: dict[str, object]) -> HubToClientMessage:
             new_round_started=bool(data['new_round_started']),
             game_finished=bool(data['game_finished']),
         )
-    raise ValueError(f'unsupported hub message type: {message_type!r}')
+    raise ValueError(f'unsupported server message type: {message_type!r}')
