@@ -29,13 +29,18 @@ def _lobby_view() -> LobbyView:
     return LobbyView(
         seat_count=3,
         participants=(
-            LobbyParticipantView(client_id='client-0', display_name='Alice', participant_kind='human', seat_index=0),
-            LobbyParticipantView(client_id='bot-1', display_name='Bot_1', participant_kind='bot', seat_index=2),
+            LobbyParticipantView(client_id="client-0", display_name="Alice", participant_kind="human", seat_index=0),
+            LobbyParticipantView(client_id="pending-bot-seat-2", display_name="Bot_1", participant_kind="bot", seat_index=2),
         ),
         seats=(
-            LobbySeatView(seat_index=0, occupant_client_id='client-0', occupant_display_name='Alice', occupant_kind='human'),
+            LobbySeatView(seat_index=0, occupant_client_id="client-0", occupant_display_name="Alice", occupant_kind="human"),
             LobbySeatView(seat_index=1, occupant_client_id=None, occupant_display_name=None, occupant_kind=None),
-            LobbySeatView(seat_index=2, occupant_client_id='bot-1', occupant_display_name='Bot_1', occupant_kind='bot'),
+            LobbySeatView(
+                seat_index=2,
+                occupant_client_id="pending-bot-seat-2",
+                occupant_display_name="Bot_1",
+                occupant_kind="bot",
+            ),
         ),
         game_started=False,
     )
@@ -43,14 +48,15 @@ def _lobby_view() -> LobbyView:
 
 def test_client_messages_roundtrip() -> None:
     for message in [
-        JoinLobby(display_name='Alice'),
-        SetDisplayName(display_name='Bob'),
-        AssignSeatToClient(seat_index=1, target_client_id='client-0'),
-        CreateLocalBotOnSeat(seat_index=2, display_name='Bot_X'),
+        JoinLobby(display_name="Alice"),
+        JoinLobby(display_name="Bot_1", requested_client_id="bot-1"),
+        SetDisplayName(display_name="Bob"),
+        AssignSeatToClient(seat_index=1, target_client_id="client-0"),
+        CreateLocalBotOnSeat(seat_index=2, display_name="Bot_X"),
         ClearSeat(seat_index=2),
         RequestStartGame(),
-        SubmitCard(player_id=PlayerID('player-0'), card_value=42),
-        SubmitRowChoice(player_id=PlayerID('player-1'), row_id=RowID('row-2')),
+        SubmitCard(player_id=PlayerID("player-0"), card_value=42),
+        SubmitRowChoice(player_id=PlayerID("player-1"), row_id=RowID("row-2")),
     ]:
         assert client_message_from_dict(client_message_to_dict(message)) == message
 
@@ -59,9 +65,9 @@ def test_server_messages_roundtrip() -> None:
     lobby = _lobby_view()
     messages = [
         LobbyStateUpdated(lobby=lobby),
-        LobbyActionRejected(message='nope'),
+        LobbyActionRejected(message="nope"),
         GameStarting(lobby=LobbyView(seat_count=lobby.seat_count, participants=lobby.participants, seats=lobby.seats, game_started=True)),
-        ServerError(message='boom'),
+        ServerError(message="boom"),
     ]
     for message in messages:
         assert server_message_from_dict(server_message_to_dict(message)) == message
@@ -71,9 +77,9 @@ def test_lobby_state_is_metadata_free() -> None:
     lobby_state = LobbyState(
         seat_count=2,
         seats=(
-            LobbySeat(seat_index=0, occupant_client_id='client-0'),
+            LobbySeat(seat_index=0, occupant_client_id="client-0"),
             LobbySeat(seat_index=1),
         ),
         game_started=False,
     )
-    assert not hasattr(lobby_state, 'clients')
+    assert not hasattr(lobby_state, "clients")

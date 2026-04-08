@@ -33,6 +33,7 @@ class LobbyView:
 @dataclass(frozen=True, slots=True)
 class JoinLobby:
     display_name: str
+    requested_client_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
