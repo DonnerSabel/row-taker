@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import random
 
-from row_taker.clients.random_bot_client import RandomBotClient
 from row_taker.engine.game import setup_game
 from row_taker.engine.game.models import PlayerID
 from row_taker.engine.game.state import GameState, PublicState
@@ -32,7 +31,7 @@ from row_taker.protocol.messages import (
 from row_taker.server.client_registry import ClientRegistry
 from row_taker.server.endpoints import LocalLoopbackEndpoint
 from row_taker.server.lobby_view import build_lobby_state_updated, build_lobby_view
-from row_taker.server.local_bot_runner import LocalBotRunner
+from row_taker.server.process_bot_runner import ProcessBotRunner
 from row_taker.server.match_participants import build_match_participants
 from row_taker.server.participants import Participant, ParticipantKind, ParticipantLocation
 
@@ -70,9 +69,9 @@ class LocalServer:
             elif kind == ParticipantKind.HUMAN:
                 # model-level replacement by bot is a later step; for now the active game keeps running only for bots already present
                 self.client_to_player_id.pop(client_id, None)
-                self.registry.remove_participant(client_id)
+                self._drop_registry_participant(client_id)
             else:
-                self.registry.remove_participant(client_id)
+                self._drop_registry_participant(client_id)
 
     def handle_client_message(self, client_id: str, message: ClientToServerMessage) -> None:
         try:
@@ -164,7 +163,7 @@ class LocalServer:
 
         bot_client_id = self._next_bot_client_id()
         bot_endpoint = LocalLoopbackEndpoint()
-        bot_runner = LocalBotRunner(client=RandomBotClient(rng=self.rng), endpoint=bot_endpoint)
+        bot_runner = ProcessBotRunner(endpoint=bot_endpoint, seed=self.rng.randrange(2**63))
         self.registry.register_participant(
             Participant(
                 client_id=bot_client_id,
@@ -279,6 +278,13 @@ class LocalServer:
             raise ValueError('client may only act for its assigned player')
         self.active_match.handle_client_message(message)
 
+
+    def _drop_registry_participant(self, client_id: str) -> None:
+        runner = self.registry.get_runner(client_id) if self.registry.has(client_id) else None
+        if runner is not None:
+            runner.close()
+        self.registry.remove_participant(client_id)
+
     def _broadcast_lobby_state(self) -> None:
         self.outbox.append(OutgoingEnvelope(build_lobby_state_updated(self.lobby_state, self.registry), target_client_id=None))
 
@@ -290,6 +296,9 @@ class LocalServer:
                 return client_id
 
     def _remove_participant(self, client_id: str) -> None:
+        runner = self.registry.get_runner(client_id) if self.registry.has(client_id) else None
+        if runner is not None:
+            runner.close()
         self.registry.remove_participant(client_id)
         self.lobby_state = remove_client(self.lobby_state, client_id)
 

@@ -18,6 +18,9 @@ class LocalEndpointRunner(Protocol):
     def pump(self) -> int:
         ...
 
+    def close(self) -> None:
+        ...
+
 
 @dataclass(slots=True)
 class LocalLoopbackEndpoint:

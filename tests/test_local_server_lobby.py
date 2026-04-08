@@ -40,7 +40,7 @@ def test_local_server_can_add_bot_on_selected_seat() -> None:
     assert seat.occupant_display_name == 'Bot_Bob'
 
 
-def test_local_bot_is_registered_with_endpoint_and_runner() -> None:
+def test_process_bot_is_registered_with_endpoint_and_runner() -> None:
     server = LocalServer(rng=random.Random(1234), seat_count=2)
     server.handle_client_message('client-0', JoinLobby(display_name='Alice'))
     server.handle_client_message('client-0', AssignSeatToClient(seat_index=0, target_client_id='client-0'))
@@ -60,7 +60,7 @@ def test_registry_is_only_source_of_participant_metadata() -> None:
     assert not hasattr(server.lobby_state, 'clients')
 
 
-def test_local_server_routes_bot_turns_via_local_endpoint_runner() -> None:
+def test_local_server_routes_bot_turns_via_process_runner() -> None:
     server = LocalServer(rng=random.Random(1234), seat_count=2)
     server.handle_client_message('client-0', JoinLobby(display_name='Alice'))
     server.handle_client_message('client-0', AssignSeatToClient(seat_index=0, target_client_id='client-0'))
