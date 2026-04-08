@@ -2,6 +2,7 @@ import random
 
 from row_taker.protocol.messages import (
     AssignSeatToClient,
+    ChooseCardRequested,
     CreateLocalBotOnSeat,
     GameStarting,
     JoinLobby,
@@ -39,6 +40,17 @@ def test_local_server_can_add_bot_on_selected_seat() -> None:
     assert seat.occupant_display_name == 'Bot_Bob'
 
 
+def test_local_bot_is_registered_with_endpoint_and_runner() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=2)
+    server.handle_client_message('client-0', JoinLobby(display_name='Alice'))
+    server.handle_client_message('client-0', AssignSeatToClient(seat_index=0, target_client_id='client-0'))
+    server.handle_client_message('client-0', CreateLocalBotOnSeat(seat_index=1, display_name='Bot_Bob'))
+
+    bot_client_id = next(client_id for client_id in server.registry.records if client_id.startswith('bot-'))
+    assert server.registry.get_endpoint(bot_client_id) is not None
+    assert server.registry.get_runner(bot_client_id) is not None
+
+
 def test_registry_is_only_source_of_participant_metadata() -> None:
     server = LocalServer(rng=random.Random(1234), seat_count=2)
     server.handle_client_message('client-0', JoinLobby(display_name='Alice'))
@@ -46,3 +58,23 @@ def test_registry_is_only_source_of_participant_metadata() -> None:
     participant = server.registry.get_participant('client-0')
     assert participant.display_name == 'Alicia'
     assert not hasattr(server.lobby_state, 'clients')
+
+
+def test_local_server_routes_bot_turns_via_local_endpoint_runner() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=2)
+    server.handle_client_message('client-0', JoinLobby(display_name='Alice'))
+    server.handle_client_message('client-0', AssignSeatToClient(seat_index=0, target_client_id='client-0'))
+    server.handle_client_message('client-0', CreateLocalBotOnSeat(seat_index=1, display_name='Bot_Bob'))
+    server.drain_outbox()
+
+    server.handle_client_message('client-0', RequestStartGame())
+    envelopes = server.drain_outbox()
+
+    assert not hasattr(server, 'bot_clients_by_client_id')
+    assert any(isinstance(envelope.message, GameStarting) for envelope in envelopes)
+    assert any(isinstance(envelope.message, StateUpdated) for envelope in envelopes)
+    assert any(
+        isinstance(envelope.message, ChooseCardRequested) and envelope.target_client_id == 'client-0'
+        for envelope in envelopes
+    )
+    assert all(not (envelope.target_client_id or '').startswith('bot-') for envelope in envelopes)

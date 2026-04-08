@@ -18,6 +18,7 @@ from row_taker.protocol.messages import (
     ClientToServerMessage,
     CreateLocalBotOnSeat,
     GameStarting,
+    GameServerMessage,
     JoinLobby,
     LobbyActionRejected,
     RequestStartGame,
@@ -29,7 +30,9 @@ from row_taker.protocol.messages import (
     TrickResolved,
 )
 from row_taker.server.client_registry import ClientRegistry
+from row_taker.server.endpoints import LocalLoopbackEndpoint
 from row_taker.server.lobby_view import build_lobby_state_updated, build_lobby_view
+from row_taker.server.local_bot_runner import LocalBotRunner
 from row_taker.server.match_participants import build_match_participants
 from row_taker.server.participants import Participant, ParticipantKind, ParticipantLocation
 
@@ -50,7 +53,6 @@ class LocalServer:
     registry: ClientRegistry = field(default_factory=ClientRegistry)
     player_to_client_id: dict[PlayerID, str] = field(default_factory=dict)
     client_to_player_id: dict[str, PlayerID] = field(default_factory=dict)
-    bot_clients_by_client_id: dict[str, RandomBotClient] = field(default_factory=dict)
     _bot_counter: int = 1
 
     def __post_init__(self) -> None:
@@ -71,7 +73,6 @@ class LocalServer:
                 self.registry.remove_participant(client_id)
             else:
                 self.registry.remove_participant(client_id)
-        self.bot_clients_by_client_id.pop(client_id, None)
 
     def handle_client_message(self, client_id: str, message: ClientToServerMessage) -> None:
         try:
@@ -162,6 +163,8 @@ class LocalServer:
                 return
 
         bot_client_id = self._next_bot_client_id()
+        bot_endpoint = LocalLoopbackEndpoint()
+        bot_runner = LocalBotRunner(client=RandomBotClient(rng=self.rng), endpoint=bot_endpoint)
         self.registry.register_participant(
             Participant(
                 client_id=bot_client_id,
@@ -169,7 +172,8 @@ class LocalServer:
                 kind=ParticipantKind.BOT,
                 location=ParticipantLocation.LOCAL,
             ),
-            controller=RandomBotClient(rng=self.rng),
+            endpoint=bot_endpoint,
+            runner=bot_runner,
         )
         self.lobby_state = assign_client_to_seat(self.lobby_state, bot_client_id, message.seat_index)
         if previous_client_id is not None:
@@ -202,17 +206,8 @@ class LocalServer:
         self.active_match = MatchHub(state=state)
         self.player_to_client_id = dict(match_participants.player_to_client_id)
         self.client_to_player_id = dict(match_participants.client_to_player_id)
-        self.bot_clients_by_client_id = {}
-        for client_id in match_participants.ordered_client_ids:
-            participant = self.registry.get_participant(client_id)
-            if participant.kind == ParticipantKind.BOT:
-                controller = self.registry.get_controller(client_id)
-                if isinstance(controller, RandomBotClient):
-                    self.bot_clients_by_client_id[client_id] = controller
-                else:
-                    self.bot_clients_by_client_id[client_id] = RandomBotClient(rng=self.rng)
         self.active_match.start_match()
-        self._relay_match_messages()
+        self._drive_match_until_idle()
 
     def _forward_game_message(self, client_id: str, message: SubmitCard | SubmitRowChoice) -> None:
         if self.active_match is None:
@@ -223,31 +218,66 @@ class LocalServer:
         if message.player_id != expected_player_id:
             raise ValueError('client may only act for its assigned player')
         self.active_match.handle_client_message(message)
-        self._relay_match_messages()
+        self._drive_match_until_idle()
 
-    def _relay_match_messages(self) -> None:
+    def _drive_match_until_idle(self) -> None:
         if self.active_match is None:
             return
-        pending = self.active_match.drain_outbox()
-        while pending:
-            follow_up = []
-            for message in pending:
-                if isinstance(message, (ChooseCardRequested, ChooseRowRequested)):
-                    target_client_id = self.player_to_client_id[message.player_id]
-                    bot_client = self.bot_clients_by_client_id.get(target_client_id)
-                    if bot_client is not None:
-                        response = bot_client.handle_server_message(message)
-                        if response is not None:
-                            self.active_match.handle_client_message(response)
-                            follow_up.extend(self.active_match.drain_outbox())
-                        continue
-                    self.outbox.append(OutgoingEnvelope(message=message, target_client_id=target_client_id))
-                    continue
-                if isinstance(message, (StateUpdated, TrickResolved)):
-                    self.outbox.append(OutgoingEnvelope(message=message, target_client_id=None))
-                    continue
-                self.outbox.append(OutgoingEnvelope(message=message, target_client_id=None))
-            pending = follow_up
+        while True:
+            routed_any = self._route_match_messages(self.active_match.drain_outbox())
+            pumped_any = self._pump_local_endpoints_once()
+            if not routed_any and not pumped_any:
+                return
+
+    def _route_match_messages(self, messages: list[GameServerMessage]) -> bool:
+        if not messages:
+            return False
+        for message in messages:
+            self._route_match_message(message)
+        return True
+
+    def _route_match_message(self, message: GameServerMessage) -> None:
+        if isinstance(message, (ChooseCardRequested, ChooseRowRequested)):
+            target_client_id = self.player_to_client_id[message.player_id]
+            endpoint = self.registry.get_endpoint(target_client_id)
+            if endpoint is not None:
+                endpoint.deliver(message)
+                return
+            self.outbox.append(OutgoingEnvelope(message=message, target_client_id=target_client_id))
+            return
+        if isinstance(message, (StateUpdated, TrickResolved)):
+            self.outbox.append(OutgoingEnvelope(message=message, target_client_id=None))
+            return
+        self.outbox.append(OutgoingEnvelope(message=message, target_client_id=None))
+
+    def _pump_local_endpoints_once(self) -> bool:
+        pumped_any = False
+        for client_id, entry in tuple(self.registry.records.items()):
+            if not self.registry.has(client_id):
+                continue
+            endpoint = entry.endpoint
+            runner = entry.runner
+            if endpoint is None or runner is None:
+                continue
+            handled_messages = runner.pump()
+            outgoing_messages = endpoint.drain_outgoing()
+            if handled_messages or outgoing_messages:
+                pumped_any = True
+            for message in outgoing_messages:
+                self._handle_local_endpoint_message(client_id, message)
+        return pumped_any
+
+    def _handle_local_endpoint_message(self, client_id: str, message: ClientToServerMessage) -> None:
+        if not isinstance(message, (SubmitCard, SubmitRowChoice)):
+            raise TypeError(f'unsupported local endpoint message type: {type(message)!r}')
+        if self.active_match is None:
+            raise ValueError('game message received before game start')
+        expected_player_id = self.client_to_player_id.get(client_id)
+        if expected_player_id is None:
+            raise ValueError('client is not assigned to a player')
+        if message.player_id != expected_player_id:
+            raise ValueError('client may only act for its assigned player')
+        self.active_match.handle_client_message(message)
 
     def _broadcast_lobby_state(self) -> None:
         self.outbox.append(OutgoingEnvelope(build_lobby_state_updated(self.lobby_state, self.registry), target_client_id=None))
@@ -261,7 +291,6 @@ class LocalServer:
 
     def _remove_participant(self, client_id: str) -> None:
         self.registry.remove_participant(client_id)
-        self.bot_clients_by_client_id.pop(client_id, None)
         self.lobby_state = remove_client(self.lobby_state, client_id)
 
     def _assert_known_client(self, client_id: str) -> None:

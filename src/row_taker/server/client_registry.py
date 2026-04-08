@@ -1,23 +1,37 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from row_taker.server.participants import Participant
+
+if TYPE_CHECKING:
+    from row_taker.server.endpoints import LocalEndpointRunner, ServerEndpoint
 
 
 @dataclass(slots=True, frozen=True)
 class RegistryEntry:
     participant: Participant
-    controller: object | None = None
+    endpoint: ServerEndpoint | None = None
+    runner: LocalEndpointRunner | None = None
 
 
 @dataclass(slots=True)
 class ClientRegistry:
     records: dict[str, RegistryEntry] = field(default_factory=dict)
 
-    def register_participant(self, participant: Participant, controller: object | None = None) -> None:
+    def register_participant(
+        self,
+        participant: Participant,
+        endpoint: ServerEndpoint | None = None,
+        runner: LocalEndpointRunner | None = None,
+    ) -> None:
         self._validate_display_name(participant.display_name, exclude_client_id=participant.client_id)
-        self.records[participant.client_id] = RegistryEntry(participant=participant, controller=controller)
+        self.records[participant.client_id] = RegistryEntry(
+            participant=participant,
+            endpoint=endpoint,
+            runner=runner,
+        )
 
     def remove_participant(self, client_id: str) -> None:
         self.records.pop(client_id, None)
@@ -32,14 +46,18 @@ class ClientRegistry:
                 kind=participant.kind,
                 location=participant.location,
             ),
-            controller=self.get_controller(client_id),
+            endpoint=self.get_endpoint(client_id),
+            runner=self.get_runner(client_id),
         )
 
     def get_participant(self, client_id: str) -> Participant:
         return self.records[client_id].participant
 
-    def get_controller(self, client_id: str) -> object | None:
-        return self.records[client_id].controller
+    def get_endpoint(self, client_id: str) -> ServerEndpoint | None:
+        return self.records[client_id].endpoint
+
+    def get_runner(self, client_id: str) -> LocalEndpointRunner | None:
+        return self.records[client_id].runner
 
     def list_participants(self) -> tuple[Participant, ...]:
         return tuple(entry.participant for entry in self.records.values())
