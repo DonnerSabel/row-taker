@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import sys
+from dataclasses import dataclass
 
 from row_taker.server.bot_process_handle import BotProcessHandle
 

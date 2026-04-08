@@ -3,7 +3,12 @@ from __future__ import annotations
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import PublicPlayerInfo, Row
 from row_taker.engine.game.phases import StepAction
-from row_taker.engine.game.state import DeltaPublicState, PublicState, get_player_index, get_row_index
+from row_taker.engine.game.state import (
+    DeltaPublicState,
+    PublicState,
+    get_player_index,
+    get_row_index,
+)
 
 
 def played_card_from_delta(delta: DeltaPublicState) -> Card:

@@ -47,10 +47,7 @@ def setup_game(
         )
         for index, name in enumerate(player_list)
     ]
-    rows = [
-        Row(row_id=RowID(f"row-{index}"))
-        for index in range(config.row_count)
-    ]
+    rows = [Row(row_id=RowID(f"row-{index}")) for index in range(config.row_count)]
 
     state = GameState(
         config=config,
@@ -61,7 +58,7 @@ def setup_game(
         trick_no=1,
         phase_info=PhaseInfo(
             phase=Phase.ROUND_SETUP,
-            message='Preparing first round.',
+            message="Preparing first round.",
         ),
     )
     _deal_new_round(state)
@@ -87,13 +84,13 @@ def _deal_new_round(state: GameState) -> None:
     state.current_trick_deltas.clear()
     state.phase_info = PhaseInfo(
         phase=Phase.CHOOSE_CARD,
-        message='Choose one card.',
+        message="Choose one card.",
     )
 
 
 def submit_play_card(state: GameState, player_id: PlayerID, card_value: int) -> None:
     if state.phase_info.phase != Phase.CHOOSE_CARD:
-        raise ValueError(f'invalid phase for submit_play_card: {state.phase_info.phase!r}')
+        raise ValueError(f"invalid phase for submit_play_card: {state.phase_info.phase!r}")
 
     state.validate_player_id(player_id)
     state.validate_no_selected_card_for_player(player_id)
@@ -113,14 +110,13 @@ def begin_trick_resolution(state: GameState) -> None:
 
     state.phase_info = PhaseInfo(
         phase=Phase.REVEAL_AND_RESOLVE,
-        message='Revealing cards and resolving trick.',
+        message="Revealing cards and resolving trick.",
     )
 
     for player_id, card in state.selected_cards.items():
         player = state.get_player_by_id(player_id)
         hand_index = next(
-            index for index, hand_card in enumerate(player.hand)
-            if hand_card.value == card.value
+            index for index, hand_card in enumerate(player.hand) if hand_card.value == card.value
         )
         player.hand.pop(hand_index)
 
@@ -159,7 +155,7 @@ def resolve_next_delta_public_state(state: GameState) -> DeltaPublicState | None
             active_player_id=player_id,
             pending_card=card,
             selectable_row_ids=selectable_row_ids,
-            message='Choose a row to take.',
+            message="Choose a row to take.",
         )
         return None
 
@@ -175,7 +171,7 @@ def resolve_next_delta_public_state(state: GameState) -> DeltaPublicState | None
 
     state.phase_info = PhaseInfo(
         phase=Phase.REVEAL_AND_RESOLVE,
-        message='Revealing cards and resolving trick.',
+        message="Revealing cards and resolving trick.",
     )
 
     return _append_current_trick_delta(
@@ -190,20 +186,20 @@ def resolve_next_delta_public_state(state: GameState) -> DeltaPublicState | None
 
 def submit_choose_row(state: GameState, player_id: PlayerID, row_id: RowID) -> DeltaPublicState:
     if state.phase_info.phase != Phase.CHOOSE_ROW:
-        raise ValueError(f'invalid phase for submit_choose_row: {state.phase_info.phase!r}')
+        raise ValueError(f"invalid phase for submit_choose_row: {state.phase_info.phase!r}")
 
     expected_player_id = state.phase_info.active_player_id
     pending_card = state.phase_info.pending_card
     if expected_player_id is None or pending_card is None:
-        raise ValueError('missing pending choose-row context')
+        raise ValueError("missing pending choose-row context")
     if player_id != expected_player_id:
         raise ValueError(
-            f'choose-row player_id mismatch: expected {expected_player_id!r}, got {player_id!r}'
+            f"choose-row player_id mismatch: expected {expected_player_id!r}, got {player_id!r}"
         )
 
     selectable_row_ids = tuple(state.phase_info.selectable_row_ids)
     if selectable_row_ids and row_id not in selectable_row_ids:
-        raise ValueError(f'row_id {row_id!r} is not selectable in the current state')
+        raise ValueError(f"row_id {row_id!r} is not selectable in the current state")
 
     chosen_index = state.get_row_index(row_id)
     bullheads, _taken = take_row(state.rows, chosen_index)
@@ -212,7 +208,7 @@ def submit_choose_row(state: GameState, player_id: PlayerID, row_id: RowID) -> D
 
     state.phase_info = PhaseInfo(
         phase=Phase.REVEAL_AND_RESOLVE,
-        message='Revealing cards and resolving trick.',
+        message="Revealing cards and resolving trick.",
     )
 
     return _append_current_trick_delta(
@@ -234,7 +230,7 @@ def finish_trick(state: GameState) -> TrickResolutionSummary:
 
     state.phase_info = PhaseInfo(
         phase=Phase.ROUND_SCORING,
-        message='Trick finished.',
+        message="Trick finished.",
     )
     state.selected_cards.clear()
     state.resolve_order.clear()
@@ -253,14 +249,14 @@ def start_next_round_if_needed(state: GameState) -> bool:
         state.trick_no += 1
         state.phase_info = PhaseInfo(
             phase=Phase.CHOOSE_CARD,
-            message='Choose one card.',
+            message="Choose one card.",
         )
         return False
 
     if any(player.score >= state.config.end_score for player in state.players):
         state.phase_info = PhaseInfo(
             phase=Phase.GAME_OVER,
-            message='Game over.',
+            message="Game over.",
         )
         return False
 

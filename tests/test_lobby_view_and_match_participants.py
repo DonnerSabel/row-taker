@@ -8,8 +8,12 @@ from row_taker.server.participants import Participant, ParticipantKind, Particip
 
 def test_lobby_view_uses_registry_metadata_without_mutating_lobby_state() -> None:
     registry = ClientRegistry()
-    registry.register_participant(Participant("client-0", "Alice", ParticipantKind.HUMAN, ParticipantLocation.REMOTE))
-    lobby_state = LobbyState(seat_count=2, seats=(LobbySeat(0, "client-0"), LobbySeat(1, None)), game_started=False)
+    registry.register_participant(
+        Participant("client-0", "Alice", ParticipantKind.HUMAN, ParticipantLocation.REMOTE)
+    )
+    lobby_state = LobbyState(
+        seat_count=2, seats=(LobbySeat(0, "client-0"), LobbySeat(1, None)), game_started=False
+    )
 
     lobby = build_lobby_view(lobby_state, registry)
     assert lobby.seats[0].occupant_display_name == "Alice"
@@ -21,7 +25,9 @@ def test_lobby_view_uses_registry_metadata_without_mutating_lobby_state() -> Non
 
 def test_lobby_view_can_overlay_pending_bot_metadata() -> None:
     registry = ClientRegistry()
-    lobby_state = LobbyState(seat_count=2, seats=(LobbySeat(0, None), LobbySeat(1, None)), game_started=False)
+    lobby_state = LobbyState(
+        seat_count=2, seats=(LobbySeat(0, None), LobbySeat(1, None)), game_started=False
+    )
     lobby = build_lobby_view(lobby_state, registry, {1: "Bot_Bob"})
     assert lobby.seats[1].occupant_display_name == "Bot_Bob"
     assert lobby.seats[1].occupant_kind == "bot"

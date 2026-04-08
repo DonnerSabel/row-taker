@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import socket
+from dataclasses import dataclass
 from typing import BinaryIO
 
 from row_taker.protocol.errors import ConnectionClosed, ConnectionFailed, ReceiveFailed, SendFailed
@@ -21,7 +21,7 @@ class TcpLineTransport:
     writer: BinaryIO
 
     @classmethod
-    def connect(cls, host: str, port: int) -> "TcpLineTransport":
+    def connect(cls, host: str, port: int) -> TcpLineTransport:
         try:
             sock = socket.create_connection((host, port))
         except OSError as exc:
@@ -29,7 +29,7 @@ class TcpLineTransport:
         return cls.from_socket(sock)
 
     @classmethod
-    def from_socket(cls, sock: socket.socket) -> "TcpLineTransport":
+    def from_socket(cls, sock: socket.socket) -> TcpLineTransport:
         return cls(sock=sock, reader=sock.makefile("rb"), writer=sock.makefile("wb"))
 
     def send_line(self, data: bytes) -> None:
@@ -63,7 +63,7 @@ class ClientTransport:
     line_transport: TcpLineTransport
 
     @classmethod
-    def connect(cls, host: str, port: int) -> "ClientTransport":
+    def connect(cls, host: str, port: int) -> ClientTransport:
         return cls(TcpLineTransport.connect(host, port))
 
     @property
@@ -85,7 +85,7 @@ class ServerTransport:
     line_transport: TcpLineTransport
 
     @classmethod
-    def from_socket(cls, sock: socket.socket) -> "ServerTransport":
+    def from_socket(cls, sock: socket.socket) -> ServerTransport:
         return cls(TcpLineTransport.from_socket(sock))
 
     @property

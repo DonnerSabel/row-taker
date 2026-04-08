@@ -30,12 +30,29 @@ def _lobby_view() -> LobbyView:
     return LobbyView(
         seat_count=3,
         participants=(
-            LobbyParticipantView(client_id="client-0", display_name="Alice", participant_kind="human", seat_index=0),
-            LobbyParticipantView(client_id="pending-bot-seat-2", display_name="Bot_1", participant_kind="bot", seat_index=2),
+            LobbyParticipantView(
+                client_id="client-0", display_name="Alice", participant_kind="human", seat_index=0
+            ),
+            LobbyParticipantView(
+                client_id="pending-bot-seat-2",
+                display_name="Bot_1",
+                participant_kind="bot",
+                seat_index=2,
+            ),
         ),
         seats=(
-            LobbySeatView(seat_index=0, occupant_client_id="client-0", occupant_display_name="Alice", occupant_kind="human"),
-            LobbySeatView(seat_index=1, occupant_client_id=None, occupant_display_name=None, occupant_kind=None),
+            LobbySeatView(
+                seat_index=0,
+                occupant_client_id="client-0",
+                occupant_display_name="Alice",
+                occupant_kind="human",
+            ),
+            LobbySeatView(
+                seat_index=1,
+                occupant_client_id=None,
+                occupant_display_name=None,
+                occupant_kind=None,
+            ),
             LobbySeatView(
                 seat_index=2,
                 occupant_client_id="pending-bot-seat-2",
@@ -68,7 +85,14 @@ def test_server_messages_roundtrip() -> None:
         IdentityAssigned(client_id="client-0"),
         LobbyStateUpdated(lobby=lobby),
         LobbyActionRejected(message="nope"),
-        GameStarting(lobby=LobbyView(seat_count=lobby.seat_count, participants=lobby.participants, seats=lobby.seats, game_started=True)),
+        GameStarting(
+            lobby=LobbyView(
+                seat_count=lobby.seat_count,
+                participants=lobby.participants,
+                seats=lobby.seats,
+                game_started=True,
+            )
+        ),
         ServerError(message="boom"),
     ]
     for message in messages:

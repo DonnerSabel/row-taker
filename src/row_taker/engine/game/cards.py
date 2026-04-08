@@ -31,7 +31,7 @@ class Deck:
     cards: list[Card] = field(default_factory=list)
 
     @classmethod
-    def create_standard_deck(cls) -> "Deck":
+    def create_standard_deck(cls) -> Deck:
         return cls(cards=[Card(value) for value in range(1, 105)])
 
     def validate(self) -> None:
@@ -67,9 +67,7 @@ class Deck:
         if count < 0:
             raise ValueError(f"count must be >= 0, got {count}")
         if count > len(self.cards):
-            raise ValueError(
-                f"cannot draw {count} cards from deck with {len(self.cards)} cards"
-            )
+            raise ValueError(f"cannot draw {count} cards from deck with {len(self.cards)} cards")
 
         return [self.draw() for _ in range(count)]
 

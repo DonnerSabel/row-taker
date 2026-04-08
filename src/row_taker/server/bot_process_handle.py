@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import subprocess
 import sys
+from dataclasses import dataclass
 
 
 @dataclass(slots=True)
@@ -19,7 +19,7 @@ class BotProcessHandle:
         client_id: str,
         seed: int,
         python_executable: str = sys.executable,
-    ) -> "BotProcessHandle":
+    ) -> BotProcessHandle:
         process = subprocess.Popen(
             [
                 python_executable,

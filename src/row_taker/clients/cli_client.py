@@ -31,7 +31,7 @@ class CliClient:
             clear_screen()
             render_player_state(state)
 
-            value = input('Wähle eine Karte (Zahl) > ').strip()
+            value = input("Wähle eine Karte (Zahl) > ").strip()
             if value.isdigit():
                 card_value = int(value)
                 try:
@@ -44,7 +44,7 @@ class CliClient:
                         card_value=card_value,
                     )
 
-            input('Ungültige Wahl. Enter...')
+            input("Ungültige Wahl. Enter...")
 
     def _handle_choose_row_requested(self, message: ChooseRowRequested) -> SubmitRowChoice:
         state = message.state
@@ -55,11 +55,13 @@ class CliClient:
             render_player_state(state)
 
             pending_card_value = state.pending_card_value()
-            pending_card_label = '?' if pending_card_value is None else str(pending_card_value)
-            print(f'{state.self_player_name()}: Deine Karte {pending_card_label} ist kleiner als alle Reihen.')
+            pending_card_label = "?" if pending_card_value is None else str(pending_card_value)
+            print(
+                f"{state.self_player_name()}: Deine Karte {pending_card_label} ist kleiner als alle Reihen."
+            )
 
             max_choice = mapping.max_cli_row()
-            value = input(f'Welche Reihe willst du nehmen? (1-{max_choice}) > ').strip()
+            value = input(f"Welche Reihe willst du nehmen? (1-{max_choice}) > ").strip()
 
             if value.isdigit():
                 cli_choice = int(value)
@@ -76,5 +78,5 @@ class CliClient:
                             row_id=row_id,
                         )
 
-            print(f'Ungültig. Bitte 1-{max_choice} eingeben.')
-            input('Enter...')
+            print(f"Ungültig. Bitte 1-{max_choice} eingeben.")
+            input("Enter...")

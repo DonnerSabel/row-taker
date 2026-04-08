@@ -4,8 +4,7 @@ import socket
 import threading
 
 from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import PlayerID, RowID
-from row_taker.engine.game.models import PublicPlayerInfo, Row
+from row_taker.engine.game.models import PlayerID, PublicPlayerInfo, Row, RowID
 from row_taker.engine.game.phases import Phase, PhaseInfo
 from row_taker.engine.game.state import PlayerState, PublicState, RulesConfig
 from row_taker.protocol.messages import ChooseCardRequested, JoinLobby, SubmitCard
@@ -19,7 +18,9 @@ def _player_state() -> PlayerState:
             config=RulesConfig(hand_size=2),
             players=[
                 PublicPlayerInfo(player_id=PlayerID("player-0"), name="Bot", score=0, hand_count=2),
-                PublicPlayerInfo(player_id=PlayerID("player-1"), name="Alice", score=0, hand_count=2),
+                PublicPlayerInfo(
+                    player_id=PlayerID("player-1"), name="Alice", score=0, hand_count=2
+                ),
             ],
             rows=[
                 Row(row_id=RowID("row-0"), cards=[Card(10)]),
@@ -51,7 +52,9 @@ def test_bot_process_joins_and_responds_over_tcp() -> None:
         try:
             join_message = transport.receive()
             results.append(join_message)
-            transport.send(ChooseCardRequested(player_id=PlayerID("player-0"), state=_player_state()))
+            transport.send(
+                ChooseCardRequested(player_id=PlayerID("player-0"), state=_player_state())
+            )
             response = transport.receive()
             results.append(response)
         finally:

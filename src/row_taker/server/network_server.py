@@ -102,7 +102,9 @@ def _serve_connection(conn: socket.socket, network_server: NetworkServer) -> Non
             transport.close()
 
 
-def run_network_server(host: str, port: int, *, rng: random.Random | None = None, seat_count: int = 4) -> None:
+def run_network_server(
+    host: str, port: int, *, rng: random.Random | None = None, seat_count: int = 4
+) -> None:
     if rng is None:
         rng = random.Random()
     with socket.create_server((host, port), reuse_port=False) as listener:
@@ -111,7 +113,9 @@ def run_network_server(host: str, port: int, *, rng: random.Random | None = None
         network_server = NetworkServer(server=local_server)
         while True:
             conn, _addr = listener.accept()
-            thread = threading.Thread(target=_serve_connection, args=(conn, network_server), daemon=True)
+            thread = threading.Thread(
+                target=_serve_connection, args=(conn, network_server), daemon=True
+            )
             thread.start()
 
 
@@ -125,7 +129,9 @@ class BackgroundServerHandle:
         self._thread.join(timeout)
 
 
-def start_background_network_server(host: str = "127.0.0.1", port: int = 0, *, seat_count: int = 4) -> BackgroundServerHandle:
+def start_background_network_server(
+    host: str = "127.0.0.1", port: int = 0, *, seat_count: int = 4
+) -> BackgroundServerHandle:
     ready = threading.Event()
     selected_port: list[int] = []
 
@@ -143,7 +149,9 @@ def start_background_network_server(host: str = "127.0.0.1", port: int = 0, *, s
             )
             while True:
                 conn, _addr = listener.accept()
-                thread = threading.Thread(target=_serve_connection, args=(conn, network_server), daemon=True)
+                thread = threading.Thread(
+                    target=_serve_connection, args=(conn, network_server), daemon=True
+                )
                 thread.start()
 
     thread = threading.Thread(target=worker, daemon=True)

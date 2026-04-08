@@ -16,12 +16,10 @@ class MatchParticipants:
 def build_match_participants(lobby_state: LobbyState) -> MatchParticipants:
     ordered_client_ids = ordered_seated_client_ids(lobby_state)
     player_to_client_id = {
-        PlayerID(f'player-{index}'): client_id
-        for index, client_id in enumerate(ordered_client_ids)
+        PlayerID(f"player-{index}"): client_id for index, client_id in enumerate(ordered_client_ids)
     }
     client_to_player_id = {
-        client_id: player_id
-        for player_id, client_id in player_to_client_id.items()
+        client_id: player_id for player_id, client_id in player_to_client_id.items()
     }
     return MatchParticipants(
         ordered_client_ids=ordered_client_ids,

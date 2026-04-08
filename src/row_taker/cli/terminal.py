@@ -7,6 +7,6 @@ import sys
 def clear_screen() -> None:
     if not sys.stdout.isatty():
         return
-    if os.name != 'nt' and not os.environ.get('TERM'):
+    if os.name != "nt" and not os.environ.get("TERM"):
         return
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system("cls" if os.name == "nt" else "clear")

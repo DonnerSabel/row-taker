@@ -1,5 +1,3 @@
-from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import Player, PlayerID, Row, RowID
 from row_taker.engine.game import (
     all_cards_selected,
     begin_trick_resolution,
@@ -9,8 +7,15 @@ from row_taker.engine.game import (
     submit_choose_row,
     submit_play_card,
 )
-from row_taker.engine.game.public_state_ops import apply_delta_public_state, classify_public_delta, played_card_from_delta, score_delta_for_public_delta
+from row_taker.engine.game.cards import Card
+from row_taker.engine.game.models import Player, PlayerID, Row, RowID
 from row_taker.engine.game.phases import Phase, PhaseInfo, StepAction
+from row_taker.engine.game.public_state_ops import (
+    apply_delta_public_state,
+    classify_public_delta,
+    played_card_from_delta,
+    score_delta_for_public_delta,
+)
 from row_taker.engine.game.state import GameState, RulesConfig
 
 
@@ -73,7 +78,9 @@ def test_choose_row_delta_can_be_applied_to_public_state() -> None:
 
     submit_play_card(state, PlayerID("player-0"), 1)
     submit_play_card(state, PlayerID("player-1"), 90)
-    public_before = __import__('row_taker.engine.game.views', fromlist=['build_public_state']).build_public_state(state)
+    public_before = __import__(
+        "row_taker.engine.game.views", fromlist=["build_public_state"]
+    ).build_public_state(state)
 
     begin_trick_resolution(state)
     delta = resolve_next_delta_public_state(state)

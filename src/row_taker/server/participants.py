@@ -5,13 +5,13 @@ from enum import Enum
 
 
 class ParticipantKind(str, Enum):
-    HUMAN = 'human'
-    BOT = 'bot'
+    HUMAN = "human"
+    BOT = "bot"
 
 
 class ParticipantLocation(str, Enum):
-    LOCAL = 'local'
-    REMOTE = 'remote'
+    LOCAL = "local"
+    REMOTE = "remote"
 
 
 @dataclass(slots=True, frozen=True)

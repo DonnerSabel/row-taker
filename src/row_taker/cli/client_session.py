@@ -50,11 +50,13 @@ class ClientSession:
                             message = self.transport.receive()
                         except ConnectionClosed:
                             return latest_public_state
-                        latest_lobby, latest_public_state, lobby_mode, finished = self._handle_message(
-                            message,
-                            latest_lobby,
-                            latest_public_state,
-                            lobby_mode,
+                        latest_lobby, latest_public_state, lobby_mode, finished = (
+                            self._handle_message(
+                                message,
+                                latest_lobby,
+                                latest_public_state,
+                                lobby_mode,
+                            )
                         )
                         if finished:
                             return latest_public_state
@@ -116,7 +118,7 @@ class ClientSession:
                     return latest_lobby, latest_public_state, lobby_mode, True
             return latest_lobby, latest_public_state, lobby_mode, False
 
-        if isinstance(message, (ChooseCardRequested, ChooseRowRequested)):
+        if isinstance(message, ChooseCardRequested | ChooseRowRequested):
             response = self.ui_client.handle_server_message(message)
             if response is not None:
                 self.transport.send(response)
@@ -128,7 +130,9 @@ class ClientSession:
 
         raise TypeError(f"unsupported server message type: {type(message)!r}")
 
-    def _handle_lobby_command(self, lobby: LobbyView, mode: tuple[str, int | None], command: str) -> tuple[str, int | None]:
+    def _handle_lobby_command(
+        self, lobby: LobbyView, mode: tuple[str, int | None], command: str
+    ) -> tuple[str, int | None]:
         state, selected = mode
         if state == "main":
             if command == "n":
@@ -158,17 +162,20 @@ class ClientSession:
                 if self.own_client_id is None:
                     print("Eigene client_id noch nicht zugewiesen. Bitte kurz warten.")
                     return ("main", None)
-                self.transport.send(AssignSeatToClient(seat_index=selected, target_client_id=self.own_client_id))
+                self.transport.send(
+                    AssignSeatToClient(seat_index=selected, target_client_id=self.own_client_id)
+                )
                 return ("main", None)
             if command == "b":
                 name = input("Bot-Name > ").strip()
                 if name:
-                    self.transport.send(CreateLocalBotOnSeat(seat_index=selected, display_name=name))
+                    self.transport.send(
+                        CreateLocalBotOnSeat(seat_index=selected, display_name=name)
+                    )
                 return ("main", None)
             return ("main", None)
 
         return ("main", None)
-
 
     def _render_lobby(self, lobby: LobbyView, mode: tuple[str, int | None]) -> None:
         clear_screen()
@@ -193,9 +200,15 @@ class ClientSession:
             ),
         )
         for participant in participants:
-            position = f"Platz {participant.seat_index}" if participant.seat_index is not None else "nicht gesetzt"
+            position = (
+                f"Platz {participant.seat_index}"
+                if participant.seat_index is not None
+                else "nicht gesetzt"
+            )
             marker = " <- du" if participant.client_id == self.own_client_id else ""
-            print(f"{participant.display_name} ({participant.participant_kind}, {position}){marker}")
+            print(
+                f"{participant.display_name} ({participant.participant_kind}, {position}){marker}"
+            )
         print()
         if mode[0] == "main":
             print("n = Name ändern, s = Platz wählen, g = Spiel starten")

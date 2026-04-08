@@ -3,7 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from row_taker.engine.lobby.state import LobbyState
-from row_taker.protocol.messages import LobbyParticipantView, LobbySeatView, LobbyStateUpdated, LobbyView
+from row_taker.protocol.messages import (
+    LobbyParticipantView,
+    LobbySeatView,
+    LobbyStateUpdated,
+    LobbyView,
+)
 from row_taker.server.client_registry import ClientRegistry
 
 
@@ -59,7 +64,9 @@ def build_lobby_view(
         )
     return LobbyView(
         seat_count=lobby_state.seat_count,
-        participants=tuple(sorted(participants, key=lambda participant: participant.display_name.casefold())),
+        participants=tuple(
+            sorted(participants, key=lambda participant: participant.display_name.casefold())
+        ),
         seats=tuple(seats),
         game_started=lobby_state.game_started,
     )
@@ -70,4 +77,6 @@ def build_lobby_state_updated(
     registry: ClientRegistry,
     pending_bot_display_names: Mapping[int, str] | None = None,
 ) -> LobbyStateUpdated:
-    return LobbyStateUpdated(lobby=build_lobby_view(lobby_state, registry, pending_bot_display_names))
+    return LobbyStateUpdated(
+        lobby=build_lobby_view(lobby_state, registry, pending_bot_display_names)
+    )

@@ -3,7 +3,6 @@ from typing import NewType
 
 from .cards import Card
 
-
 PlayerID = NewType("PlayerID", str)
 RowID = NewType("RowID", str)
 

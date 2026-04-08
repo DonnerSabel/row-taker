@@ -45,7 +45,7 @@ class MatchHub:
         if isinstance(message, SubmitRowChoice):
             self._handle_submit_row_choice(message)
             return
-        raise TypeError(f'unsupported client message type: {type(message)!r}')
+        raise TypeError(f"unsupported client message type: {type(message)!r}")
 
     def drain_outbox(self) -> list[GameServerMessage]:
         drained = list(self.outbox)
@@ -87,7 +87,7 @@ class MatchHub:
             if has_pending_row_choice(self.state):
                 active_player_id = self.state.phase_info.active_player_id
                 if active_player_id is None:
-                    raise ValueError('missing active_player_id for choose-row phase')
+                    raise ValueError("missing active_player_id for choose-row phase")
                 self.outbox.append(
                     ChooseRowRequested(
                         player_id=active_player_id,

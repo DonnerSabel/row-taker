@@ -43,7 +43,7 @@ class DeltaPublicState:
 
     def validate(self) -> None:
         if not self.new_row_cards:
-            raise ValueError('delta public state must contain at least one row card')
+            raise ValueError("delta public state must contain at least one row card")
 
     def played_card(self) -> Card:
         self.validate()
@@ -88,7 +88,7 @@ class GameState:
     def validate_complete_play_selections(self) -> None:
         expected_player_ids = {player.player_id for player in self.players}
         if set(self.selected_cards.keys()) != expected_player_ids:
-            raise ValueError('selections must contain one card for every player_id')
+            raise ValueError("selections must contain one card for every player_id")
 
     def validate_player_has_card(self, player_id: PlayerID, card: Card) -> None:
         player = self.get_player_by_id(player_id)
@@ -130,7 +130,7 @@ class PlayerState:
 
     def validate_hand_not_empty(self) -> None:
         if not self.hand:
-            raise ValueError('player hand is empty')
+            raise ValueError("player hand is empty")
 
     def validate_has_card(self, card: Card) -> None:
         if all(hand_card.value != card.value for hand_card in self.hand):

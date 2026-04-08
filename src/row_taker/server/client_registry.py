@@ -15,7 +15,9 @@ class ClientRegistry:
     records: dict[str, RegistryEntry] = field(default_factory=dict)
 
     def register_participant(self, participant: Participant) -> None:
-        self._validate_display_name(participant.display_name, exclude_client_id=participant.client_id)
+        self._validate_display_name(
+            participant.display_name, exclude_client_id=participant.client_id
+        )
         self.records[participant.client_id] = RegistryEntry(participant=participant)
 
     def remove_participant(self, client_id: str) -> None:
@@ -42,7 +44,9 @@ class ClientRegistry:
     def has(self, client_id: str) -> bool:
         return client_id in self.records
 
-    def _validate_display_name(self, display_name: str, exclude_client_id: str | None = None) -> str:
+    def _validate_display_name(
+        self, display_name: str, exclude_client_id: str | None = None
+    ) -> str:
         value = display_name.strip()
         if not value:
             raise ValueError("display name must not be empty")

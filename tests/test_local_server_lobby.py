@@ -37,8 +37,12 @@ def test_local_server_starts_match_from_multiclient_lobby_messages() -> None:
 
     server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
     server.handle_client_message("client-1", JoinLobby(display_name="Bob"))
-    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
-    server.handle_client_message("client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1")
+    )
     server.drain_outbox()
 
     server.handle_client_message("client-0", RequestStartGame())
@@ -51,8 +55,12 @@ def test_local_server_starts_match_from_multiclient_lobby_messages() -> None:
 def test_local_server_can_plan_bot_on_selected_seat_without_registering_it() -> None:
     server = LocalServer(rng=random.Random(1234), seat_count=2)
     server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
-    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
-    server.handle_client_message("client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob")
+    )
     lobby = server.drain_outbox()[-1].message.lobby
     seat = next(seat for seat in lobby.seats if seat.seat_index == 1)
     assert seat.occupant_client_id is not None
@@ -64,8 +72,12 @@ def test_local_server_spawns_pending_bot_only_when_game_starts() -> None:
     fake_server_handle = _FakeServerHandle()
     server = LocalServer(rng=random.Random(1234), seat_count=2, server_handle=fake_server_handle)
     server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
-    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
-    server.handle_client_message("client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob")
+    )
     server.drain_outbox()
 
     server.handle_client_message("client-0", RequestStartGame())
@@ -78,8 +90,12 @@ def test_local_server_finishes_start_when_bot_joins_with_requested_client_id() -
     fake_server_handle = _FakeServerHandle()
     server = LocalServer(rng=random.Random(1234), seat_count=2, server_handle=fake_server_handle)
     server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
-    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
-    server.handle_client_message("client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob")
+    )
     server.drain_outbox()
 
     server.handle_client_message("client-0", RequestStartGame())
@@ -97,7 +113,8 @@ def test_local_server_finishes_start_when_bot_joins_with_requested_client_id() -
     assert any(isinstance(envelope.message, GameStarting) for envelope in envelopes)
     assert any(isinstance(envelope.message, StateUpdated) for envelope in envelopes)
     assert any(
-        isinstance(envelope.message, ChooseCardRequested) and envelope.target_client_id == "client-0"
+        isinstance(envelope.message, ChooseCardRequested)
+        and envelope.target_client_id == "client-0"
         for envelope in envelopes
     )
 
@@ -106,8 +123,12 @@ def test_unknown_requested_client_id_is_rejected() -> None:
     fake_server_handle = _FakeServerHandle()
     server = LocalServer(rng=random.Random(1234), seat_count=2, server_handle=fake_server_handle)
     server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
-    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
-    server.handle_client_message("client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob")
+    )
     server.drain_outbox()
 
     server.handle_client_message(

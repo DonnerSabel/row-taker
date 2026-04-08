@@ -15,10 +15,7 @@ def build_public_state(game_state: GameState) -> PublicState:
         for player in game_state.players
     ]
 
-    visible_rows = [
-        Row(row_id=row.row_id, cards=list(row.cards))
-        for row in game_state.rows
-    ]
+    visible_rows = [Row(row_id=row.row_id, cards=list(row.cards)) for row in game_state.rows]
 
     return PublicState(
         config=game_state.config,

@@ -24,7 +24,9 @@ def test_join_sends_identity_assigned_to_joining_client() -> None:
     transport = _FakeTransport()
 
     client_id = network_server.add_connection(transport)
-    final_client_id = network_server.handle_client_message(client_id, JoinLobby(display_name="Alice"))
+    final_client_id = network_server.handle_client_message(
+        client_id, JoinLobby(display_name="Alice")
+    )
 
     assert final_client_id == client_id
     assert isinstance(transport.sent_messages[0], IdentityAssigned)

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import random
+from dataclasses import dataclass, field
 
 from row_taker.engine.game import setup_game
 from row_taker.engine.game.models import PlayerID
 from row_taker.engine.game.state import GameState, PublicState
-from row_taker.engine.lobby.rules import assign_client_to_seat, clear_seat, mark_game_started, remove_client
+from row_taker.engine.lobby.rules import (
+    assign_client_to_seat,
+    clear_seat,
+    mark_game_started,
+    remove_client,
+)
 from row_taker.engine.lobby.state import LobbyState
 from row_taker.hub.match_hub import MatchHub
 from row_taker.protocol.messages import (
@@ -16,17 +21,15 @@ from row_taker.protocol.messages import (
     ClearSeat,
     ClientToServerMessage,
     CreateLocalBotOnSeat,
-    GameStarting,
     GameServerMessage,
+    GameStarting,
     JoinLobby,
     LobbyActionRejected,
     RequestStartGame,
     ServerToClientMessage,
     SetDisplayName,
-    StateUpdated,
     SubmitCard,
     SubmitRowChoice,
-    TrickResolved,
 )
 from row_taker.server.bot_process_handle import BotProcessHandle
 from row_taker.server.client_registry import ClientRegistry
@@ -121,16 +124,22 @@ class LocalServer:
             if isinstance(message, RequestStartGame):
                 self._handle_start_game()
                 return None
-            if isinstance(message, (SubmitCard, SubmitRowChoice)):
+            if isinstance(message, SubmitCard | SubmitRowChoice):
                 self._forward_game_message(client_id, message)
                 return None
             raise TypeError(f"unsupported client message type: {type(message)!r}")
         except Exception as exc:
-            self.outbox.append(OutgoingEnvelope(LobbyActionRejected(message=str(exc)), target_client_id=reply_target))
+            self.outbox.append(
+                OutgoingEnvelope(
+                    LobbyActionRejected(message=str(exc)), target_client_id=reply_target
+                )
+            )
             if self.active_match is None:
                 self.outbox.append(
                     OutgoingEnvelope(
-                        build_lobby_state_updated(self.lobby_state, self.registry, self._pending_bot_display_names()),
+                        build_lobby_state_updated(
+                            self.lobby_state, self.registry, self._pending_bot_display_names()
+                        ),
                         target_client_id=reply_target,
                     )
                 )
@@ -168,7 +177,9 @@ class LocalServer:
                     location=ParticipantLocation.LOCAL,
                 )
             )
-            self.lobby_state = assign_client_to_seat(self.lobby_state, requested_client_id, pending.seat_index)
+            self.lobby_state = assign_client_to_seat(
+                self.lobby_state, requested_client_id, pending.seat_index
+            )
             self._pending_bot_starts.pop(requested_client_id, None)
             self._pending_bot_seats.pop(pending.seat_index, None)
             self._running_bot_processes_by_client_id[requested_client_id] = pending.handle
@@ -201,7 +212,9 @@ class LocalServer:
             raise ValueError("cannot edit seats after game start")
         self._assert_known_client(message.target_client_id)
         self._pending_bot_seats.pop(message.seat_index, None)
-        self.lobby_state = assign_client_to_seat(self.lobby_state, message.target_client_id, message.seat_index)
+        self.lobby_state = assign_client_to_seat(
+            self.lobby_state, message.target_client_id, message.seat_index
+        )
         self._broadcast_lobby_state()
 
     def _handle_create_local_bot(self, message: CreateLocalBotOnSeat) -> None:
@@ -311,7 +324,7 @@ class LocalServer:
         return True
 
     def _route_match_message(self, message: GameServerMessage) -> None:
-        if isinstance(message, (ChooseCardRequested, ChooseRowRequested)):
+        if isinstance(message, ChooseCardRequested | ChooseRowRequested):
             target_client_id = self.player_to_client_id[message.player_id]
             self.outbox.append(OutgoingEnvelope(message=message, target_client_id=target_client_id))
             return
@@ -337,8 +350,7 @@ class LocalServer:
 
     def _pending_bot_display_names(self) -> dict[int, str]:
         return {
-            seat_index: spec.display_name
-            for seat_index, spec in self._pending_bot_seats.items()
+            seat_index: spec.display_name for seat_index, spec in self._pending_bot_seats.items()
         }
 
     def _validate_pending_bot_display_name(self, display_name: str) -> str:
@@ -353,7 +365,11 @@ class LocalServer:
     def _can_start_game_with_pending_bots(self) -> bool:
         if self.lobby_state.game_started:
             return False
-        occupied_humans = {seat.seat_index for seat in self.lobby_state.seats if seat.occupant_client_id is not None}
+        occupied_humans = {
+            seat.seat_index
+            for seat in self.lobby_state.seats
+            if seat.occupant_client_id is not None
+        }
         occupied_pending = set(self._pending_bot_seats)
         occupied = occupied_humans | occupied_pending
         return len(occupied) >= 2 and len(occupied) == self.lobby_state.seat_count
