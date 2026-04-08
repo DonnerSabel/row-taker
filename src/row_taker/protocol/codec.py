@@ -9,8 +9,6 @@ from row_taker.engine.game.state_mappers import (
     public_state_from_dict,
     public_state_to_dict,
 )
-from row_taker.engine.lobby.config import ClientKind
-from row_taker.engine.lobby.state import ConnectedClient, LobbySeat, LobbyState
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     ChooseCardRequested,
@@ -21,7 +19,10 @@ from row_taker.protocol.messages import (
     GameStarting,
     JoinLobby,
     LobbyActionRejected,
+    LobbyParticipantView,
+    LobbySeatView,
     LobbyStateUpdated,
+    LobbyView,
     RequestStartGame,
     ServerError,
     ServerToClientMessage,
@@ -33,48 +34,61 @@ from row_taker.protocol.messages import (
 )
 
 
-def _connected_client_to_dict(client: ConnectedClient) -> dict[str, object]:
-    return {'client_id': client.client_id, 'display_name': client.display_name, 'kind': client.kind.value}
-
-
-def _connected_client_from_dict(data: object) -> ConnectedClient:
-    if not isinstance(data, dict):
-        raise TypeError(f'connected client must be a dict, got {type(data)!r}')
-    return ConnectedClient(
-        client_id=str(data['client_id']),
-        display_name=str(data['display_name']),
-        kind=ClientKind(str(data['kind'])),
-    )
-
-
-def _lobby_seat_to_dict(seat: LobbySeat) -> dict[str, object]:
-    return {'seat_index': seat.seat_index, 'occupant_client_id': seat.occupant_client_id}
-
-
-def _lobby_seat_from_dict(data: object) -> LobbySeat:
-    if not isinstance(data, dict):
-        raise TypeError(f'lobby seat must be a dict, got {type(data)!r}')
-    return LobbySeat(
-        seat_index=int(data['seat_index']),
-        occupant_client_id=None if data.get('occupant_client_id') is None else str(data['occupant_client_id']),
-    )
-
-
-def _lobby_state_to_dict(state: LobbyState) -> dict[str, object]:
+def _lobby_participant_to_dict(participant: LobbyParticipantView) -> dict[str, object]:
     return {
-        'seat_count': state.seat_count,
-        'clients': [_connected_client_to_dict(client) for client in state.clients],
-        'seats': [_lobby_seat_to_dict(seat) for seat in state.seats],
-        'game_started': state.game_started,
+        'client_id': participant.client_id,
+        'display_name': participant.display_name,
+        'participant_kind': participant.participant_kind,
+        'seat_index': participant.seat_index,
     }
 
 
-def _lobby_state_from_dict(data: object) -> LobbyState:
+def _lobby_participant_from_dict(data: object) -> LobbyParticipantView:
     if not isinstance(data, dict):
-        raise TypeError(f'lobby state data must be a dict, got {type(data)!r}')
-    return LobbyState(
+        raise TypeError(f'lobby participant must be a dict, got {type(data)!r}')
+    return LobbyParticipantView(
+        client_id=str(data['client_id']),
+        display_name=str(data['display_name']),
+        participant_kind=str(data['participant_kind']),
+        seat_index=None if data.get('seat_index') is None else int(data['seat_index']),
+    )
+
+
+def _lobby_seat_to_dict(seat: LobbySeatView) -> dict[str, object]:
+    return {
+        'seat_index': seat.seat_index,
+        'occupant_client_id': seat.occupant_client_id,
+        'occupant_display_name': seat.occupant_display_name,
+        'occupant_kind': seat.occupant_kind,
+    }
+
+
+def _lobby_seat_from_dict(data: object) -> LobbySeatView:
+    if not isinstance(data, dict):
+        raise TypeError(f'lobby seat must be a dict, got {type(data)!r}')
+    return LobbySeatView(
+        seat_index=int(data['seat_index']),
+        occupant_client_id=None if data.get('occupant_client_id') is None else str(data['occupant_client_id']),
+        occupant_display_name=None if data.get('occupant_display_name') is None else str(data['occupant_display_name']),
+        occupant_kind=None if data.get('occupant_kind') is None else str(data['occupant_kind']),
+    )
+
+
+def _lobby_view_to_dict(lobby: LobbyView) -> dict[str, object]:
+    return {
+        'seat_count': lobby.seat_count,
+        'participants': [_lobby_participant_to_dict(participant) for participant in lobby.participants],
+        'seats': [_lobby_seat_to_dict(seat) for seat in lobby.seats],
+        'game_started': lobby.game_started,
+    }
+
+
+def _lobby_view_from_dict(data: object) -> LobbyView:
+    if not isinstance(data, dict):
+        raise TypeError(f'lobby view data must be a dict, got {type(data)!r}')
+    return LobbyView(
         seat_count=int(data['seat_count']),
-        clients=tuple(_connected_client_from_dict(client) for client in data['clients']),
+        participants=tuple(_lobby_participant_from_dict(participant) for participant in data['participants']),
         seats=tuple(_lobby_seat_from_dict(seat) for seat in data['seats']),
         game_started=bool(data['game_started']),
     )
@@ -123,11 +137,11 @@ def client_message_from_dict(data: dict[str, object]) -> ClientToServerMessage:
 
 def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
     if isinstance(message, LobbyStateUpdated):
-        return {'type': 'lobby_state_updated', 'lobby_state': _lobby_state_to_dict(message.lobby_state)}
+        return {'type': 'lobby_state_updated', 'lobby': _lobby_view_to_dict(message.lobby)}
     if isinstance(message, LobbyActionRejected):
         return {'type': 'lobby_action_rejected', 'message': message.message}
     if isinstance(message, GameStarting):
-        return {'type': 'game_starting', 'lobby_state': _lobby_state_to_dict(message.lobby_state)}
+        return {'type': 'game_starting', 'lobby': _lobby_view_to_dict(message.lobby)}
     if isinstance(message, StateUpdated):
         return {'type': 'state_updated', 'state': public_state_to_dict(message.state)}
     if isinstance(message, ChooseCardRequested):
@@ -149,11 +163,11 @@ def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
 def server_message_from_dict(data: dict[str, object]) -> ServerToClientMessage:
     message_type = str(data['type'])
     if message_type == 'lobby_state_updated':
-        return LobbyStateUpdated(lobby_state=_lobby_state_from_dict(data['lobby_state']))
+        return LobbyStateUpdated(lobby=_lobby_view_from_dict(data['lobby']))
     if message_type == 'lobby_action_rejected':
         return LobbyActionRejected(message=str(data['message']))
     if message_type == 'game_starting':
-        return GameStarting(lobby_state=_lobby_state_from_dict(data['lobby_state']))
+        return GameStarting(lobby=_lobby_view_from_dict(data['lobby']))
     if message_type == 'state_updated':
         return StateUpdated(state=public_state_from_dict(data['state']))
     if message_type == 'choose_card_requested':

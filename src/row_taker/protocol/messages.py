@@ -4,7 +4,30 @@ from dataclasses import dataclass
 
 from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game.state import DeltaPublicState, PlayerState, PublicState
-from row_taker.engine.lobby.state import LobbyState
+
+
+@dataclass(frozen=True, slots=True)
+class LobbyParticipantView:
+    client_id: str
+    display_name: str
+    participant_kind: str
+    seat_index: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class LobbySeatView:
+    seat_index: int
+    occupant_client_id: str | None
+    occupant_display_name: str | None
+    occupant_kind: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LobbyView:
+    seat_count: int
+    participants: tuple[LobbyParticipantView, ...]
+    seats: tuple[LobbySeatView, ...]
+    game_started: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +88,7 @@ ClientToServerMessage = (
 
 @dataclass(frozen=True, slots=True)
 class LobbyStateUpdated:
-    lobby_state: LobbyState
+    lobby: LobbyView
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,7 +98,7 @@ class LobbyActionRejected:
 
 @dataclass(frozen=True, slots=True)
 class GameStarting:
-    lobby_state: LobbyState
+    lobby: LobbyView
 
 
 @dataclass(frozen=True, slots=True)
