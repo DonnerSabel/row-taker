@@ -17,6 +17,7 @@ from row_taker.protocol.messages import (
     ClientToServerMessage,
     CreateLocalBotOnSeat,
     GameStarting,
+    IdentityAssigned,
     JoinLobby,
     LobbyActionRejected,
     LobbyParticipantView,
@@ -142,6 +143,8 @@ def client_message_from_dict(data: dict[str, object]) -> ClientToServerMessage:
 
 
 def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
+    if isinstance(message, IdentityAssigned):
+        return {"type": "identity_assigned", "client_id": message.client_id}
     if isinstance(message, LobbyStateUpdated):
         return {"type": "lobby_state_updated", "lobby": _lobby_view_to_dict(message.lobby)}
     if isinstance(message, LobbyActionRejected):
@@ -168,6 +171,8 @@ def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
 
 def server_message_from_dict(data: dict[str, object]) -> ServerToClientMessage:
     message_type = str(data["type"])
+    if message_type == "identity_assigned":
+        return IdentityAssigned(client_id=str(data["client_id"]))
     if message_type == "lobby_state_updated":
         return LobbyStateUpdated(lobby=_lobby_view_from_dict(data["lobby"]))
     if message_type == "lobby_action_rejected":

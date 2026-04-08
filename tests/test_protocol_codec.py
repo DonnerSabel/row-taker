@@ -11,6 +11,7 @@ from row_taker.protocol.messages import (
     ClearSeat,
     CreateLocalBotOnSeat,
     GameStarting,
+    IdentityAssigned,
     JoinLobby,
     LobbyActionRejected,
     LobbyParticipantView,
@@ -64,6 +65,7 @@ def test_client_messages_roundtrip() -> None:
 def test_server_messages_roundtrip() -> None:
     lobby = _lobby_view()
     messages = [
+        IdentityAssigned(client_id="client-0"),
         LobbyStateUpdated(lobby=lobby),
         LobbyActionRejected(message="nope"),
         GameStarting(lobby=LobbyView(seat_count=lobby.seat_count, participants=lobby.participants, seats=lobby.seats, game_started=True)),

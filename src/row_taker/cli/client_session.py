@@ -16,6 +16,7 @@ from row_taker.protocol.messages import (
     ClearSeat,
     CreateLocalBotOnSeat,
     GameStarting,
+    IdentityAssigned,
     LobbyActionRejected,
     LobbyStateUpdated,
     LobbyView,
@@ -33,6 +34,7 @@ class ClientSession:
     transport: ClientTransport
     ui_client: CliClient
     interactive: bool = True
+    own_client_id: str | None = None
 
     def run(self) -> PublicState | None:
         latest_public_state: PublicState | None = None
@@ -79,6 +81,10 @@ class ClientSession:
             self.transport.close()
 
     def _handle_message(self, message, latest_lobby, latest_public_state, lobby_mode):
+        if isinstance(message, IdentityAssigned):
+            self.own_client_id = message.client_id
+            return latest_lobby, latest_public_state, lobby_mode, False
+
         if isinstance(message, LobbyStateUpdated):
             latest_lobby = message.lobby
             return latest_lobby, latest_public_state, ("main", None), False
@@ -149,7 +155,10 @@ class ClientSession:
                 self.transport.send(ClearSeat(seat_index=selected))
                 return ("main", None)
             if command == "m":
-                self.transport.send(AssignSeatToClient(seat_index=selected, target_client_id=self._own_client_id(lobby)))
+                if self.own_client_id is None:
+                    print("Eigene client_id noch nicht zugewiesen. Bitte kurz warten.")
+                    return ("main", None)
+                self.transport.send(AssignSeatToClient(seat_index=selected, target_client_id=self.own_client_id))
                 return ("main", None)
             if command == "b":
                 name = input("Bot-Name > ").strip()
@@ -160,11 +169,6 @@ class ClientSession:
 
         return ("main", None)
 
-    def _own_client_id(self, lobby: LobbyView) -> str:
-        human_participants = [participant for participant in lobby.participants if participant.participant_kind == "human"]
-        if len(human_participants) == 1:
-            return human_participants[0].client_id
-        raise ValueError("could not infer own client id from lobby view")
 
     def _render_lobby(self, lobby: LobbyView, mode: tuple[str, int | None]) -> None:
         clear_screen()
@@ -176,6 +180,22 @@ class ClientSession:
             if seat.occupant_display_name is not None:
                 occupant = f"{seat.occupant_display_name} ({seat.occupant_kind})"
             print(f"Platz {seat.seat_index}: {occupant}")
+        print()
+        print("Teilnehmer")
+        print("==========")
+        print()
+        participants = sorted(
+            lobby.participants,
+            key=lambda participant: (
+                participant.seat_index is None,
+                participant.seat_index if participant.seat_index is not None else 9999,
+                participant.display_name.lower(),
+            ),
+        )
+        for participant in participants:
+            position = f"Platz {participant.seat_index}" if participant.seat_index is not None else "nicht gesetzt"
+            marker = " <- du" if participant.client_id == self.own_client_id else ""
+            print(f"{participant.display_name} ({participant.participant_kind}, {position}){marker}")
         print()
         if mode[0] == "main":
             print("n = Name ändern, s = Platz wählen, g = Spiel starten")

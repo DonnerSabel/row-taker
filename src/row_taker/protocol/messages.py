@@ -88,6 +88,11 @@ ClientToServerMessage = (
 
 
 @dataclass(frozen=True, slots=True)
+class IdentityAssigned:
+    client_id: str
+
+
+@dataclass(frozen=True, slots=True)
 class LobbyStateUpdated:
     lobby: LobbyView
 
@@ -132,7 +137,8 @@ class ServerError:
 
 
 ServerToClientMessage = (
-    LobbyStateUpdated
+    IdentityAssigned
+    | LobbyStateUpdated
     | LobbyActionRejected
     | GameStarting
     | StateUpdated

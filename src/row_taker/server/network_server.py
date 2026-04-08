@@ -6,7 +6,7 @@ import threading
 from dataclasses import dataclass, field
 
 from row_taker.protocol.errors import ConnectionClosed, ProtocolError, TransportError
-from row_taker.protocol.messages import ClientToServerMessage
+from row_taker.protocol.messages import ClientToServerMessage, IdentityAssigned, JoinLobby
 from row_taker.protocol.transport import ServerTransport
 from row_taker.server.local_server import LocalServer, OutgoingEnvelope
 from row_taker.server.server_handle import ServerHandle
@@ -21,6 +21,10 @@ class _Connection:
     def send(self, envelope: OutgoingEnvelope) -> None:
         with self.write_lock:
             self.transport.send(envelope.message)
+
+    def send_message(self, message: object) -> None:
+        with self.write_lock:
+            self.transport.send(message)
 
 
 @dataclass(slots=True)
@@ -54,6 +58,10 @@ class NetworkServer:
             if adopted_client_id is not None and adopted_client_id != client_id:
                 self._rename_connection_locked(client_id, adopted_client_id)
                 client_id = adopted_client_id
+            if isinstance(message, JoinLobby):
+                connection = self._connections.get(client_id)
+                if connection is not None:
+                    connection.send_message(IdentityAssigned(client_id=client_id))
             self._dispatch_locked(self.server.drain_outbox())
             return client_id
 

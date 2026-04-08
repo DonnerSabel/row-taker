@@ -5,7 +5,7 @@ import socket
 import pytest
 
 from row_taker.protocol.errors import ConnectionClosed, MessageDecodeError
-from row_taker.protocol.messages import JoinLobby, LobbyActionRejected
+from row_taker.protocol.messages import IdentityAssigned, JoinLobby, LobbyActionRejected
 from row_taker.protocol.transport import ClientTransport, ServerTransport, TcpLineTransport
 
 
@@ -32,6 +32,16 @@ def test_server_to_client_roundtrip() -> None:
     try:
         server.send(LobbyActionRejected(message="nein"))
         assert client.receive() == LobbyActionRejected(message="nein")
+    finally:
+        client.close()
+        server.close()
+
+
+def test_identity_assigned_roundtrip() -> None:
+    client, server = _pair()
+    try:
+        server.send(IdentityAssigned(client_id="client-7"))
+        assert client.receive() == IdentityAssigned(client_id="client-7")
     finally:
         client.close()
         server.close()
