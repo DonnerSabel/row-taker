@@ -9,26 +9,17 @@ from row_taker.engine.lobby.config import ClientKind, MatchConfig, SeatConfig
 class ConnectedClient:
     client_id: str
     display_name: str
+    kind: ClientKind
 
 
 @dataclass(slots=True, frozen=True)
 class LobbySeat:
     seat_index: int
-    kind: ClientKind | None = None
-    name: str | None = None
-    client_id: str | None = None
+    occupant_client_id: str | None = None
 
     @property
     def is_empty(self) -> bool:
-        return self.kind is None
-
-    @property
-    def is_human(self) -> bool:
-        return self.kind == ClientKind.HUMAN
-
-    @property
-    def is_bot(self) -> bool:
-        return self.kind == ClientKind.RANDOM_BOT
+        return self.occupant_client_id is None
 
 
 @dataclass(slots=True, frozen=True)
@@ -58,15 +49,22 @@ class LobbyState:
 
     def seat_for_client(self, client_id: str) -> LobbySeat | None:
         for seat in self.seats:
-            if seat.client_id == client_id:
+            if seat.occupant_client_id == client_id:
                 return seat
         return None
+
+    def occupant_for_seat(self, seat_index: int) -> ConnectedClient | None:
+        seat = self.seats[seat_index]
+        if seat.occupant_client_id is None:
+            return None
+        return self.get_client(seat.occupant_client_id)
 
     def to_match_config(self) -> MatchConfig:
         config_seats: list[SeatConfig] = []
         for seat in self.seats:
-            if seat.kind is None or seat.name is None:
+            if seat.occupant_client_id is None:
                 raise ValueError('cannot build match config from incomplete lobby')
-            config_seats.append(SeatConfig(seat_index=seat.seat_index, kind=seat.kind, name=seat.name))
+            client = self.get_client(seat.occupant_client_id)
+            config_seats.append(SeatConfig(seat_index=seat.seat_index, kind=client.kind, name=client.display_name))
         config_seats.sort(key=lambda seat: seat.seat_index)
         return MatchConfig.from_seats(config_seats)

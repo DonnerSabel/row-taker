@@ -8,8 +8,8 @@ from row_taker.protocol.codec import (
     server_message_to_dict,
 )
 from row_taker.protocol.messages import (
-    ChooseCardRequested,
-    ChooseSeat,
+    AssignSeatToClient,
+    CreateLocalBotOnSeat,
     GameStarting,
     JoinLobby,
     LobbyActionRejected,
@@ -19,17 +19,21 @@ from row_taker.protocol.messages import (
     SetDisplayName,
     SubmitCard,
     SubmitRowChoice,
+    ClearSeat,
 )
 
 
 def _lobby_state() -> LobbyState:
     return LobbyState(
         seat_count=3,
-        clients=(ConnectedClient(client_id='client-0', display_name='Alice'),),
+        clients=(
+            ConnectedClient(client_id='client-0', display_name='Alice', kind=ClientKind.HUMAN),
+            ConnectedClient(client_id='bot-1', display_name='Bot_1', kind=ClientKind.RANDOM_BOT),
+        ),
         seats=(
-            LobbySeat(seat_index=0, kind=ClientKind.HUMAN, name='Alice', client_id='client-0'),
+            LobbySeat(seat_index=0, occupant_client_id='client-0'),
             LobbySeat(seat_index=1),
-            LobbySeat(seat_index=2, kind=ClientKind.RANDOM_BOT, name='Bot_3'),
+            LobbySeat(seat_index=2, occupant_client_id='bot-1'),
         ),
         game_started=False,
     )
@@ -39,7 +43,9 @@ def test_client_messages_roundtrip() -> None:
     for message in [
         JoinLobby(display_name='Alice'),
         SetDisplayName(display_name='Bob'),
-        ChooseSeat(seat_index=1),
+        AssignSeatToClient(seat_index=1, target_client_id='client-0'),
+        CreateLocalBotOnSeat(seat_index=2, display_name='Bot_X'),
+        ClearSeat(seat_index=2),
         RequestStartGame(),
         SubmitCard(player_id=PlayerID('player-0'), card_value=42),
         SubmitRowChoice(player_id=PlayerID('player-1'), row_id=RowID('row-2')),

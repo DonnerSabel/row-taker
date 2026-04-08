@@ -4,6 +4,9 @@ from row_taker.engine.lobby.config import ClientKind, MAX_PLAYERS, MIN_PLAYERS
 from row_taker.engine.lobby.state import ConnectedClient, LobbySeat, LobbyState
 
 
+BOT_PREFIX = 'bot-'
+
+
 def validate_lobby_state(lobby_state: LobbyState) -> None:
     if not (MIN_PLAYERS <= lobby_state.seat_count <= MAX_PLAYERS):
         raise ValueError(
@@ -11,35 +14,24 @@ def validate_lobby_state(lobby_state: LobbyState) -> None:
         )
     if len({client.client_id for client in lobby_state.clients}) != len(lobby_state.clients):
         raise ValueError('duplicate client ids in lobby')
-    if len({client.display_name.strip().casefold() for client in lobby_state.clients}) != len(lobby_state.clients):
+    normalized_names = [client.display_name.strip().casefold() for client in lobby_state.clients]
+    if len(set(normalized_names)) != len(normalized_names):
         raise ValueError('duplicate client display names in lobby')
 
     seen_seats: set[int] = set()
-    seen_human_client_ids: set[str] = set()
-    seen_names: set[str] = set()
+    seen_occupants: set[str] = set()
+    known_client_ids = {client.client_id for client in lobby_state.clients}
     for seat in lobby_state.seats:
         if seat.seat_index in seen_seats:
             raise ValueError(f'duplicate seat index {seat.seat_index}')
         seen_seats.add(seat.seat_index)
-        if seat.kind is None:
-            if seat.name is not None or seat.client_id is not None:
-                raise ValueError('empty seats must not have name or client_id')
+        if seat.occupant_client_id is None:
             continue
-        if not seat.name or not seat.name.strip():
-            raise ValueError('occupied seats must have a non-empty name')
-        norm_name = seat.name.strip().casefold()
-        if norm_name in seen_names:
-            raise ValueError(f'duplicate seat/player name {seat.name!r}')
-        seen_names.add(norm_name)
-        if seat.kind == ClientKind.HUMAN:
-            if seat.client_id is None:
-                raise ValueError('human seat missing client_id')
-            if seat.client_id in seen_human_client_ids:
-                raise ValueError('a client may occupy at most one seat')
-            seen_human_client_ids.add(seat.client_id)
-        else:
-            if seat.client_id is not None:
-                raise ValueError('bot seat must not carry a client_id')
+        if seat.occupant_client_id not in known_client_ids:
+            raise ValueError(f'unknown occupant client_id: {seat.occupant_client_id!r}')
+        if seat.occupant_client_id in seen_occupants:
+            raise ValueError('a client may occupy at most one seat')
+        seen_occupants.add(seat.occupant_client_id)
     if seen_seats != set(range(lobby_state.seat_count)):
         raise ValueError('seat indices must be contiguous from 0')
 
@@ -49,7 +41,23 @@ def join_lobby(lobby_state: LobbyState, client_id: str, display_name: str) -> Lo
     if any(client.client_id == client_id for client in lobby_state.clients):
         raise ValueError(f'client {client_id!r} already joined')
     clients = list(lobby_state.clients)
-    clients.append(ConnectedClient(client_id=client_id, display_name=_validate_display_name(display_name)))
+    clients.append(ConnectedClient(client_id=client_id, display_name=_validate_display_name(display_name), kind=ClientKind.HUMAN))
+    new_state = LobbyState(
+        seat_count=lobby_state.seat_count,
+        clients=tuple(clients),
+        seats=lobby_state.seats,
+        game_started=lobby_state.game_started,
+    )
+    validate_lobby_state(new_state)
+    return new_state
+
+
+def add_local_bot(lobby_state: LobbyState, client_id: str, display_name: str) -> LobbyState:
+    validate_lobby_state(lobby_state)
+    if any(client.client_id == client_id for client in lobby_state.clients):
+        raise ValueError(f'client {client_id!r} already exists')
+    clients = list(lobby_state.clients)
+    clients.append(ConnectedClient(client_id=client_id, display_name=_validate_display_name(display_name), kind=ClientKind.RANDOM_BOT))
     new_state = LobbyState(
         seat_count=lobby_state.seat_count,
         clients=tuple(clients),
@@ -65,7 +73,7 @@ def remove_client(lobby_state: LobbyState, client_id: str) -> LobbyState:
     clients = tuple(client for client in lobby_state.clients if client.client_id != client_id)
     seats = []
     for seat in lobby_state.seats:
-        if seat.client_id == client_id:
+        if seat.occupant_client_id == client_id:
             seats.append(LobbySeat(seat_index=seat.seat_index))
         else:
             seats.append(seat)
@@ -86,37 +94,29 @@ def set_display_name(lobby_state: LobbyState, client_id: str, display_name: str)
     clients = []
     for client in lobby_state.clients:
         if client.client_id == client_id:
-            clients.append(ConnectedClient(client_id=client.client_id, display_name=validated_name))
+            clients.append(ConnectedClient(client_id=client.client_id, display_name=validated_name, kind=client.kind))
             found = True
         else:
             clients.append(client)
     if not found:
         raise ValueError(f'unknown client_id: {client_id!r}')
-    seats = []
-    for seat in lobby_state.seats:
-        if seat.client_id == client_id:
-            seats.append(LobbySeat(seat_index=seat.seat_index, kind=seat.kind, name=validated_name, client_id=client_id))
-        else:
-            seats.append(seat)
-    new_state = LobbyState(lobby_state.seat_count, tuple(clients), tuple(seats), lobby_state.game_started)
+    new_state = LobbyState(lobby_state.seat_count, tuple(clients), lobby_state.seats, lobby_state.game_started)
     validate_lobby_state(new_state)
     return new_state
 
 
-def choose_seat(lobby_state: LobbyState, client_id: str, seat_index: int) -> LobbyState:
+def assign_client_to_seat(lobby_state: LobbyState, target_client_id: str, seat_index: int) -> LobbyState:
     validate_lobby_state(lobby_state)
-    client = lobby_state.get_client(client_id)
     if not (0 <= seat_index < lobby_state.seat_count):
         raise ValueError(f'seat index out of range: {seat_index}')
+    lobby_state.get_client(target_client_id)
     seats = []
     for seat in lobby_state.seats:
-        if seat.client_id == client_id:
+        if seat.occupant_client_id == target_client_id:
             seats.append(LobbySeat(seat_index=seat.seat_index))
             continue
         if seat.seat_index == seat_index:
-            if not seat.is_empty:
-                raise ValueError(f'seat {seat_index + 1} is already occupied')
-            seats.append(LobbySeat(seat_index=seat.seat_index, kind=ClientKind.HUMAN, name=client.display_name, client_id=client_id))
+            seats.append(LobbySeat(seat_index=seat.seat_index, occupant_client_id=target_client_id))
             continue
         seats.append(seat)
     new_state = LobbyState(lobby_state.seat_count, lobby_state.clients, tuple(seats), lobby_state.game_started)
@@ -124,38 +124,13 @@ def choose_seat(lobby_state: LobbyState, client_id: str, seat_index: int) -> Lob
     return new_state
 
 
-def leave_seat(lobby_state: LobbyState, client_id: str) -> LobbyState:
+def clear_seat(lobby_state: LobbyState, seat_index: int) -> LobbyState:
     validate_lobby_state(lobby_state)
+    if not (0 <= seat_index < lobby_state.seat_count):
+        raise ValueError(f'seat index out of range: {seat_index}')
     seats = []
     for seat in lobby_state.seats:
-        if seat.client_id == client_id:
-            seats.append(LobbySeat(seat_index=seat.seat_index))
-        else:
-            seats.append(seat)
-    new_state = LobbyState(lobby_state.seat_count, lobby_state.clients, tuple(seats), lobby_state.game_started)
-    validate_lobby_state(new_state)
-    return new_state
-
-
-def fill_empty_seats_with_bots(lobby_state: LobbyState) -> LobbyState:
-    validate_lobby_state(lobby_state)
-    seats = []
-    for seat in lobby_state.seats:
-        if seat.is_empty:
-            seat_no = seat.seat_index + 1
-            seats.append(LobbySeat(seat_index=seat.seat_index, kind=ClientKind.RANDOM_BOT, name=f'Bot_{seat_no}'))
-        else:
-            seats.append(seat)
-    new_state = LobbyState(lobby_state.seat_count, lobby_state.clients, tuple(seats), lobby_state.game_started)
-    validate_lobby_state(new_state)
-    return new_state
-
-
-def clear_bot_seats(lobby_state: LobbyState) -> LobbyState:
-    validate_lobby_state(lobby_state)
-    seats = []
-    for seat in lobby_state.seats:
-        if seat.is_bot:
+        if seat.seat_index == seat_index:
             seats.append(LobbySeat(seat_index=seat.seat_index))
         else:
             seats.append(seat)

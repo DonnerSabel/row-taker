@@ -12,15 +12,14 @@ from row_taker.engine.game.state_mappers import (
 from row_taker.engine.lobby.config import ClientKind
 from row_taker.engine.lobby.state import ConnectedClient, LobbySeat, LobbyState
 from row_taker.protocol.messages import (
+    AssignSeatToClient,
     ChooseCardRequested,
     ChooseRowRequested,
-    ChooseSeat,
-    ClearBotSeats,
+    ClearSeat,
     ClientToServerMessage,
-    FillEmptySeatsWithBots,
+    CreateLocalBotOnSeat,
     GameStarting,
     JoinLobby,
-    LeaveSeat,
     LobbyActionRejected,
     LobbyStateUpdated,
     RequestStartGame,
@@ -35,34 +34,29 @@ from row_taker.protocol.messages import (
 
 
 def _connected_client_to_dict(client: ConnectedClient) -> dict[str, object]:
-    return {"client_id": client.client_id, "display_name": client.display_name}
+    return {'client_id': client.client_id, 'display_name': client.display_name, 'kind': client.kind.value}
 
 
 def _connected_client_from_dict(data: object) -> ConnectedClient:
     if not isinstance(data, dict):
         raise TypeError(f'connected client must be a dict, got {type(data)!r}')
-    return ConnectedClient(client_id=str(data['client_id']), display_name=str(data['display_name']))
+    return ConnectedClient(
+        client_id=str(data['client_id']),
+        display_name=str(data['display_name']),
+        kind=ClientKind(str(data['kind'])),
+    )
 
 
 def _lobby_seat_to_dict(seat: LobbySeat) -> dict[str, object]:
-    return {
-        'seat_index': seat.seat_index,
-        'kind': None if seat.kind is None else seat.kind.value,
-        'name': seat.name,
-        'client_id': seat.client_id,
-    }
+    return {'seat_index': seat.seat_index, 'occupant_client_id': seat.occupant_client_id}
 
 
 def _lobby_seat_from_dict(data: object) -> LobbySeat:
     if not isinstance(data, dict):
         raise TypeError(f'lobby seat must be a dict, got {type(data)!r}')
-    raw_kind = data.get('kind')
-    kind = None if raw_kind is None else ClientKind(str(raw_kind))
     return LobbySeat(
         seat_index=int(data['seat_index']),
-        kind=kind,
-        name=None if data.get('name') is None else str(data['name']),
-        client_id=None if data.get('client_id') is None else str(data['client_id']),
+        occupant_client_id=None if data.get('occupant_client_id') is None else str(data['occupant_client_id']),
     )
 
 
@@ -91,14 +85,12 @@ def client_message_to_dict(message: ClientToServerMessage) -> dict[str, object]:
         return {'type': 'join_lobby', 'display_name': message.display_name}
     if isinstance(message, SetDisplayName):
         return {'type': 'set_display_name', 'display_name': message.display_name}
-    if isinstance(message, ChooseSeat):
-        return {'type': 'choose_seat', 'seat_index': message.seat_index}
-    if isinstance(message, LeaveSeat):
-        return {'type': 'leave_seat'}
-    if isinstance(message, FillEmptySeatsWithBots):
-        return {'type': 'fill_empty_seats_with_bots'}
-    if isinstance(message, ClearBotSeats):
-        return {'type': 'clear_bot_seats'}
+    if isinstance(message, AssignSeatToClient):
+        return {'type': 'assign_seat_to_client', 'seat_index': message.seat_index, 'target_client_id': message.target_client_id}
+    if isinstance(message, CreateLocalBotOnSeat):
+        return {'type': 'create_local_bot_on_seat', 'seat_index': message.seat_index, 'display_name': message.display_name}
+    if isinstance(message, ClearSeat):
+        return {'type': 'clear_seat', 'seat_index': message.seat_index}
     if isinstance(message, RequestStartGame):
         return {'type': 'request_start_game'}
     if isinstance(message, SubmitCard):
@@ -114,14 +106,12 @@ def client_message_from_dict(data: dict[str, object]) -> ClientToServerMessage:
         return JoinLobby(display_name=str(data['display_name']))
     if message_type == 'set_display_name':
         return SetDisplayName(display_name=str(data['display_name']))
-    if message_type == 'choose_seat':
-        return ChooseSeat(seat_index=int(data['seat_index']))
-    if message_type == 'leave_seat':
-        return LeaveSeat()
-    if message_type == 'fill_empty_seats_with_bots':
-        return FillEmptySeatsWithBots()
-    if message_type == 'clear_bot_seats':
-        return ClearBotSeats()
+    if message_type == 'assign_seat_to_client':
+        return AssignSeatToClient(seat_index=int(data['seat_index']), target_client_id=str(data['target_client_id']))
+    if message_type == 'create_local_bot_on_seat':
+        return CreateLocalBotOnSeat(seat_index=int(data['seat_index']), display_name=str(data['display_name']))
+    if message_type == 'clear_seat':
+        return ClearSeat(seat_index=int(data['seat_index']))
     if message_type == 'request_start_game':
         return RequestStartGame()
     if message_type == 'submit_card':

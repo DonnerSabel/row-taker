@@ -18,23 +18,20 @@ class SetDisplayName:
 
 
 @dataclass(frozen=True, slots=True)
-class ChooseSeat:
+class AssignSeatToClient:
     seat_index: int
+    target_client_id: str
 
 
 @dataclass(frozen=True, slots=True)
-class LeaveSeat:
-    pass
+class CreateLocalBotOnSeat:
+    seat_index: int
+    display_name: str
 
 
 @dataclass(frozen=True, slots=True)
-class FillEmptySeatsWithBots:
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class ClearBotSeats:
-    pass
+class ClearSeat:
+    seat_index: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,10 +54,9 @@ class SubmitRowChoice:
 ClientToServerMessage = (
     JoinLobby
     | SetDisplayName
-    | ChooseSeat
-    | LeaveSeat
-    | FillEmptySeatsWithBots
-    | ClearBotSeats
+    | AssignSeatToClient
+    | CreateLocalBotOnSeat
+    | ClearSeat
     | RequestStartGame
     | SubmitCard
     | SubmitRowChoice
