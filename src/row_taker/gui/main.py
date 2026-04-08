@@ -1,6 +1,6 @@
 import pygame
 
-from row_taker.engine.cards import Card
+from row_taker.engine.game.cards import Card
 from row_taker.gui.card import CardSprite
 from row_taker.gui.constants import (
     BACKGROUND_COLOR,

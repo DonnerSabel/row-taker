@@ -3,8 +3,8 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from row_taker.engine.phases import Phase
-from row_taker.engine.player_state_ops import playable_cards, selectable_row_ids
+from row_taker.engine.game.phases import Phase
+from row_taker.engine.game.player_state_ops import playable_cards, selectable_row_ids
 from row_taker.protocol.messages import (
     ChooseCardRequested,
     ChooseRowRequested,

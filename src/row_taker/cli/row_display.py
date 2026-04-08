@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from row_taker.engine.phases import StepAction
-from row_taker.engine.public_state_ops import (
+from row_taker.engine.game.phases import StepAction
+from row_taker.engine.game.public_state_ops import (
     apply_delta_public_state,
     classify_public_delta,
     played_card_from_delta,
     score_delta_for_public_delta,
 )
-from row_taker.engine.state import DeltaPublicState, PublicState
+from row_taker.engine.game.state import DeltaPublicState, PublicState
 
 
 @dataclass(slots=True, frozen=True)

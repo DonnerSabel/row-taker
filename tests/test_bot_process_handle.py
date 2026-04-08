@@ -3,11 +3,11 @@ from __future__ import annotations
 import socket
 import threading
 
-from row_taker.engine.cards import Card
+from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import PlayerID, RowID
-from row_taker.engine.models import PublicPlayerInfo, Row
-from row_taker.engine.phases import Phase, PhaseInfo
-from row_taker.engine.state import PlayerState, PublicState, RulesConfig
+from row_taker.engine.game.models import PublicPlayerInfo, Row
+from row_taker.engine.game.phases import Phase, PhaseInfo
+from row_taker.engine.game.state import PlayerState, PublicState, RulesConfig
 from row_taker.protocol.messages import ChooseCardRequested, JoinLobby, SubmitCard
 from row_taker.protocol.transport import ServerTransport
 from row_taker.server.bot_process_handle import BotProcessHandle

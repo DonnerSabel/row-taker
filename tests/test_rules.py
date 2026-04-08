@@ -1,6 +1,6 @@
-from row_taker.engine.cards import Card
-from row_taker.engine.models import Row, RowID
-from row_taker.engine.rules import place_card, target_row_index
+from row_taker.engine.game.cards import Card
+from row_taker.engine.game.models import Row, RowID
+from row_taker.engine.game.rules import place_card, target_row_index
 
 
 def test_target_row_index_picks_best_lower_row() -> None:

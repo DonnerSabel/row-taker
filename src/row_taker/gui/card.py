@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pygame
 
-from row_taker.engine.cards import Card
+from row_taker.engine.game.cards import Card
 from row_taker.gui.constants import CARD_ASPECT_RATIO, CARD_SCALE
 
 

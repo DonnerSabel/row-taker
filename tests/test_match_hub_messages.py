@@ -1,7 +1,7 @@
-from row_taker.engine.cards import Card
-from row_taker.engine.models import PlayerID, RowID
+from row_taker.engine.game.cards import Card
+from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game import setup_game
-from row_taker.engine.public_state_ops import played_card_from_delta
+from row_taker.engine.game.public_state_ops import played_card_from_delta
 from row_taker.hub.match_hub import MatchHub
 from row_taker.protocol.messages import (
     ChooseCardRequested,

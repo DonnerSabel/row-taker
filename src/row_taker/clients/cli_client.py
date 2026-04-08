@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from row_taker.cli.render import render_player_state
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.cli.terminal import clear_screen
-from row_taker.engine.player_state_ops import validate_submit_card, validate_submit_row_choice
+from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
 from row_taker.protocol.messages import (
     ChooseCardRequested,
     ChooseRowRequested,
