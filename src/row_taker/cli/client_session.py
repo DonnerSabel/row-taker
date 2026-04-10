@@ -5,29 +5,19 @@ from contextlib import suppress
 from dataclasses import dataclass
 
 from row_taker.cli.console import CliConsole
-from row_taker.cli.render import render_screen, render_public_state, get_prompt
+from row_taker.cli.render import get_prompt, render_public_state, render_screen
 from row_taker.cli.state_machine import reduce_server_message, reduce_user_input
-from row_taker.cli.state_models import (
-    CliState,
-    LobbyStateMain,
-    LobbyStateSeatEdit,
-    initial_cli_state,
-)
+from row_taker.cli.state_models import CliState, initial_cli_state
 from row_taker.cli.terminal import clear_screen
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.errors import ConnectionClosed
-from row_taker.protocol.messages import (
-    IdentityAssigned,
-    LobbyView,
-    ServerToClientMessage,
-)
+from row_taker.protocol.messages import ServerToClientMessage
 from row_taker.protocol.transport import ClientTransport
 
 
 @dataclass(slots=True)
 class ClientSession:
     transport: ClientTransport
-    ui_client: object | None = None
     interactive: bool = True
     own_client_id: str | None = None
 
@@ -120,57 +110,9 @@ class ClientSession:
             self.transport.close()
 
     async def _refresh_screen(self, console: CliConsole, state: CliState) -> None:
-        await console.render(render_screen(state), get_prompt(state) if self.interactive else None)
+        prompt = get_prompt(state) if self.interactive else None
+        await console.render(render_screen(state), prompt)
 
-    def _handle_message(self, message, latest_lobby, latest_public_state, lobby_mode):
-        state = CliState(
-            own_client_id=self.own_client_id,
-            lobby_view=latest_lobby,
-            public_state=latest_public_state,
-            mode=self._legacy_mode_to_state(lobby_mode),
-        )
-        state = reduce_server_message(state, message)
-        self.own_client_id = state.own_client_id
-        return state.lobby_view, state.public_state, self._state_to_legacy_mode(state), state.should_exit
-
-    def _handle_lobby_command(self, lobby: LobbyView, mode, command: str):
-        if mode == ("seat", 0) or (isinstance(mode, tuple) and mode[0] == "seat"):
-            if command == "m" and self.own_client_id is None:
-                print("Eigene client_id noch nicht zugewiesen. Bitte kurz warten.")
-                return ("main", None)
-
-        state = CliState(
-            own_client_id=self.own_client_id,
-            lobby_view=lobby,
-            mode=self._legacy_mode_to_state(mode),
-        )
-        result = reduce_user_input(state, command)
-        self.own_client_id = result.state.own_client_id
-        if result.outbound_message is not None:
-            self.transport.send(result.outbound_message)
-        return self._state_to_legacy_mode(result.state)
-
-    def _render_lobby(self, lobby: LobbyView, mode) -> None:
-        clear_screen()
-        state = CliState(
-            own_client_id=self.own_client_id,
-            lobby_view=lobby,
-            mode=self._legacy_mode_to_state(mode),
-        )
-        print(render_screen(state))
-
-    @staticmethod
-    def _legacy_mode_to_state(mode):
-        state_name, selected = mode
-        if state_name == "seat" and selected is not None:
-            return LobbyStateSeatEdit(seat_index=selected)
-        return LobbyStateMain()
-
-    @staticmethod
-    def _state_to_legacy_mode(state: CliState):
-        if isinstance(state.mode, LobbyStateSeatEdit):
-            return ("seat", state.mode.seat_index)
-        return ("main", None)
 
 
 def print_final_result(public_state: PublicState | None) -> None:
@@ -182,4 +124,3 @@ def print_final_result(public_state: PublicState | None) -> None:
     ranking = sorted(public_state.players, key=lambda player: (player.score, player.name))
     for place, player in enumerate(ranking, start=1):
         print(f"  {place}. {player.name}: {player.score} Punkte")
-

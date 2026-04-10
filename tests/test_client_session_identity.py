@@ -1,35 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
-import pytest
-
-from row_taker.cli.client_session import ClientSession
+from row_taker.cli.render import render_screen
+from row_taker.cli.state_machine import reduce_server_message, reduce_user_input
+from row_taker.cli.state_models import CliState, LobbyStateMain, LobbyStateSeatEdit
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     IdentityAssigned,
     LobbyParticipantView,
     LobbySeatView,
+    LobbyStateUpdated,
     LobbyView,
 )
-
-
-@dataclass
-class _FakeTransport:
-    sent_messages: list[object] = field(default_factory=list)
-    sock: object = field(default_factory=object)
-
-    def send(self, message: object) -> None:
-        self.sent_messages.append(message)
-
-    def close(self) -> None:
-        pass
-
-
-@dataclass
-class _FakeUiClient:
-    def handle_server_message(self, message: object) -> object | None:
-        return None
 
 
 def _lobby() -> LobbyView:
@@ -76,65 +57,67 @@ def _lobby() -> LobbyView:
     )
 
 
-def test_client_session_stores_own_client_id_from_identity_assigned() -> None:
-    session = ClientSession(
-        transport=_FakeTransport(), ui_client=_FakeUiClient(), interactive=False
-    )
 
-    latest_lobby, latest_public_state, lobby_mode, finished = session._handle_message(
-        IdentityAssigned(client_id="client-1"),
-        None,
-        None,
-        ("main", None),
-    )
+def test_reduce_server_message_stores_own_client_id_from_identity_assigned() -> None:
+    state = CliState()
 
-    assert session.own_client_id == "client-1"
-    assert latest_lobby is None
-    assert latest_public_state is None
-    assert lobby_mode == ("main", None)
-    assert finished is False
+    new_state = reduce_server_message(state, IdentityAssigned(client_id="client-1"))
+
+    assert new_state.own_client_id == "client-1"
+    assert new_state.mode == LobbyStateMain()
 
 
-def test_assign_seat_uses_explicit_own_client_id() -> None:
-    transport = _FakeTransport()
-    session = ClientSession(
-        transport=transport, ui_client=_FakeUiClient(), interactive=False, own_client_id="client-1"
-    )
 
-    mode = session._handle_lobby_command(_lobby(), ("seat", 0), "m")
-
-    assert mode == ("main", None)
-    assert transport.sent_messages == [
-        AssignSeatToClient(seat_index=0, target_client_id="client-1")
-    ]
-
-
-def test_assign_seat_without_identity_does_not_crash(capsys: pytest.CaptureFixture[str]) -> None:
-    transport = _FakeTransport()
-    session = ClientSession(transport=transport, ui_client=_FakeUiClient(), interactive=False)
-
-    mode = session._handle_lobby_command(_lobby(), ("seat", 0), "m")
-
-    assert mode == ("main", None)
-    assert transport.sent_messages == []
-    assert "client_id" in capsys.readouterr().out
-
-
-def test_render_lobby_shows_participants_and_marks_own_client(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("row_taker.cli.client_session.clear_screen", lambda: None)
-    session = ClientSession(
-        transport=_FakeTransport(),
-        ui_client=_FakeUiClient(),
-        interactive=False,
+def test_reduce_user_input_assign_seat_uses_explicit_own_client_id() -> None:
+    state = CliState(
         own_client_id="client-1",
+        lobby_view=_lobby(),
+        mode=LobbyStateSeatEdit(seat_index=0),
     )
 
-    session._render_lobby(_lobby(), ("main", None))
+    result = reduce_user_input(state, "m")
 
-    out = capsys.readouterr().out
+    assert result.state.mode == LobbyStateMain()
+    assert result.outbound_message == AssignSeatToClient(seat_index=0, target_client_id="client-1")
+
+
+
+def test_reduce_user_input_assign_seat_without_identity_sets_local_error() -> None:
+    state = CliState(
+        lobby_view=_lobby(),
+        mode=LobbyStateSeatEdit(seat_index=0),
+    )
+
+    result = reduce_user_input(state, "m")
+
+    assert result.outbound_message is None
+    assert isinstance(result.state.mode, LobbyStateSeatEdit)
+    assert "client_id" in (result.state.mode.error_message or "")
+
+
+
+def test_render_lobby_shows_participants_and_marks_own_client() -> None:
+    state = CliState(
+        own_client_id="client-1",
+        lobby_view=_lobby(),
+        mode=LobbyStateMain(),
+    )
+
+    out = render_screen(state)
     assert "Teilnehmer" in out
     assert "Alice (human, nicht gesetzt) <- du" in out
     assert "Bob (human, Platz 1)" in out
     assert "Bot_1 (bot, Platz 2)" in out
+
+
+
+def test_reduce_server_message_lobby_update_keeps_active_lobby_mode() -> None:
+    state = CliState(
+        own_client_id="client-1",
+        mode=LobbyStateSeatEdit(seat_index=2),
+    )
+
+    new_state = reduce_server_message(state, LobbyStateUpdated(lobby=_lobby()))
+
+    assert new_state.lobby_view == _lobby()
+    assert new_state.mode == LobbyStateSeatEdit(seat_index=2)
