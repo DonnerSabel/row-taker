@@ -10,7 +10,8 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 dependencies = [
-  "pygame>=2.5"
+  "pygame>=2.5",
+  "prompt_toolkit>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -38,3 +39,4 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+

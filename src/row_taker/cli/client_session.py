@@ -1,30 +1,25 @@
 from __future__ import annotations
 
-import select
-import sys
+import asyncio
+from contextlib import suppress
 from dataclasses import dataclass
 
-from row_taker.cli.render import render_public_state, render_trick_resolution
+from row_taker.cli.console import CliConsole
+from row_taker.cli.render import render_screen, render_public_state, get_prompt
+from row_taker.cli.state_machine import reduce_server_message, reduce_user_input
+from row_taker.cli.state_models import (
+    CliState,
+    LobbyStateMain,
+    LobbyStateSeatEdit,
+    initial_cli_state,
+)
 from row_taker.cli.terminal import clear_screen
-from row_taker.clients.cli_client import CliClient
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.errors import ConnectionClosed
 from row_taker.protocol.messages import (
-    AssignSeatToClient,
-    ChooseCardRequested,
-    ChooseRowRequested,
-    ClearSeat,
-    CreateLocalBotOnSeat,
-    GameStarting,
     IdentityAssigned,
-    LobbyActionRejected,
-    LobbyStateUpdated,
     LobbyView,
-    RequestStartGame,
-    ServerError,
-    SetDisplayName,
-    StateUpdated,
-    TrickResolved,
+    ServerToClientMessage,
 )
 from row_taker.protocol.transport import ClientTransport
 
@@ -32,198 +27,159 @@ from row_taker.protocol.transport import ClientTransport
 @dataclass(slots=True)
 class ClientSession:
     transport: ClientTransport
-    ui_client: CliClient
+    ui_client: object | None = None
     interactive: bool = True
     own_client_id: str | None = None
 
     def run(self) -> PublicState | None:
-        latest_public_state: PublicState | None = None
-        latest_lobby: LobbyView | None = None
-        lobby_mode: tuple[str, int | None] = ("main", None)
+        return asyncio.run(self.run_async())
+
+    async def run_async(self) -> PublicState | None:
+        console = CliConsole()
+        state = initial_cli_state(self.own_client_id)
+        server_task: asyncio.Task[ServerToClientMessage] | None = asyncio.create_task(
+            asyncio.to_thread(self.transport.receive)
+        )
+        input_task: asyncio.Task[str] | None = None
+        input_prompt: str | None = None
+
         try:
-            while True:
-                if latest_lobby is not None and not latest_lobby.game_started and self.interactive:
-                    self._render_lobby(latest_lobby, lobby_mode)
-                    readable, _, _ = select.select([self.transport.sock, sys.stdin], [], [])
-                    if self.transport.sock in readable:
-                        try:
-                            message = self.transport.receive()
-                        except ConnectionClosed:
-                            return latest_public_state
-                        latest_lobby, latest_public_state, lobby_mode, finished = (
-                            self._handle_message(
-                                message,
-                                latest_lobby,
-                                latest_public_state,
-                                lobby_mode,
-                            )
-                        )
-                        if finished:
-                            return latest_public_state
-                        continue
-                    if sys.stdin in readable:
-                        line = sys.stdin.readline()
-                        command = line.strip()
-                        lobby_mode = self._handle_lobby_command(latest_lobby, lobby_mode, command)
-                        continue
-                else:
+            await self._refresh_screen(console, state)
+
+            while not state.should_exit:
+                current_prompt = get_prompt(state) if self.interactive else None
+
+                if current_prompt is None:
+                    if input_task is not None:
+                        input_task.cancel()
+                        with suppress(asyncio.CancelledError):
+                            await input_task
+                        input_task = None
+                        input_prompt = None
+                elif input_task is None or input_prompt != current_prompt:
+                    if input_task is not None:
+                        input_task.cancel()
+                        with suppress(asyncio.CancelledError):
+                            await input_task
+                    input_task = asyncio.create_task(console.read_line())
+                    input_prompt = current_prompt
+
+                wait_tasks: set[asyncio.Task[object]] = set()
+                if server_task is not None:
+                    wait_tasks.add(server_task)
+                if input_task is not None:
+                    wait_tasks.add(input_task)
+                if not wait_tasks:
+                    break
+
+                done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
+
+                if server_task is not None and server_task in done:
                     try:
-                        message = self.transport.receive()
+                        message = server_task.result()
                     except ConnectionClosed:
-                        return latest_public_state
-                    latest_lobby, latest_public_state, lobby_mode, finished = self._handle_message(
-                        message,
-                        latest_lobby,
-                        latest_public_state,
-                        lobby_mode,
-                    )
-                    if finished:
-                        return latest_public_state
+                        break
+
+                    state = reduce_server_message(state, message)
+                    self.own_client_id = state.own_client_id
+                    await self._refresh_screen(console, state)
+
+                    if state.should_exit:
+                        break
+
+                    server_task = asyncio.create_task(asyncio.to_thread(self.transport.receive))
+
+                if input_task is not None and input_task in done:
+                    try:
+                        line = input_task.result()
+                    except asyncio.CancelledError:
+                        line = None
+
+                    input_task = None
+                    input_prompt = None
+
+                    if line is not None:
+                        result = reduce_user_input(state, line)
+                        state = result.state
+                        self.own_client_id = state.own_client_id
+                        if result.outbound_message is not None:
+                            await asyncio.to_thread(self.transport.send, result.outbound_message)
+                        await self._refresh_screen(console, state)
+
+            return state.public_state
         finally:
+            if server_task is not None:
+                server_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await server_task
+            if input_task is not None:
+                input_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await input_task
+            await console.close()
             self.transport.close()
 
+    async def _refresh_screen(self, console: CliConsole, state: CliState) -> None:
+        await console.render(render_screen(state), get_prompt(state) if self.interactive else None)
+
     def _handle_message(self, message, latest_lobby, latest_public_state, lobby_mode):
-        if isinstance(message, IdentityAssigned):
-            self.own_client_id = message.client_id
-            return latest_lobby, latest_public_state, lobby_mode, False
-
-        if isinstance(message, LobbyStateUpdated):
-            latest_lobby = message.lobby
-            return latest_lobby, latest_public_state, ("main", None), False
-
-        if isinstance(message, LobbyActionRejected):
-            print(f"Lobby-Aktion abgelehnt: {message.message}")
-            return latest_lobby, latest_public_state, lobby_mode, False
-
-        if isinstance(message, GameStarting):
-            clear_screen()
-            print("Spielstart...")
-            print()
-            latest_lobby = message.lobby
-            return latest_lobby, latest_public_state, ("main", None), False
-
-        if isinstance(message, StateUpdated):
-            latest_public_state = message.state
-            return latest_lobby, latest_public_state, lobby_mode, False
-
-        if isinstance(message, TrickResolved):
-            if latest_public_state is None:
-                raise ValueError("missing public state before trick resolution")
-            clear_screen()
-            render_trick_resolution(latest_public_state, message)
-            if self.interactive and not message.game_finished:
-                print()
-                cont = input("Enter für nächsten Stich, 'q' zum Beenden > ").strip().lower()
-                if cont == "q":
-                    return latest_lobby, latest_public_state, lobby_mode, True
-            return latest_lobby, latest_public_state, lobby_mode, False
-
-        if isinstance(message, ChooseCardRequested | ChooseRowRequested):
-            response = self.ui_client.handle_server_message(message)
-            if response is not None:
-                self.transport.send(response)
-            return latest_lobby, latest_public_state, lobby_mode, False
-
-        if isinstance(message, ServerError):
-            print(f"Serverfehler: {message.message}")
-            return latest_lobby, latest_public_state, lobby_mode, True
-
-        raise TypeError(f"unsupported server message type: {type(message)!r}")
-
-    def _handle_lobby_command(
-        self, lobby: LobbyView, mode: tuple[str, int | None], command: str
-    ) -> tuple[str, int | None]:
-        state, selected = mode
-        if state == "main":
-            if command == "n":
-                name = input("Neuer Anzeigename > ").strip()
-                if name:
-                    self.transport.send(SetDisplayName(display_name=name))
-                return ("main", None)
-            if command == "s":
-                seat_value = input(f"Platz wählen [0-{lobby.seat_count - 1}] > ").strip()
-                if seat_value.isdigit():
-                    seat_index = int(seat_value)
-                    if 0 <= seat_index < lobby.seat_count:
-                        return ("seat", seat_index)
-                return ("main", None)
-            if command == "g":
-                self.transport.send(RequestStartGame())
-                return ("main", None)
-            return ("main", None)
-
-        if state == "seat":
-            if selected is None:
-                return ("main", None)
-            if command == "c":
-                self.transport.send(ClearSeat(seat_index=selected))
-                return ("main", None)
-            if command == "m":
-                if self.own_client_id is None:
-                    print("Eigene client_id noch nicht zugewiesen. Bitte kurz warten.")
-                    return ("main", None)
-                self.transport.send(
-                    AssignSeatToClient(seat_index=selected, target_client_id=self.own_client_id)
-                )
-                return ("main", None)
-            if command == "b":
-                name = input("Bot-Name > ").strip()
-                if name:
-                    self.transport.send(
-                        CreateLocalBotOnSeat(seat_index=selected, display_name=name)
-                    )
-                return ("main", None)
-            return ("main", None)
-
-        return ("main", None)
-
-    def _render_lobby(self, lobby: LobbyView, mode: tuple[str, int | None]) -> None:
-        clear_screen()
-        print("Lobby")
-        print("=====")
-        print()
-        for seat in lobby.seats:
-            occupant = "frei"
-            if seat.occupant_display_name is not None:
-                occupant = f"{seat.occupant_display_name} ({seat.occupant_kind})"
-            print(f"Platz {seat.seat_index}: {occupant}")
-        print()
-        print("Teilnehmer")
-        print("==========")
-        print()
-        participants = sorted(
-            lobby.participants,
-            key=lambda participant: (
-                participant.seat_index is None,
-                participant.seat_index if participant.seat_index is not None else 9999,
-                participant.display_name.lower(),
-            ),
+        state = CliState(
+            own_client_id=self.own_client_id,
+            lobby_view=latest_lobby,
+            public_state=latest_public_state,
+            mode=self._legacy_mode_to_state(lobby_mode),
         )
-        for participant in participants:
-            position = (
-                f"Platz {participant.seat_index}"
-                if participant.seat_index is not None
-                else "nicht gesetzt"
-            )
-            marker = " <- du" if participant.client_id == self.own_client_id else ""
-            print(
-                f"{participant.display_name} ({participant.participant_kind}, {position}){marker}"
-            )
-        print()
-        if mode[0] == "main":
-            print("n = Name ändern, s = Platz wählen, g = Spiel starten")
-        else:
-            print("m = mich setzen, b = Bot setzen, c = Platz leeren")
+        state = reduce_server_message(state, message)
+        self.own_client_id = state.own_client_id
+        return state.lobby_view, state.public_state, self._state_to_legacy_mode(state), state.should_exit
+
+    def _handle_lobby_command(self, lobby: LobbyView, mode, command: str):
+        if mode == ("seat", 0) or (isinstance(mode, tuple) and mode[0] == "seat"):
+            if command == "m" and self.own_client_id is None:
+                print("Eigene client_id noch nicht zugewiesen. Bitte kurz warten.")
+                return ("main", None)
+
+        state = CliState(
+            own_client_id=self.own_client_id,
+            lobby_view=lobby,
+            mode=self._legacy_mode_to_state(mode),
+        )
+        result = reduce_user_input(state, command)
+        self.own_client_id = result.state.own_client_id
+        if result.outbound_message is not None:
+            self.transport.send(result.outbound_message)
+        return self._state_to_legacy_mode(result.state)
+
+    def _render_lobby(self, lobby: LobbyView, mode) -> None:
+        clear_screen()
+        state = CliState(
+            own_client_id=self.own_client_id,
+            lobby_view=lobby,
+            mode=self._legacy_mode_to_state(mode),
+        )
+        print(render_screen(state))
+
+    @staticmethod
+    def _legacy_mode_to_state(mode):
+        state_name, selected = mode
+        if state_name == "seat" and selected is not None:
+            return LobbyStateSeatEdit(seat_index=selected)
+        return LobbyStateMain()
+
+    @staticmethod
+    def _state_to_legacy_mode(state: CliState):
+        if isinstance(state.mode, LobbyStateSeatEdit):
+            return ("seat", state.mode.seat_index)
+        return ("main", None)
 
 
 def print_final_result(public_state: PublicState | None) -> None:
     if public_state is None:
         return
-
     clear_screen()
     render_public_state(public_state)
-
     print("Endstand:")
     ranking = sorted(public_state.players, key=lambda player: (player.score, player.name))
     for place, player in enumerate(ranking, start=1):
         print(f"  {place}. {player.name}: {player.score} Punkte")
+

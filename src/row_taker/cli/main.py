@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from row_taker.cli.client_session import ClientSession, print_final_result
 from row_taker.cli.terminal import clear_screen
-from row_taker.clients.cli_client import CliClient
 from row_taker.protocol.messages import JoinLobby
 from row_taker.protocol.transport import ClientTransport
 from row_taker.server.network_server import start_background_network_server
@@ -70,7 +69,7 @@ def main() -> None:
     transport = ClientTransport.connect(host, port)
     transport.send(JoinLobby(display_name=display_name))
 
-    session = ClientSession(transport=transport, ui_client=CliClient())
+    session = ClientSession(transport=transport)
     final_state = session.run()
     print_final_result(final_state)
 
@@ -83,3 +82,4 @@ def run() -> int:
         clear_screen()
         print("Abbruch mit Strg+C!")
         return 0
+
