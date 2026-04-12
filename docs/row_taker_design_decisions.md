@@ -56,6 +56,40 @@ This area contains the message types and codec used between server and clients.
 
 Its role is to define transport-facing structures without forcing the internal domain model to mirror them exactly.
 
+
+### Shared engine basis
+
+The engine is the shared foundation for all game-state structures used by both clients and the server.
+
+Consequences:
+- the server does not own a separate game-rule model
+- clients and server are expected to rely on the same game-domain concepts
+- client-side rendering and interpretation should build on the shared engine model rather than on server-private orchestration details
+
+This applies in particular to game-state structures such as `PublicState`, `PlayerState`, trick-resolution data, and related domain transitions.
+
+### Protocol reconstruction principle
+
+The client/server protocol is designed so that the real game flow of *6 nimmt!* can be fully reconstructed.
+
+At the same time, it is intentionally minimal:
+- the protocol should transmit the information that is necessary for synchronization and player interaction
+- additional interpretation should, where appropriate, be reconstructed with the help of the shared engine
+- the server should not transmit redundant derived information merely for presentation convenience if the same meaning can be reconstructed from protocol data plus shared engine logic
+
+This means the protocol is not intended to make clients "dumb". Clients may use the shared engine to interpret transport-facing state transitions, as long as they do not reconstruct server-private orchestration state.
+
+### Process separation
+
+Each client and the server run in their own process.
+
+Consequences:
+- the server is never embedded inside a client process
+- every CLI client, GUI client, and bot is a separate process
+- for a game with `n` players there are always `n + 1` processes in total: one server process and `n` participant processes
+
+This process-level separation is intentional. It keeps all participants technically symmetric and avoids special host-client behaviour.
+
 ---
 
 ## 2. Core unification: bots and humans are regular participants
@@ -246,8 +280,9 @@ Clients:
 - render those messages
 - send input back
 - do not reconstruct internal server models
+- may use shared engine logic to interpret protocol-facing game-state transitions
 
-Clients do not build their own domain-level lobby view. They only render the view already produced by the server.
+Clients do not build their own domain-level lobby view. They only render the view already produced by the server. However, clients are not intended to be "dumb": they may rely on the shared engine to reconstruct game meaning from protocol data, as long as they do not recreate server-private orchestration state.
 
 ---
 
@@ -346,6 +381,7 @@ This means:
   - `ChooseCardRequested`
   - `ChooseRowRequested`
   - `TrickResolved`
+- protocol messages may be interpreted with the help of shared engine logic when needed for presentation or reconstruction of the real game flow
 
 If internal server or lobby types appear in the CLI, that is a design warning sign.
 
