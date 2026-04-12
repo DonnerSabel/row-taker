@@ -42,17 +42,9 @@ class ClientSession:
             while not state.should_exit and not abort_requested:
                 current_prompt = build_view(state).prompt if self.interactive else None
                 if current_prompt is None:
-                    if input_task is not None:
-                        input_task.cancel()
-                        with suppress(asyncio.CancelledError):
-                            await input_task
-                        input_task = None
-                        input_prompt = None
+                    input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
                 elif input_task is None or input_prompt != current_prompt:
-                    if input_task is not None:
-                        input_task.cancel()
-                        with suppress(asyncio.CancelledError):
-                            await input_task
+                    input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
                     input_task = asyncio.create_task(console.read_line())
                     input_prompt = current_prompt
 
@@ -84,6 +76,8 @@ class ClientSession:
                     self.own_client_id = state.own_client_id
                     await self._refresh_screen(console, state)
                     if state.should_exit:
+                        input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
+                        await self._refresh_screen(console, state)
                         break
                     server_task = asyncio.create_task(asyncio.to_thread(self.transport.receive))
 
@@ -107,6 +101,8 @@ class ClientSession:
                             with suppress(Exception):
                                 await asyncio.to_thread(self.transport.send, result.outbound_message)
                         if state.should_exit and state.suppress_final_result:
+                            input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
+                            await self._refresh_screen(console, state)
                             break
                         await self._refresh_screen(console, state)
 
@@ -129,6 +125,17 @@ class ClientSession:
         view = build_view(state)
         prompt = view.prompt if self.interactive else None
         await console.render(view.body, prompt)
+
+    async def _cancel_input_task(
+        self,
+        input_task: asyncio.Task[str] | None,
+        input_prompt: str | None,
+    ) -> tuple[asyncio.Task[str] | None, str | None]:
+        if input_task is not None:
+            input_task.cancel()
+            with suppress(asyncio.CancelledError, InputAborted, KeyboardInterrupt):
+                await input_task
+        return None, None
 
 
 def print_final_result(public_state: PublicState | None) -> None:
