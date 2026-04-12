@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from row_taker.cli.render import render_screen
 from row_taker.cli.state_machine import reduce_server_message, reduce_user_input
-from row_taker.cli.state_models import CliState, LobbyStateMain, LobbyStateSeatEdit
+from row_taker.cli.state_models import CliState, LobbyScreen
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     IdentityAssigned,
@@ -64,7 +64,7 @@ def test_reduce_server_message_stores_own_client_id_from_identity_assigned() -> 
     new_state = reduce_server_message(state, IdentityAssigned(client_id="client-1"))
 
     assert new_state.own_client_id == "client-1"
-    assert new_state.mode == LobbyStateMain()
+    assert new_state.screen == LobbyScreen(kind="main")
 
 
 
@@ -72,12 +72,12 @@ def test_reduce_user_input_assign_seat_uses_explicit_own_client_id() -> None:
     state = CliState(
         own_client_id="client-1",
         lobby_view=_lobby(),
-        mode=LobbyStateSeatEdit(seat_index=0),
+        screen=LobbyScreen(kind="seat_edit", seat_index=0),
     )
 
     result = reduce_user_input(state, "m")
 
-    assert result.state.mode == LobbyStateMain()
+    assert result.state.screen == LobbyScreen(kind="main")
     assert result.outbound_message == AssignSeatToClient(seat_index=0, target_client_id="client-1")
 
 
@@ -85,14 +85,14 @@ def test_reduce_user_input_assign_seat_uses_explicit_own_client_id() -> None:
 def test_reduce_user_input_assign_seat_without_identity_sets_local_error() -> None:
     state = CliState(
         lobby_view=_lobby(),
-        mode=LobbyStateSeatEdit(seat_index=0),
+        screen=LobbyScreen(kind="seat_edit", seat_index=0),
     )
 
     result = reduce_user_input(state, "m")
 
     assert result.outbound_message is None
-    assert isinstance(result.state.mode, LobbyStateSeatEdit)
-    assert "client_id" in (result.state.mode.error_message or "")
+    assert result.state.screen == LobbyScreen(kind="seat_edit", seat_index=0)
+    assert "client_id" in ((result.state.flash_message.text if result.state.flash_message else ""))
 
 
 
@@ -100,7 +100,7 @@ def test_render_lobby_shows_participants_and_marks_own_client() -> None:
     state = CliState(
         own_client_id="client-1",
         lobby_view=_lobby(),
-        mode=LobbyStateMain(),
+        screen=LobbyScreen(kind="main"),
     )
 
     out = render_screen(state)
@@ -114,10 +114,10 @@ def test_render_lobby_shows_participants_and_marks_own_client() -> None:
 def test_reduce_server_message_lobby_update_keeps_active_lobby_mode() -> None:
     state = CliState(
         own_client_id="client-1",
-        mode=LobbyStateSeatEdit(seat_index=2),
+        screen=LobbyScreen(kind="seat_edit", seat_index=2),
     )
 
     new_state = reduce_server_message(state, LobbyStateUpdated(lobby=_lobby()))
 
     assert new_state.lobby_view == _lobby()
-    assert new_state.mode == LobbyStateSeatEdit(seat_index=2)
+    assert new_state.screen == LobbyScreen(kind="seat_edit", seat_index=2)

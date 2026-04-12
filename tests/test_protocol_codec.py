@@ -1,3 +1,5 @@
+from row_taker.engine.game import setup_game
+from row_taker.engine.game.views import build_public_state
 from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.lobby.state import LobbySeat, LobbyState
 from row_taker.protocol.codec import (
@@ -18,11 +20,13 @@ from row_taker.protocol.messages import (
     LobbySeatView,
     LobbyStateUpdated,
     LobbyView,
+    PlayedCardView,
     RequestStartGame,
     ServerError,
     SetDisplayName,
     SubmitCard,
     SubmitRowChoice,
+    TrickRevealed,
 )
 
 
@@ -81,6 +85,8 @@ def test_client_messages_roundtrip() -> None:
 
 def test_server_messages_roundtrip() -> None:
     lobby = _lobby_view()
+    game = setup_game(["Alice", "Bob"])
+    public_state = build_public_state(game)
     messages = [
         IdentityAssigned(client_id="client-0"),
         LobbyStateUpdated(lobby=lobby),
@@ -92,6 +98,18 @@ def test_server_messages_roundtrip() -> None:
                 seats=lobby.seats,
                 game_started=True,
             )
+        ),
+        TrickRevealed(
+            state=public_state,
+            played_cards=(
+                PlayedCardView(
+                    player_id=PlayerID("player-0"),
+                    player_name="Alice",
+                    card_value=17,
+                ),
+            ),
+            active_player_id=PlayerID("player-0"),
+            pending_card_value=17,
         ),
         ServerError(message="boom"),
     ]

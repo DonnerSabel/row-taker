@@ -15,6 +15,7 @@ from row_taker.engine.game import (
 )
 from row_taker.engine.game.models import PlayerID
 from row_taker.engine.game.phases import Phase
+from row_taker.engine.game.rules import target_row_index
 from row_taker.engine.game.state import GameState, PlayerState, PublicState
 from row_taker.engine.game.views import build_player_state, build_public_state
 from row_taker.protocol.messages import (
@@ -22,10 +23,12 @@ from row_taker.protocol.messages import (
     ChooseRowRequested,
     GameClientMessage,
     GameServerMessage,
+    PlayedCardView,
     StateUpdated,
     SubmitCard,
     SubmitRowChoice,
     TrickResolved,
+    TrickRevealed,
 )
 
 
@@ -76,6 +79,7 @@ class MatchHub:
             return
 
         begin_trick_resolution(self.state)
+        self.outbox.append(self._build_trick_revealed())
         self._advance_resolution_until_blocked()
 
     def _handle_submit_row_choice(self, message: SubmitRowChoice) -> None:
@@ -120,3 +124,30 @@ class MatchHub:
 
         if not result.game_finished:
             self._request_choose_cards_for_current_trick()
+
+    def _build_trick_revealed(self) -> TrickRevealed:
+        played_cards = tuple(
+            PlayedCardView(
+                player_id=player_id,
+                player_name=self.state.get_player_by_id(player_id).name,
+                card_value=card.value,
+            )
+            for player_id, card in sorted(
+                self.state.selected_cards.items(),
+                key=lambda item: item[1].value,
+            )
+        )
+        active_player_id: PlayerID | None = None
+        pending_card_value: int | None = None
+        if self.state.resolve_order:
+            first_player_id = self.state.resolve_order[0]
+            first_card = self.state.selected_cards[first_player_id]
+            if target_row_index(self.state.rows, first_card) is None:
+                active_player_id = first_player_id
+                pending_card_value = first_card.value
+        return TrickRevealed(
+            state=self.build_public_state(),
+            played_cards=played_cards,
+            active_player_id=active_player_id,
+            pending_card_value=pending_card_value,
+        )

@@ -1,122 +1,153 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from row_taker.cli.row_display import build_row_display_mapping, format_public_deltas_for_cli
-from row_taker.cli.state_models import (
-    CliState,
-    GameStateChooseCard,
-    GameStateChooseRow,
-    GameStateEnded,
-    GameStateTrickResolved,
-    GameStateWaiting,
-    LobbyStateMain,
-    LobbyStateRename,
-    LobbyStateSeatEdit,
-)
+from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, TrickResolvedModal, UiMessage
 from row_taker.engine.game.public_state_ops import apply_deltas_public_state
 from row_taker.engine.game.state import PlayerState, PublicState
-from row_taker.protocol.messages import LobbySeatView, TrickResolved
+from row_taker.protocol.messages import LobbySeatView, TrickResolved, TrickRevealed
+
+
+@dataclass(frozen=True, slots=True)
+class ScreenView:
+    body: str
+    prompt: str | None
+
+
+def build_view(state: CliState) -> ScreenView:
+    if state.session_error is not None:
+        return ScreenView(body=render_session_error(state.session_error), prompt=None)
+
+    body = render_main_screen(state)
+
+    if state.flash_message is not None:
+        body = "\n\n".join([body, render_flash_message(state.flash_message)])
+
+    if state.modal is not None:
+        body = "\n\n".join([body, render_modal(state)])
+
+    return ScreenView(body=body, prompt=determine_prompt(state))
 
 
 def get_prompt(state: CliState) -> str | None:
-    match state.mode:
-        case LobbyStateMain():
-            return "Auswahl > "
-        case LobbyStateRename():
-            return "Neuer Anzeigename > "
-        case LobbyStateSeatEdit(seat_index=seat_index):
-            return f"Platz {seat_index} > "
-        case GameStateWaiting():
-            return None
-        case GameStateChooseCard():
-            return "Karte > "
-        case GameStateChooseRow():
-            return "Reihe > "
-        case GameStateTrickResolved():
-            return "Weiter mit Enter > "
-        case GameStateEnded():
-            return "Weiter mit Enter > "
-        case _:
-            raise TypeError(f"unsupported mode: {type(state.mode)!r}")
+    return build_view(state).prompt
 
 
 def render_screen(state: CliState) -> str:
-    parts: list[str] = []
+    return build_view(state).body
+
+
+def determine_prompt(state: CliState) -> str | None:
     if state.session_error is not None:
-        parts.append(render_session_error(state.session_error))
+        return None
+    if state.modal is not None:
+        return "Weiter mit Enter > "
 
-    match state.mode:
-        case LobbyStateMain():
-            parts.append(render_lobby_main(state))
-        case LobbyStateRename():
-            parts.append(render_lobby_rename(state))
-        case LobbyStateSeatEdit():
-            parts.append(render_lobby_seat_edit(state))
-        case GameStateWaiting():
-            parts.append(render_game_waiting(state))
-        case GameStateChooseCard():
-            parts.append(render_game_choose_card(state))
-        case GameStateChooseRow():
-            parts.append(render_game_choose_row(state))
-        case GameStateTrickResolved():
-            parts.append(render_game_trick_resolved(state))
-        case GameStateEnded():
-            parts.append(render_game_ended(state))
-        case _:
-            raise TypeError(f"unsupported mode: {type(state.mode)!r}")
+    match state.screen:
+        case LobbyScreen(kind="main"):
+            return "Auswahl > "
+        case LobbyScreen(kind="rename"):
+            return "Neuer Anzeigename > "
+        case LobbyScreen(kind="seat_edit", seat_index=seat_index):
+            return f"Platz {seat_index} > "
+        case GameScreen(kind="waiting"):
+            return None
+        case GameScreen(kind="choose_card"):
+            return "Karte > "
+        case GameScreen(kind="choose_row"):
+            return "Reihe > "
+        case GameScreen(kind="ended"):
+            return "Weiter mit Enter > "
 
-    return "\n\n".join(part for part in parts if part)
+    raise TypeError(f"unsupported screen: {state.screen!r}")
+
+
+def render_main_screen(state: CliState) -> str:
+    match state.screen:
+        case LobbyScreen(kind="main"):
+            return render_lobby_main(state)
+        case LobbyScreen(kind="rename"):
+            return render_lobby_rename(state)
+        case LobbyScreen(kind="seat_edit"):
+            return render_lobby_seat_edit(state)
+        case GameScreen(kind="waiting"):
+            return render_game_waiting(state)
+        case GameScreen(kind="choose_card"):
+            return render_game_choose_card(state)
+        case GameScreen(kind="choose_row"):
+            return render_game_choose_row(state)
+        case GameScreen(kind="ended"):
+            return render_game_ended(state)
+
+    raise TypeError(f"unsupported screen: {state.screen!r}")
 
 
 def render_session_error(message: str) -> str:
     return "\n".join(["SERVERFEHLER", "-----------", message])
 
 
-def render_lobby_main(state: CliState) -> str:
+def render_flash_message(message: UiMessage) -> str:
+    title = "Fehler" if message.level == "error" else "Hinweis"
+    return "\n".join([f"{title}: {message.text}"])
+
+
+def render_modal(state: CliState) -> str:
+    modal = state.modal
+    if not isinstance(modal, TrickResolvedModal):
+        raise TypeError(f"unsupported modal: {modal!r}")
     lines = [
-        render_lobby_overview(state),
+        "Stich aufgelöst",
+        "---------------",
         "",
-        "Menü:",
-        "  n = Name ändern",
-        "  0,1,2,3... = Platz editieren",
-        "  g = Spiel starten",
+        render_trick_resolved_summary(modal.public_state_before, modal.resolved),
     ]
-    mode = state.mode
-    if isinstance(mode, LobbyStateMain) and mode.error_message is not None:
-        lines.extend(["", f"Fehler: {mode.error_message}"])
+    if state.public_state is not None:
+        lines.extend(["", "Aktueller Stand:", "----------------", "", render_game_overview(state)])
     return "\n".join(lines)
+
+
+def render_lobby_main(state: CliState) -> str:
+    return "\n".join(
+        [
+            render_lobby_overview(state),
+            "",
+            "Menü:",
+            "  n = Name ändern",
+            "  0,1,2,3... = Platz editieren",
+            "  g = Spiel starten",
+        ]
+    )
 
 
 def render_lobby_rename(state: CliState) -> str:
-    lines = [
-        render_lobby_overview(state),
-        "",
-        "Name ändern",
-        "-----------",
-        "Bitte neuen Anzeigenamen eingeben.",
-    ]
-    mode = state.mode
-    if isinstance(mode, LobbyStateRename) and mode.error_message is not None:
-        lines.extend(["", f"Fehler: {mode.error_message}"])
-    return "\n".join(lines)
+    return "\n".join(
+        [
+            render_lobby_overview(state),
+            "",
+            "Name ändern",
+            "-----------",
+            "Bitte neuen Anzeigenamen eingeben.",
+        ]
+    )
 
 
 def render_lobby_seat_edit(state: CliState) -> str:
-    mode = state.mode
-    if not isinstance(mode, LobbyStateSeatEdit):
-        raise TypeError("expected LobbyStateSeatEdit")
-    lines = [
-        render_lobby_overview_with_highlight(state, mode.seat_index),
-        "",
-        f"Platz {mode.seat_index} bearbeiten",
-        "-------------------------",
-        "  m = mich setzen",
-        "  b = Bot setzen",
-        "  c = Platz leeren",
-        "  x = zurück",
-    ]
-    if mode.error_message is not None:
-        lines.extend(["", f"Fehler: {mode.error_message}"])
-    return "\n".join(lines)
+    screen = state.screen
+    if not isinstance(screen, LobbyScreen) or screen.kind != "seat_edit" or screen.seat_index is None:
+        raise TypeError("expected seat_edit screen")
+    return "\n".join(
+        [
+            render_lobby_overview_with_highlight(state, screen.seat_index),
+            "",
+            f"Platz {screen.seat_index} bearbeiten",
+            "-------------------------",
+            "  m = mich setzen",
+            "  b = Bot setzen",
+            "  c = Platz leeren",
+            "  x = zurück",
+        ]
+    )
 
 
 def render_lobby_overview(state: CliState) -> str:
@@ -192,64 +223,49 @@ def _describe_lobby_seat(state: CliState, seat: LobbySeatView) -> str:
 
 
 def render_game_waiting(state: CliState) -> str:
-    lines = [render_game_overview(state), "", "Warten auf andere Spieler..."]
-    mode = state.mode
-    if isinstance(mode, GameStateWaiting) and mode.info_message is not None:
-        lines.extend(["", mode.info_message])
+    lines = [render_game_overview(state)]
+    revealed = render_revealed_trick(state.revealed_trick, own_player_id=state.own_player_id)
+    if revealed is not None:
+        lines.extend(["", revealed])
+    lines.extend(["", "Warten auf andere Spieler..."])
     return "\n".join(lines)
 
 
 def render_game_choose_card(state: CliState) -> str:
-    mode = state.mode
-    if not isinstance(mode, GameStateChooseCard):
-        raise TypeError("expected GameStateChooseCard")
+    screen = state.screen
+    if not isinstance(screen, GameScreen) or screen.kind != "choose_card" or screen.player_state is None:
+        raise TypeError("expected choose_card screen")
     lines = [
         render_game_overview(state),
         "",
-        render_own_hand(mode.player_state),
+        render_own_hand(screen.player_state),
         "",
         "Du bist dran.",
         "Wähle eine Karte aus deiner Hand.",
     ]
-    if mode.error_message is not None:
-        lines.extend(["", f"Fehler: {mode.error_message}"])
     return "\n".join(lines)
 
 
 def render_game_choose_row(state: CliState) -> str:
-    mode = state.mode
-    if not isinstance(mode, GameStateChooseRow):
-        raise TypeError("expected GameStateChooseRow")
-    mapping = build_row_display_mapping(mode.player_state.public_state)
-    pending_card_value = mode.player_state.pending_card_value()
+    screen = state.screen
+    if not isinstance(screen, GameScreen) or screen.kind != "choose_row" or screen.player_state is None:
+        raise TypeError("expected choose_row screen")
+    mapping = build_row_display_mapping(screen.player_state.public_state)
+    pending_card_value = screen.player_state.pending_card_value()
     pending_card_text = "?" if pending_card_value is None else str(pending_card_value)
-    lines = [
-        render_game_overview(state),
-        "",
-        render_own_hand(mode.player_state),
-        "",
-        f"Deine Karte {pending_card_text} ist kleiner als alle Reihen.",
-        f"Bitte wähle eine Reihe zwischen 1 und {mapping.max_cli_row()}.",
-    ]
-    if mode.error_message is not None:
-        lines.extend(["", f"Fehler: {mode.error_message}"])
-    return "\n".join(lines)
-
-
-def render_game_trick_resolved(state: CliState) -> str:
-    mode = state.mode
-    if not isinstance(mode, GameStateTrickResolved):
-        raise TypeError("expected GameStateTrickResolved")
-    lines = [
-        "Stich aufgelöst",
-        "---------------",
-        "",
-        render_trick_resolved_summary(mode.public_state_before, mode.resolved),
-    ]
-    if state.public_state is not None:
-        lines.extend(["", "Aktueller Stand:", "----------------", "", render_game_overview(state)])
-    if mode.info_message is not None:
-        lines.extend(["", mode.info_message])
+    lines = [render_game_overview(state)]
+    revealed = render_revealed_trick(state.revealed_trick, own_player_id=state.own_player_id)
+    if revealed is not None:
+        lines.extend(["", revealed])
+    lines.extend(
+        [
+            "",
+            render_own_hand(screen.player_state),
+            "",
+            f"Deine Karte {pending_card_text} ist kleiner als alle Reihen.",
+            f"Bitte wähle eine Reihe zwischen 1 und {mapping.max_cli_row()}.",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -257,9 +273,6 @@ def render_game_ended(state: CliState) -> str:
     lines = ["Spiel beendet", "-------------"]
     if state.public_state is not None:
         lines.extend(["", render_game_overview(state)])
-    mode = state.mode
-    if isinstance(mode, GameStateEnded) and mode.info_message is not None:
-        lines.extend(["", mode.info_message])
     return "\n".join(lines)
 
 
@@ -279,6 +292,25 @@ def render_game_overview(state: CliState) -> str:
     for index, player in enumerate(public_state.players):
         marker = " <- du" if player.player_id == state.own_player_id else ""
         lines.append(f"  ({index}) {player.name}: {player.score}, {player.hand_count} Karten{marker}")
+    return "\n".join(lines)
+
+
+def render_revealed_trick(revealed: TrickRevealed | None, *, own_player_id) -> str | None:
+    if revealed is None:
+        return None
+    lines = ["Gespielte Karten:"]
+    for card in revealed.played_cards:
+        marker = " <- du" if card.player_id == own_player_id else ""
+        lines.append(f"  {card.card_value:>3}  {card.player_name}{marker}")
+    if revealed.active_player_id is not None:
+        chooser_name = next(
+            (card.player_name for card in revealed.played_cards if card.player_id == revealed.active_player_id),
+            str(revealed.active_player_id),
+        )
+        if revealed.pending_card_value is None:
+            lines.append(f"{chooser_name} muss eine Reihe wählen.")
+        else:
+            lines.append(f"{chooser_name} muss für Karte {revealed.pending_card_value} eine Reihe wählen.")
     return "\n".join(lines)
 
 
@@ -310,7 +342,7 @@ def render_trick_resolved_summary(
 
 
 def render_public_state(state: PublicState) -> None:
-    cli_state = CliState(public_state=state, mode=GameStateWaiting())
+    cli_state = CliState(public_state=state, screen=GameScreen(kind="waiting"))
     print(render_game_overview(cli_state))
 
 
@@ -322,7 +354,7 @@ def render_player_state(state: PlayerState) -> None:
     cli_state = CliState(
         own_player_id=state.self_player_id,
         public_state=state.public_state,
-        mode=GameStateChooseCard(player_state=state),
+        screen=GameScreen(kind="choose_card", player_state=state),
     )
     print(render_game_choose_card(cli_state))
 
@@ -331,9 +363,10 @@ def render_trick_resolution(public_state_before: PublicState, message: TrickReso
     public_state_after = apply_deltas_public_state(public_state_before, message.deltas)
     cli_state = CliState(
         public_state=public_state_after,
-        mode=GameStateTrickResolved(
+        modal=TrickResolvedModal(
             public_state_before=public_state_before,
             resolved=message,
         ),
+        screen=GameScreen(kind="waiting"),
     )
-    print(render_game_trick_resolved(cli_state))
+    print(render_modal(cli_state))

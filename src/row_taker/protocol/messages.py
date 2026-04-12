@@ -113,6 +113,21 @@ class StateUpdated:
 
 
 @dataclass(frozen=True, slots=True)
+class PlayedCardView:
+    player_id: PlayerID
+    player_name: str
+    card_value: int
+
+
+@dataclass(frozen=True, slots=True)
+class TrickRevealed:
+    state: PublicState
+    played_cards: tuple[PlayedCardView, ...]
+    active_player_id: PlayerID | None = None
+    pending_card_value: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ChooseCardRequested:
     player_id: PlayerID
     state: PlayerState
@@ -142,6 +157,7 @@ ServerToClientMessage = (
     | LobbyActionRejected
     | GameStarting
     | StateUpdated
+    | TrickRevealed
     | ChooseCardRequested
     | ChooseRowRequested
     | TrickResolved
@@ -149,4 +165,4 @@ ServerToClientMessage = (
 )
 
 GameClientMessage = SubmitCard | SubmitRowChoice
-GameServerMessage = StateUpdated | ChooseCardRequested | ChooseRowRequested | TrickResolved
+GameServerMessage = StateUpdated | TrickRevealed | ChooseCardRequested | ChooseRowRequested | TrickResolved

@@ -1,62 +1,40 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 from row_taker.engine.game.state import PlayerState, PublicState
-from row_taker.protocol.messages import LobbyView, TrickResolved
+from row_taker.protocol.messages import LobbyView, TrickResolved, TrickRevealed
 
 
 @dataclass(frozen=True, slots=True)
-class LobbyStateMain:
-    error_message: str | None = None
+class UiMessage:
+    level: Literal["info", "error"]
+    text: str
 
 
 @dataclass(frozen=True, slots=True)
-class LobbyStateRename:
-    error_message: str | None = None
+class LobbyScreen:
+    kind: Literal["main", "rename", "seat_edit"]
+    seat_index: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class LobbyStateSeatEdit:
-    seat_index: int
-    error_message: str | None = None
+class GameScreen:
+    kind: Literal["waiting", "choose_card", "choose_row", "ended"]
+    player_state: PlayerState | None = None
 
 
-LobbyMode = LobbyStateMain | LobbyStateRename | LobbyStateSeatEdit
-
-
-@dataclass(frozen=True, slots=True)
-class GameStateWaiting:
-    info_message: str | None = None
+Screen = LobbyScreen | GameScreen
 
 
 @dataclass(frozen=True, slots=True)
-class GameStateChooseCard:
-    player_state: PlayerState
-    error_message: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class GameStateChooseRow:
-    player_state: PlayerState
-    error_message: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class GameStateTrickResolved:
+class TrickResolvedModal:
     public_state_before: PublicState | None
     resolved: TrickResolved
-    info_message: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class GameStateEnded:
-    info_message: str | None = None
-
-
-GameImmediateState = GameStateWaiting | GameStateChooseCard | GameStateChooseRow | GameStateEnded
-GameMode = GameImmediateState | GameStateTrickResolved
-CliMode = LobbyMode | GameMode
+ModalDialog = TrickResolvedModal
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,12 +43,24 @@ class CliState:
     own_player_id: str | None = None
     lobby_view: LobbyView | None = None
     public_state: PublicState | None = None
-    mode: CliMode = field(default_factory=LobbyStateMain)
-    pending_next_state: GameImmediateState | None = None
+    screen: Screen = field(default_factory=lambda: LobbyScreen(kind="main"))
+    modal: ModalDialog | None = None
+    flash_message: UiMessage | None = None
+    revealed_trick: TrickRevealed | None = None
     session_error: str | None = None
     should_exit: bool = False
 
 
+# Kompatibilitäts-Alias für ältere Tests/Hilfsfunktionen.
+LobbyStateMain = LobbyScreen
+LobbyStateRename = LobbyScreen
+LobbyStateSeatEdit = LobbyScreen
+GameStateWaiting = GameScreen
+GameStateChooseCard = GameScreen
+GameStateChooseRow = GameScreen
+GameStateEnded = GameScreen
+GameStateTrickResolved = TrickResolvedModal
+
+
 def initial_cli_state(own_client_id: str | None = None) -> CliState:
     return CliState(own_client_id=own_client_id)
-

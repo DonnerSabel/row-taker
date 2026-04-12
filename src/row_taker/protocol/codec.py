@@ -24,6 +24,7 @@ from row_taker.protocol.messages import (
     LobbySeatView,
     LobbyStateUpdated,
     LobbyView,
+    PlayedCardView,
     RequestStartGame,
     ServerError,
     ServerToClientMessage,
@@ -32,6 +33,7 @@ from row_taker.protocol.messages import (
     SubmitCard,
     SubmitRowChoice,
     TrickResolved,
+    TrickRevealed,
 )
 
 
@@ -100,6 +102,24 @@ def _lobby_view_from_dict(data: object) -> LobbyView:
         ),
         seats=tuple(_lobby_seat_from_dict(seat) for seat in data["seats"]),
         game_started=bool(data["game_started"]),
+    )
+
+
+def _played_card_to_dict(card: PlayedCardView) -> dict[str, object]:
+    return {
+        "player_id": str(card.player_id),
+        "player_name": card.player_name,
+        "card_value": card.card_value,
+    }
+
+
+def _played_card_from_dict(data: object) -> PlayedCardView:
+    if not isinstance(data, dict):
+        raise TypeError(f"played card must be a dict, got {type(data)!r}")
+    return PlayedCardView(
+        player_id=PlayerID(str(data["player_id"])),
+        player_name=str(data["player_name"]),
+        card_value=int(data["card_value"]),
     )
 
 
@@ -187,6 +207,16 @@ def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
         return {"type": "game_starting", "lobby": _lobby_view_to_dict(message.lobby)}
     if isinstance(message, StateUpdated):
         return {"type": "state_updated", "state": public_state_to_dict(message.state)}
+    if isinstance(message, TrickRevealed):
+        return {
+            "type": "trick_revealed",
+            "state": public_state_to_dict(message.state),
+            "played_cards": [_played_card_to_dict(card) for card in message.played_cards],
+            "active_player_id": None
+            if message.active_player_id is None
+            else str(message.active_player_id),
+            "pending_card_value": message.pending_card_value,
+        }
     if isinstance(message, ChooseCardRequested):
         return {
             "type": "choose_card_requested",
@@ -223,6 +253,16 @@ def server_message_from_dict(data: dict[str, object]) -> ServerToClientMessage:
         return GameStarting(lobby=_lobby_view_from_dict(data["lobby"]))
     if message_type == "state_updated":
         return StateUpdated(state=public_state_from_dict(data["state"]))
+    if message_type == "trick_revealed":
+        active_player_id = data.get("active_player_id")
+        return TrickRevealed(
+            state=public_state_from_dict(data["state"]),
+            played_cards=tuple(_played_card_from_dict(card) for card in data["played_cards"]),
+            active_player_id=None if active_player_id is None else PlayerID(str(active_player_id)),
+            pending_card_value=None
+            if data.get("pending_card_value") is None
+            else int(data["pending_card_value"]),
+        )
     if message_type == "choose_card_requested":
         return ChooseCardRequested(
             player_id=PlayerID(str(data["player_id"])), state=player_state_from_dict(data["state"])

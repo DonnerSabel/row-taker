@@ -5,7 +5,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 
 from row_taker.cli.console import CliConsole
-from row_taker.cli.render import get_prompt, render_public_state, render_screen
+from row_taker.cli.render import build_view, render_public_state
 from row_taker.cli.state_machine import reduce_server_message, reduce_user_input
 from row_taker.cli.state_models import CliState, initial_cli_state
 from row_taker.cli.terminal import clear_screen
@@ -37,7 +37,7 @@ class ClientSession:
             await self._refresh_screen(console, state)
 
             while not state.should_exit:
-                current_prompt = get_prompt(state) if self.interactive else None
+                current_prompt = build_view(state).prompt if self.interactive else None
 
                 if current_prompt is None:
                     if input_task is not None:
@@ -110,8 +110,9 @@ class ClientSession:
             self.transport.close()
 
     async def _refresh_screen(self, console: CliConsole, state: CliState) -> None:
-        prompt = get_prompt(state) if self.interactive else None
-        await console.render(render_screen(state), prompt)
+        view = build_view(state)
+        prompt = view.prompt if self.interactive else None
+        await console.render(view.body, prompt)
 
 
 

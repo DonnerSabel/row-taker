@@ -3,17 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from row_taker.cli.row_display import build_row_display_mapping
-from row_taker.cli.state_models import (
-    CliState,
-    GameStateChooseCard,
-    GameStateChooseRow,
-    GameStateEnded,
-    GameStateTrickResolved,
-    GameStateWaiting,
-    LobbyStateMain,
-    LobbyStateRename,
-    LobbyStateSeatEdit,
-)
+from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, TrickResolvedModal, UiMessage
 from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
 from row_taker.protocol.messages import (
     AssignSeatToClient,
@@ -34,6 +24,7 @@ from row_taker.protocol.messages import (
     SubmitCard,
     SubmitRowChoice,
     TrickResolved,
+    TrickRevealed,
 )
 
 
@@ -52,42 +43,62 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
             return replace(state, lobby_view=lobby)
 
         case LobbyActionRejected(message=text):
-            return replace(state, mode=_apply_lobby_error(state.mode, text))
+            return _with_flash(state, "error", text)
 
         case GameStarting(lobby=lobby):
             return replace(
                 state,
                 lobby_view=lobby,
                 public_state=None,
-                mode=GameStateWaiting(info_message="Spielstart..."),
-                pending_next_state=None,
+                screen=GameScreen(kind="waiting"),
+                modal=None,
+                flash_message=UiMessage(level="info", text="Spielstart..."),
+                revealed_trick=None,
             )
 
         case StateUpdated(state=public_state):
             return replace(state, public_state=public_state)
 
-        case ChooseCardRequested(player_id=player_id, state=player_state):
-            next_mode = GameStateChooseCard(player_state=player_state)
-            state = replace(state, own_player_id=player_id)
-            if isinstance(state.mode, GameStateTrickResolved):
-                return replace(state, pending_next_state=next_mode)
-            return replace(state, mode=next_mode)
-
-        case ChooseRowRequested(player_id=player_id, state=player_state):
-            next_mode = GameStateChooseRow(player_state=player_state)
-            state = replace(state, own_player_id=player_id)
-            if isinstance(state.mode, GameStateTrickResolved):
-                return replace(state, pending_next_state=next_mode)
-            return replace(state, mode=next_mode)
-
-        case TrickResolved() as resolved:
+        case TrickRevealed() as revealed:
             return replace(
                 state,
-                mode=GameStateTrickResolved(
+                public_state=revealed.state,
+                revealed_trick=revealed,
+                flash_message=None,
+            )
+
+        case ChooseCardRequested(player_id=player_id, state=player_state):
+            return replace(
+                state,
+                own_player_id=player_id,
+                screen=GameScreen(kind="choose_card", player_state=player_state),
+                flash_message=None,
+                revealed_trick=None,
+            )
+
+        case ChooseRowRequested(player_id=player_id, state=player_state):
+            return replace(
+                state,
+                own_player_id=player_id,
+                screen=GameScreen(kind="choose_row", player_state=player_state),
+                flash_message=None,
+            )
+
+        case TrickResolved() as resolved:
+            next_screen = state.screen
+            if isinstance(next_screen, GameScreen) and next_screen.kind == "choose_row":
+                next_screen = GameScreen(kind="waiting")
+            if resolved.game_finished:
+                next_screen = GameScreen(kind="ended")
+            return replace(
+                state,
+                screen=next_screen,
+                modal=TrickResolvedModal(
                     public_state_before=state.public_state,
                     resolved=resolved,
                 ),
-                pending_next_state=None,
+                flash_message=None,
+                revealed_trick=None,
             )
 
         case ServerError(message=text):
@@ -100,65 +111,67 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
 def reduce_user_input(state: CliState, text: str) -> UserInputResult:
     normalized = text.strip()
 
-    match state.mode:
-        case LobbyStateMain():
+    if state.modal is not None:
+        return _reduce_modal_input(state, normalized)
+
+    match state.screen:
+        case LobbyScreen(kind="main"):
             return _reduce_lobby_main_input(state, normalized)
-        case LobbyStateRename():
+        case LobbyScreen(kind="rename"):
             return _reduce_lobby_rename_input(state, normalized)
-        case LobbyStateSeatEdit(seat_index=seat_index):
+        case LobbyScreen(kind="seat_edit", seat_index=seat_index):
+            if seat_index is None:
+                raise TypeError("seat_edit screen requires seat_index")
             return _reduce_lobby_seat_edit_input(state, normalized, seat_index)
-        case GameStateWaiting():
+        case GameScreen(kind="waiting"):
             return _reduce_game_waiting_input(state, normalized)
-        case GameStateChooseCard(player_state=player_state):
+        case GameScreen(kind="choose_card", player_state=player_state):
+            if player_state is None:
+                raise TypeError("choose_card screen requires player_state")
             return _reduce_game_choose_card_input(state, normalized, player_state)
-        case GameStateChooseRow(player_state=player_state):
+        case GameScreen(kind="choose_row", player_state=player_state):
+            if player_state is None:
+                raise TypeError("choose_row screen requires player_state")
             return _reduce_game_choose_row_input(state, normalized, player_state)
-        case GameStateTrickResolved():
-            return _reduce_game_trick_resolved_input(state, normalized)
-        case GameStateEnded():
+        case GameScreen(kind="ended"):
             return _reduce_game_ended_input(state, normalized)
 
-    raise TypeError(f"unsupported mode: {type(state.mode)!r}")
+    raise TypeError(f"unsupported screen: {state.screen!r}")
 
 
-def _apply_lobby_error(mode: object, text: str) -> object:
-    match mode:
-        case LobbyStateMain():
-            return LobbyStateMain(error_message=text)
-        case LobbyStateRename():
-            return LobbyStateRename(error_message=text)
-        case LobbyStateSeatEdit(seat_index=seat_index):
-            return LobbyStateSeatEdit(seat_index=seat_index, error_message=text)
-        case _:
-            return mode
+def _with_flash(state: CliState, level: str, text: str) -> CliState:
+    return replace(state, flash_message=UiMessage(level=level, text=text))
+
+
+def _reduce_modal_input(state: CliState, text: str) -> UserInputResult:
+    if text != "":
+        return UserInputResult(state=_with_flash(state, "info", "Bitte mit Enter fortfahren."))
+    return UserInputResult(state=replace(state, modal=None, flash_message=None))
 
 
 def _reduce_lobby_main_input(state: CliState, text: str) -> UserInputResult:
     if text == "n":
-        return UserInputResult(state=replace(state, mode=LobbyStateRename()))
+        return UserInputResult(state=replace(state, screen=LobbyScreen(kind="rename"), flash_message=None))
 
     if text == "g":
         return UserInputResult(
-            state=replace(state, mode=LobbyStateMain()),
+            state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
             outbound_message=RequestStartGame(),
         )
 
     if text.isdigit():
         seat_index = int(text)
         if not _is_valid_seat_index(state, seat_index):
-            return UserInputResult(
-                state=replace(state, mode=LobbyStateMain(error_message="Ungültiger Platz."))
-            )
+            return UserInputResult(state=_with_flash(replace(state, screen=LobbyScreen(kind="main")), "error", "Ungültiger Platz."))
         return UserInputResult(
-            state=replace(state, mode=LobbyStateSeatEdit(seat_index=seat_index))
+            state=replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index), flash_message=None)
         )
 
     return UserInputResult(
-        state=replace(
-            state,
-            mode=LobbyStateMain(
-                error_message="Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer."
-            ),
+        state=_with_flash(
+            replace(state, screen=LobbyScreen(kind="main")),
+            "error",
+            "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer.",
         )
     )
 
@@ -166,16 +179,15 @@ def _reduce_lobby_main_input(state: CliState, text: str) -> UserInputResult:
 def _reduce_lobby_rename_input(state: CliState, text: str) -> UserInputResult:
     if text == "":
         return UserInputResult(
-            state=replace(
-                state,
-                mode=LobbyStateRename(
-                    error_message="Der Anzeigename darf nicht leer sein."
-                ),
+            state=_with_flash(
+                replace(state, screen=LobbyScreen(kind="rename")),
+                "error",
+                "Der Anzeigename darf nicht leer sein.",
             )
         )
 
     return UserInputResult(
-        state=replace(state, mode=LobbyStateMain()),
+        state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
         outbound_message=SetDisplayName(display_name=text),
     )
 
@@ -185,19 +197,19 @@ def _reduce_lobby_seat_edit_input(
     text: str,
     seat_index: int,
 ) -> UserInputResult:
+    seat_screen = LobbyScreen(kind="seat_edit", seat_index=seat_index)
+
     if text == "m":
         if state.own_client_id is None:
             return UserInputResult(
-                state=replace(
-                    state,
-                    mode=LobbyStateSeatEdit(
-                        seat_index=seat_index,
-                        error_message="Eigene client_id noch nicht zugewiesen. Bitte kurz warten.",
-                    ),
+                state=_with_flash(
+                    replace(state, screen=seat_screen),
+                    "error",
+                    "Eigene client_id noch nicht zugewiesen. Bitte kurz warten.",
                 )
             )
         return UserInputResult(
-            state=replace(state, mode=LobbyStateMain()),
+            state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
             outbound_message=AssignSeatToClient(
                 seat_index=seat_index,
                 target_client_id=state.own_client_id,
@@ -206,7 +218,7 @@ def _reduce_lobby_seat_edit_input(
 
     if text == "b":
         return UserInputResult(
-            state=replace(state, mode=LobbyStateMain()),
+            state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
             outbound_message=CreateLocalBotOnSeat(
                 seat_index=seat_index,
                 display_name=f"Bot_{seat_index}",
@@ -215,20 +227,18 @@ def _reduce_lobby_seat_edit_input(
 
     if text == "c":
         return UserInputResult(
-            state=replace(state, mode=LobbyStateMain()),
+            state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
             outbound_message=ClearSeat(seat_index=seat_index),
         )
 
     if text == "x":
-        return UserInputResult(state=replace(state, mode=LobbyStateMain()))
+        return UserInputResult(state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None))
 
     return UserInputResult(
-        state=replace(
-            state,
-            mode=LobbyStateSeatEdit(
-                seat_index=seat_index,
-                error_message="Ungültige Eingabe. Erlaubt sind m, b, c oder x.",
-            ),
+        state=_with_flash(
+            replace(state, screen=seat_screen),
+            "error",
+            "Ungültige Eingabe. Erlaubt sind m, b, c oder x.",
         )
     )
 
@@ -236,12 +246,7 @@ def _reduce_lobby_seat_edit_input(
 def _reduce_game_waiting_input(state: CliState, text: str) -> UserInputResult:
     if text == "":
         return UserInputResult(state=state)
-    return UserInputResult(
-        state=replace(
-            state,
-            mode=GameStateWaiting(info_message="Momentan ist keine Eingabe erforderlich."),
-        )
-    )
+    return UserInputResult(state=_with_flash(state, "info", "Momentan ist keine Eingabe erforderlich."))
 
 
 def _reduce_game_choose_card_input(
@@ -251,13 +256,7 @@ def _reduce_game_choose_card_input(
 ) -> UserInputResult:
     if not text.isdigit():
         return UserInputResult(
-            state=replace(
-                state,
-                mode=GameStateChooseCard(
-                    player_state=player_state,
-                    error_message="Bitte gib die Zahl einer Handkarte ein.",
-                ),
-            )
+            state=_with_flash(state, "error", "Bitte gib die Zahl einer Handkarte ein.")
         )
 
     card_value = int(text)
@@ -265,17 +264,11 @@ def _reduce_game_choose_card_input(
         validate_submit_card(player_state, card_value)
     except ValueError:
         return UserInputResult(
-            state=replace(
-                state,
-                mode=GameStateChooseCard(
-                    player_state=player_state,
-                    error_message="Diese Karte befindet sich nicht auf deiner Hand.",
-                ),
-            )
+            state=_with_flash(state, "error", "Diese Karte befindet sich nicht auf deiner Hand.")
         )
 
     return UserInputResult(
-        state=replace(state, mode=GameStateWaiting()),
+        state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
         outbound_message=SubmitCard(
             player_id=player_state.self_player_id,
             card_value=card_value,
@@ -292,24 +285,20 @@ def _reduce_game_choose_row_input(
 
     if not text.isdigit():
         return UserInputResult(
-            state=replace(
+            state=_with_flash(
                 state,
-                mode=GameStateChooseRow(
-                    player_state=player_state,
-                    error_message=f"Bitte gib eine Zahl zwischen 1 und {mapping.max_cli_row()} ein.",
-                ),
+                "error",
+                f"Bitte gib eine Zahl zwischen 1 und {mapping.max_cli_row()} ein.",
             )
         )
 
     cli_row = int(text)
     if not (1 <= cli_row <= mapping.max_cli_row()):
         return UserInputResult(
-            state=replace(
+            state=_with_flash(
                 state,
-                mode=GameStateChooseRow(
-                    player_state=player_state,
-                    error_message=f"Ungültige Reihe. Erlaubt sind 1 bis {mapping.max_cli_row()}.",
-                ),
+                "error",
+                f"Ungültige Reihe. Erlaubt sind 1 bis {mapping.max_cli_row()}.",
             )
         )
 
@@ -319,50 +308,15 @@ def _reduce_game_choose_row_input(
         validate_submit_row_choice(player_state, row_id)
     except ValueError:
         return UserInputResult(
-            state=replace(
-                state,
-                mode=GameStateChooseRow(
-                    player_state=player_state,
-                    error_message="Diese Reihe ist momentan nicht wählbar.",
-                ),
-            )
+            state=_with_flash(state, "error", "Diese Reihe ist momentan nicht wählbar.")
         )
 
     return UserInputResult(
-        state=replace(state, mode=GameStateWaiting()),
+        state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
         outbound_message=SubmitRowChoice(
             player_id=player_state.self_player_id,
             row_id=row_id,
         ),
-    )
-
-
-def _reduce_game_trick_resolved_input(state: CliState, text: str) -> UserInputResult:
-    mode = state.mode
-    if not isinstance(mode, GameStateTrickResolved):
-        raise TypeError("expected GameStateTrickResolved")
-
-    if text != "":
-        return UserInputResult(
-            state=replace(
-                state,
-                mode=GameStateTrickResolved(
-                    public_state_before=mode.public_state_before,
-                    resolved=mode.resolved,
-                    info_message="Bitte mit Enter fortfahren.",
-                ),
-            )
-        )
-
-    next_mode = state.pending_next_state
-    if next_mode is None:
-        if mode.resolved.game_finished:
-            next_mode = GameStateEnded()
-        else:
-            next_mode = GameStateWaiting()
-
-    return UserInputResult(
-        state=replace(state, mode=next_mode, pending_next_state=None)
     )
 
 
@@ -376,4 +330,3 @@ def _is_valid_seat_index(state: CliState, seat_index: int) -> bool:
     if state.lobby_view is None:
         return False
     return 0 <= seat_index < state.lobby_view.seat_count
-

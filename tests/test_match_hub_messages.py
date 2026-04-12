@@ -10,6 +10,7 @@ from row_taker.protocol.messages import (
     SubmitCard,
     SubmitRowChoice,
     TrickResolved,
+    TrickRevealed,
 )
 
 
@@ -36,6 +37,12 @@ def test_match_hub_drives_trick_via_messages() -> None:
     hub.handle_client_message(SubmitCard(PlayerID("player-1"), 90))
 
     messages = hub.drain_outbox()
+    reveal_messages = [message for message in messages if isinstance(message, TrickRevealed)]
+    assert len(reveal_messages) == 1
+    reveal = reveal_messages[0]
+    assert [card.card_value for card in reveal.played_cards] == [1, 90]
+    assert reveal.active_player_id == PlayerID("player-0")
+
     choose_row_messages = [
         message for message in messages if isinstance(message, ChooseRowRequested)
     ]
