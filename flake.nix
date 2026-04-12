@@ -2,7 +2,7 @@
   description = "Row-Taker development shell";
 
   inputs = {
-    nixos-config.url = "github:BerndDonner/NixOS-Config?ref=kitty";
+    nixos-config.url = "github:BerndDonner/NixOS-Config";
     nixpkgs.follows = "nixos-config/nixpkgs";
   };
 
