@@ -2,7 +2,7 @@
   description = "Row-Taker development shell";
 
   inputs = {
-    nixos-config.url = "github:BerndDonner/NixOS-Config";
+    nixos-config.url = "github:BerndDonner/NixOS-Config?ref=kitty";
     nixpkgs.follows = "nixos-config/nixpkgs";
   };
 
@@ -33,7 +33,7 @@
           python3Packages.pygame-avx2
           python3Packages.prompt-toolkit
           python3Packages.pytest
-          python3Packages.ruff
+          unstable.python3Packages.ruff
           vscode-fhs
         ];
 

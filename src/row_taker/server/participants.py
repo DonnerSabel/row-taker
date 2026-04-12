@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class ParticipantKind(str, Enum):
+class ParticipantKind(StrEnum):
     HUMAN = "human"
     BOT = "bot"
 
 
-class ParticipantLocation(str, Enum):
+class ParticipantLocation(StrEnum):
     LOCAL = "local"
     REMOTE = "remote"
 
