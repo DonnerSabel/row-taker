@@ -7,7 +7,7 @@ from row_taker.protocol.messages import SessionEnded, SessionEndReason
 
 
 class _FakeConsole:
-    instances: list["_FakeConsole"] = []
+    instances: list[_FakeConsole] = []
 
     def __init__(self) -> None:
         self.renders: list[tuple[str, str | None]] = []

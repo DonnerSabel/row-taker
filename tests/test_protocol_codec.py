@@ -1,6 +1,6 @@
 from row_taker.engine.game import setup_game
-from row_taker.engine.game.views import build_public_state
 from row_taker.engine.game.models import PlayerID, RowID
+from row_taker.engine.game.views import build_public_state
 from row_taker.engine.lobby.state import LobbySeat, LobbyState
 from row_taker.protocol.codec import (
     client_message_from_dict,
@@ -22,10 +22,10 @@ from row_taker.protocol.messages import (
     LobbyStateUpdated,
     LobbyView,
     PlayedCardView,
-    SessionEnded,
-    SessionEndReason,
     RequestStartGame,
     ServerError,
+    SessionEnded,
+    SessionEndReason,
     SetDisplayName,
     SubmitCard,
     SubmitRowChoice,

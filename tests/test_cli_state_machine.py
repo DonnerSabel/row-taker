@@ -9,8 +9,8 @@ from row_taker.engine.game.cards import Card
 from row_taker.engine.game.state import DeltaPublicState
 from row_taker.protocol.messages import (
     ChooseCardRequested,
-    PlayedCardView,
     LeaveSession,
+    PlayedCardView,
     SessionEnded,
     SessionEndReason,
     StateUpdated,

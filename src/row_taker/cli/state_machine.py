@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from row_taker.cli.row_display import build_row_display_mapping
-from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, TrickResolvedModal, UiMessage
+from row_taker.cli.state_models import (
+    CliState,
+    GameScreen,
+    LobbyScreen,
+    TrickResolvedModal,
+    UiMessage,
+)
 from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
 from row_taker.protocol.messages import (
     AssignSeatToClient,
@@ -14,13 +20,13 @@ from row_taker.protocol.messages import (
     CreateLocalBotOnSeat,
     GameStarting,
     IdentityAssigned,
+    LeaveSession,
     LobbyActionRejected,
     LobbyStateUpdated,
     RequestStartGame,
-    LeaveSession,
     ServerError,
-    SessionEnded,
     ServerToClientMessage,
+    SessionEnded,
     SetDisplayName,
     StateUpdated,
     SubmitCard,

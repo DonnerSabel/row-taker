@@ -92,7 +92,7 @@ def test_reduce_user_input_assign_seat_without_identity_sets_local_error() -> No
 
     assert result.outbound_message is None
     assert result.state.screen == LobbyScreen(kind="seat_edit", seat_index=0)
-    assert "client_id" in ((result.state.flash_message.text if result.state.flash_message else ""))
+    assert "client_id" in (result.state.flash_message.text if result.state.flash_message else "")
 
 
 

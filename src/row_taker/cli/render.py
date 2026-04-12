@@ -3,10 +3,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from row_taker.cli.row_display import build_row_display_mapping, format_public_deltas_for_cli
-from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, TrickResolvedModal, UiMessage
+from row_taker.cli.state_models import (
+    CliState,
+    GameScreen,
+    LobbyScreen,
+    TrickResolvedModal,
+    UiMessage,
+)
 from row_taker.engine.game.public_state_ops import apply_deltas_public_state
 from row_taker.engine.game.state import PlayerState, PublicState
-from row_taker.protocol.messages import LobbyParticipantView, LobbySeatView, TrickResolved, TrickRevealed
+from row_taker.protocol.messages import (
+    LobbyParticipantView,
+    LobbySeatView,
+    TrickResolved,
+    TrickRevealed,
+)
 
 
 @dataclass(frozen=True, slots=True)

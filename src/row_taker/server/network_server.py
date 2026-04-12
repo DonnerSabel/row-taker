@@ -8,7 +8,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from row_taker.protocol.errors import ConnectionClosed, ProtocolError, TransportError
-from row_taker.protocol.messages import ClientToServerMessage, IdentityAssigned, JoinLobby, LeaveSession
+from row_taker.protocol.messages import (
+    ClientToServerMessage,
+    IdentityAssigned,
+    JoinLobby,
+    LeaveSession,
+)
 from row_taker.protocol.transport import ServerTransport
 from row_taker.server.local_server import LocalServer, OutgoingEnvelope
 from row_taker.server.server_handle import ServerHandle
