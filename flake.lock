@@ -69,41 +69,25 @@
         "type": "github"
       }
     },
-    "lib": {
-      "flake": false,
-      "locked": {
-        "path": "./lib",
-        "type": "path"
-      },
-      "original": {
-        "path": "./lib",
-        "type": "path"
-      },
-      "parent": [
-        "nixos-config"
-      ]
-    },
     "nixos-config": {
       "inputs": {
         "bootdev-cli": "bootdev-cli",
         "context": "context",
         "helix": "helix",
         "home-manager": "home-manager",
-        "lib": "lib",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-unstable": "nixpkgs-unstable"
       },
       "locked": {
-        "lastModified": 1775984746,
-        "narHash": "sha256-ZeySlx8vg6Pf331ANHnfS0WZjImrxFANdQV384ruDH0=",
+        "lastModified": 1775995911,
+        "narHash": "sha256-KzoXVOaYYNbqosGfhaOS+dzJLf8WAzPxkKdee7uavtc=",
         "owner": "BerndDonner",
         "repo": "NixOS-Config",
-        "rev": "16d5c635fe3fd0b52534de7746b63ec71f46cc4c",
+        "rev": "4087214d01dafd0f15b7155c897a3a925368f34e",
         "type": "github"
       },
       "original": {
         "owner": "BerndDonner",
-        "ref": "kitty",
         "repo": "NixOS-Config",
         "type": "github"
       }
