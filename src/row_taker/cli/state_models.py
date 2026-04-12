@@ -49,6 +49,7 @@ class CliState:
     revealed_trick: TrickRevealed | None = None
     session_error: str | None = None
     exit_on_ack: bool = False
+    suppress_final_result: bool = False
     should_exit: bool = False
 
 

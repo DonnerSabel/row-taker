@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from row_taker.engine.game import setup_game
 from row_taker.engine.game.models import PlayerID
@@ -24,10 +25,13 @@ from row_taker.protocol.messages import (
     GameServerMessage,
     GameStarting,
     JoinLobby,
+    LeaveSession,
     LobbyActionRejected,
     RequestStartGame,
     ServerError,
     ServerToClientMessage,
+    SessionEndReason,
+    SessionEnded,
     SetDisplayName,
     SubmitCard,
     SubmitRowChoice,
@@ -87,25 +91,11 @@ class LocalServer:
 
     def disconnect_client(self, client_id: str) -> None:
         endpoint = self._connection_endpoints.pop(client_id, None)
-        if not self.registry.has(client_id):
-            return
-        kind = self.registry.get_participant(client_id).kind
-        if self.active_match is None:
-            self._remove_participant(client_id)
-            if self._start_in_progress and kind == ParticipantKind.BOT:
-                self._abort_startup()
-            self._broadcast_lobby_state()
-            return
-        if kind == ParticipantKind.HUMAN:
-            name = self.registry.get_participant(client_id).display_name
-            self._abort_active_match(
-                f"Spielabbruch: {name} ({endpoint or 'unbekannte Verbindung'}) hat die Verbindung beendet.",
-                disconnecting_client_id=client_id,
-            )
-            return
-        self._close_running_bot(client_id)
-        self.registry.remove_participant(client_id)
-        self._abort_active_match("Spielabbruch: Ein Bot wurde getrennt.", disconnecting_client_id=client_id)
+        self._handle_departure(
+            client_id,
+            reason=SessionEndReason.DISCONNECT,
+            endpoint_display=endpoint,
+        )
 
     def handle_client_message(
         self,
@@ -132,6 +122,9 @@ class LocalServer:
                 return None
             if isinstance(message, RequestStartGame):
                 self._handle_start_game()
+                return None
+            if isinstance(message, LeaveSession):
+                self._handle_departure(client_id, reason=SessionEndReason.QUIT)
                 return None
             if isinstance(message, SubmitCard | SubmitRowChoice):
                 self._forward_game_message(client_id, message)
@@ -198,20 +191,27 @@ class LocalServer:
             self._pending_bot_starts.pop(requested_client_id, None)
             self._pending_bot_seats.pop(pending.seat_index, None)
             self._running_bot_processes_by_client_id[requested_client_id] = pending.handle
+            self._log(
+                f"bot joined: client_id={requested_client_id} name={pending.display_name!r} endpoint={endpoint_display or '-'} seat={pending.seat_index}"
+            )
             self._broadcast_lobby_state()
             self._try_finish_start_game()
             return requested_client_id
 
         if self.active_match is not None or self._start_in_progress:
             raise ValueError("cannot join after game start")
+        display_name = message.display_name.strip()
         self.registry.register_participant(
             Participant(
                 client_id=client_id,
-                display_name=message.display_name.strip(),
+                display_name=display_name,
                 kind=ParticipantKind.HUMAN,
                 location=ParticipantLocation.REMOTE,
                 endpoint_display=self._connection_endpoints.get(client_id),
             )
+        )
+        self._log(
+            f"participant joined: client_id={client_id} name={display_name!r} endpoint={self._connection_endpoints.get(client_id) or '-'}"
         )
         self._broadcast_lobby_state()
         return None
@@ -220,7 +220,12 @@ class LocalServer:
         if self.active_match is not None or self._start_in_progress:
             raise ValueError("cannot change display name after game start")
         self._assert_known_client(client_id)
+        old_name = self.registry.get_participant(client_id).display_name
         self.registry.set_display_name(client_id, message.display_name)
+        new_name = self.registry.get_participant(client_id).display_name
+        self._log(
+            f"display name changed: client_id={client_id} old={old_name!r} new={new_name!r}"
+        )
         self._broadcast_lobby_state()
 
     def _handle_assign_seat(self, message: AssignSeatToClient) -> None:
@@ -230,6 +235,9 @@ class LocalServer:
         self._pending_bot_seats.pop(message.seat_index, None)
         self.lobby_state = assign_client_to_seat(
             self.lobby_state, message.target_client_id, message.seat_index
+        )
+        self._log(
+            f"seat assigned: seat={message.seat_index} client_id={message.target_client_id}"
         )
         self._broadcast_lobby_state()
 
@@ -245,6 +253,9 @@ class LocalServer:
             display_name=display_name,
             seed=self.rng.randrange(2**63),
         )
+        self._log(
+            f"pending bot configured: seat={message.seat_index} name={display_name!r}"
+        )
         self._broadcast_lobby_state()
 
     def _handle_clear_seat(self, message: ClearSeat) -> None:
@@ -252,6 +263,7 @@ class LocalServer:
             raise ValueError("cannot edit seats after game start")
         self._pending_bot_seats.pop(message.seat_index, None)
         self.lobby_state = clear_seat(self.lobby_state, message.seat_index)
+        self._log(f"seat cleared: seat={message.seat_index}")
         self._broadcast_lobby_state()
 
     def _handle_start_game(self) -> None:
@@ -265,6 +277,7 @@ class LocalServer:
         if self.server_handle is None:
             raise ValueError("cannot start local bots without server handle")
         self._start_in_progress = True
+        self._log("starting game: spawning pending local bots")
         for seat_index, spec in sorted(self._pending_bot_seats.items()):
             client_id = self._next_bot_client_id()
             handle = self.server_handle.spawn_local_bot(
@@ -290,23 +303,19 @@ class LocalServer:
     def _start_match_now(self) -> None:
         self.lobby_state = mark_game_started(self.lobby_state)
         self._start_in_progress = False
-        self.outbox.append(
-            OutgoingEnvelope(
-                GameStarting(
-                    lobby=build_lobby_view(
-                        self.lobby_state,
-                        self.registry,
-                        self._pending_bot_display_names(),
-                        server_endpoint=self._server_endpoint_display(),
-                    )
-                )
-            )
+        lobby_view = build_lobby_view(
+            self.lobby_state,
+            self.registry,
+            self._pending_bot_display_names(),
+            server_endpoint=self._server_endpoint_display(),
         )
+        self.outbox.append(OutgoingEnvelope(GameStarting(lobby=lobby_view)))
         match_participants = build_match_participants(self.lobby_state)
         display_names = [
             self.registry.get_participant(client_id).display_name
             for client_id in match_participants.ordered_client_ids
         ]
+        self._log(f"match started: players={display_names!r}")
         state = setup_game(display_names, rng=self.rng)
         self.active_match = MatchHub(state=state)
         self.player_to_client_id = dict(match_participants.player_to_client_id)
@@ -347,18 +356,83 @@ class LocalServer:
             return
         self.outbox.append(OutgoingEnvelope(message=message, target_client_id=None))
 
+    def _handle_departure(
+        self,
+        client_id: str,
+        *,
+        reason: SessionEndReason,
+        endpoint_display: str | None = None,
+    ) -> None:
+        if not self.registry.has(client_id):
+            return
+        participant = self.registry.get_participant(client_id)
+        endpoint = endpoint_display or participant.endpoint_display or self._connection_endpoints.get(client_id)
+        self._log(
+            f"participant departed: client_id={client_id} name={participant.display_name!r} reason={reason.value} endpoint={endpoint or '-'}"
+        )
+        if self.active_match is None:
+            self._remove_participant(client_id)
+            if self._start_in_progress and participant.kind == ParticipantKind.BOT:
+                self._abort_startup()
+            self._broadcast_lobby_state()
+            return
+
+        if participant.kind == ParticipantKind.HUMAN:
+            self._abort_active_match(
+                departing_client_id=client_id,
+                departing_display_name=participant.display_name,
+                reason=reason,
+                endpoint_display=endpoint,
+            )
+            return
+
+        self._close_running_bot(client_id)
+        self.registry.remove_participant(client_id)
+        self._abort_active_match(
+            departing_client_id=client_id,
+            departing_display_name=participant.display_name,
+            reason=reason,
+            endpoint_display=endpoint,
+        )
+
     def _abort_startup(self) -> None:
         for pending in self._pending_bot_starts.values():
             pending.handle.close()
         self._pending_bot_starts.clear()
         self._start_in_progress = False
+        self._log("startup aborted")
 
-    def _abort_active_match(self, reason: str, disconnecting_client_id: str | None = None) -> None:
+    def _abort_active_match(
+        self,
+        *,
+        departing_client_id: str,
+        departing_display_name: str,
+        reason: SessionEndReason,
+        endpoint_display: str | None,
+    ) -> None:
+        message = self._build_session_end_message(
+            departing_display_name=departing_display_name,
+            reason=reason,
+            endpoint_display=endpoint_display,
+        )
         remaining_client_ids = [
-            client_id for client_id in self.registry.records if client_id != disconnecting_client_id
+            client_id for client_id in self.registry.records if client_id != departing_client_id
         ]
+        self._log(
+            f"active match aborted: client_id={departing_client_id} name={departing_display_name!r} reason={reason.value} remaining_clients={remaining_client_ids!r}"
+        )
         for client_id in remaining_client_ids:
-            self.outbox.append(OutgoingEnvelope(ServerError(message=reason), target_client_id=client_id))
+            self.outbox.append(
+                OutgoingEnvelope(
+                    SessionEnded(
+                        message=message,
+                        reason=reason,
+                        client_id=departing_client_id,
+                        display_name=departing_display_name,
+                    ),
+                    target_client_id=client_id,
+                )
+            )
 
         bot_client_ids = [
             client_id
@@ -368,8 +442,8 @@ class LocalServer:
         for bot_client_id in bot_client_ids:
             self._remove_participant(bot_client_id)
             self._connection_endpoints.pop(bot_client_id, None)
-        if disconnecting_client_id is not None:
-            self._remove_participant(disconnecting_client_id)
+        self._remove_participant(departing_client_id)
+        self._connection_endpoints.pop(departing_client_id, None)
 
         self.active_match = None
         self.player_to_client_id.clear()
@@ -379,7 +453,6 @@ class LocalServer:
             seats=self.lobby_state.seats,
             game_started=False,
         )
-
 
     @property
     def should_shutdown(self) -> bool:
@@ -463,3 +536,21 @@ class LocalServer:
     def _assert_known_client(self, client_id: str) -> None:
         if not self.registry.has(client_id):
             raise ValueError(f"unknown client_id: {client_id!r}")
+
+    def _build_session_end_message(
+        self,
+        *,
+        departing_display_name: str,
+        reason: SessionEndReason,
+        endpoint_display: str | None,
+    ) -> str:
+        if reason is SessionEndReason.QUIT:
+            return f"Spiel abgebrochen: {departing_display_name} hat die Sitzung verlassen."
+        if reason is SessionEndReason.KICKED:
+            return f"Spiel abgebrochen: {departing_display_name} wurde aus der Sitzung entfernt."
+        endpoint_suffix = f" ({endpoint_display})" if endpoint_display else ""
+        return f"Spiel abgebrochen: Verbindung zu {departing_display_name}{endpoint_suffix} verloren."
+
+    def _log(self, message: str) -> None:
+        timestamp = datetime.now().isoformat(sep=" ", timespec="seconds")
+        print(f"{timestamp} [server] {message}", flush=True)

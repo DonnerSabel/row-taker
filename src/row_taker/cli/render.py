@@ -111,6 +111,7 @@ def render_lobby_main(state: CliState) -> str:
             "  n = Name ändern",
             "  0,1,2,3... = Platz editieren",
             "  g = Spiel starten",
+            "  X = Sitzung verlassen",
         ]
     )
 
@@ -123,6 +124,7 @@ def render_lobby_rename(state: CliState) -> str:
             "Name ändern",
             "-----------",
             "Bitte neuen Anzeigenamen eingeben.",
+            "X beendet die Sitzung sofort.",
         ]
     )
 
@@ -141,6 +143,7 @@ def render_lobby_seat_edit(state: CliState) -> str:
             "  b = Bot setzen/umbenennen",
             "  c = Platz leeren",
             "  x = zurück",
+            "  X = Sitzung verlassen",
         ]
     )
 
@@ -160,6 +163,7 @@ def render_lobby_bot_name(state: CliState) -> str:
             "Neuen Bot-Namen eingeben.",
             "Leere Eingabe übernimmt den vorgeschlagenen Namen.",
             "x bricht ab.",
+            "X beendet die Sitzung sofort.",
         ]
     )
 
@@ -246,7 +250,7 @@ def render_game_waiting(state: CliState) -> str:
     revealed = render_revealed_trick(state.revealed_trick, own_player_id=state.own_player_id)
     if revealed is not None:
         lines.extend(["", revealed])
-    lines.extend(["", "Warten auf andere Spieler..."])
+    lines.extend(["", "Warten auf andere Spieler...", "X beendet die Sitzung sofort."])
     return "\n".join(lines)
 
 
@@ -261,6 +265,7 @@ def render_game_choose_card(state: CliState) -> str:
         "",
         "Du bist dran.",
         "Wähle eine Karte aus deiner Hand.",
+        "X beendet die Sitzung sofort.",
     ]
     return "\n".join(lines)
 
@@ -283,6 +288,7 @@ def render_game_choose_row(state: CliState) -> str:
             "",
             f"Deine Karte {pending_card_text} ist kleiner als alle Reihen.",
             f"Bitte wähle eine Reihe zwischen 1 und {mapping.max_cli_row()}.",
+            "X beendet die Sitzung sofort.",
         ]
     )
     return "\n".join(lines)
@@ -292,6 +298,7 @@ def render_game_ended(state: CliState) -> str:
     lines = ["Spiel beendet", "-------------"]
     if state.public_state is not None:
         lines.extend(["", render_game_overview(state)])
+    lines.extend(["", "Enter beendet die Sitzung."])
     return "\n".join(lines)
 
 

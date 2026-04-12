@@ -3,10 +3,12 @@ from __future__ import annotations
 import random
 import socket
 import threading
+from contextlib import suppress
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from row_taker.protocol.errors import ConnectionClosed, ProtocolError, TransportError
-from row_taker.protocol.messages import ClientToServerMessage, IdentityAssigned, JoinLobby
+from row_taker.protocol.messages import ClientToServerMessage, IdentityAssigned, JoinLobby, LeaveSession
 from row_taker.protocol.transport import ServerTransport
 from row_taker.server.local_server import LocalServer, OutgoingEnvelope
 from row_taker.server.server_handle import ServerHandle
@@ -26,6 +28,10 @@ class _Connection:
         with self.write_lock:
             self.transport.send(message)
 
+    def close(self) -> None:
+        with suppress(Exception):
+            self.transport.close()
+
 
 @dataclass(slots=True)
 class NetworkServer:
@@ -42,11 +48,15 @@ class NetworkServer:
             self._connections[client_id] = _Connection(client_id=client_id, transport=transport)
             self._ever_had_connection = True
             self.server.register_connection(client_id, endpoint_display=endpoint_display)
+            _log(f"connection accepted: client_id={client_id} endpoint={endpoint_display or '-'}")
             return client_id
 
     def remove_connection(self, client_id: str) -> None:
         with self._lock:
-            self._connections.pop(client_id, None)
+            connection = self._connections.pop(client_id, None)
+            if connection is not None:
+                connection.close()
+            _log(f"connection closed: client_id={client_id}")
             self.server.disconnect_client(client_id)
             self._dispatch_locked(self.server.drain_outbox())
 
@@ -60,6 +70,7 @@ class NetworkServer:
             if adopted_client_id is not None and adopted_client_id != client_id:
                 self._rename_connection_locked(client_id, adopted_client_id)
                 client_id = adopted_client_id
+                _log(f"connection adopted requested client id: client_id={client_id}")
             if isinstance(message, JoinLobby):
                 connection = self._connections.get(client_id)
                 if connection is not None:
@@ -79,14 +90,32 @@ class NetworkServer:
         self._connections[new_client_id] = connection
 
     def _dispatch_locked(self, envelopes: list[OutgoingEnvelope]) -> None:
+        failed_client_ids: set[str] = set()
         for envelope in envelopes:
             if envelope.target_client_id is None:
-                for connection in list(self._connections.values()):
-                    connection.send(envelope)
+                recipients = list(self._connections.values())
             else:
                 connection = self._connections.get(envelope.target_client_id)
-                if connection is not None:
+                recipients = [] if connection is None else [connection]
+            for connection in recipients:
+                if connection.client_id in failed_client_ids:
+                    continue
+                try:
                     connection.send(envelope)
+                except TransportError as exc:
+                    failed_client_ids.add(connection.client_id)
+                    _log(
+                        f"send failed: client_id={connection.client_id} error={type(exc).__name__}: {exc}"
+                    )
+        if failed_client_ids:
+            for client_id in failed_client_ids:
+                connection = self._connections.pop(client_id, None)
+                if connection is not None:
+                    connection.close()
+                self.server.disconnect_client(client_id)
+            extra_envelopes = self.server.drain_outbox()
+            if extra_envelopes:
+                self._dispatch_locked(extra_envelopes)
 
 
 def _format_endpoint(addr: object) -> str | None:
@@ -103,15 +132,17 @@ def _serve_connection(conn: socket.socket, network_server: NetworkServer, endpoi
             try:
                 message = transport.receive()
             except ConnectionClosed:
+                _log(f"client disconnected while receiving: client_id={client_id}")
                 break
-            except (ProtocolError, TransportError):
+            except (ProtocolError, TransportError) as exc:
+                _log(f"client transport error: client_id={client_id} error={type(exc).__name__}: {exc}")
                 break
             client_id = network_server.handle_client_message(client_id, message)
+            if isinstance(message, LeaveSession):
+                _log(f"client requested leave: client_id={client_id}")
+                break
     finally:
-        try:
-            network_server.remove_connection(client_id)
-        finally:
-            transport.close()
+        network_server.remove_connection(client_id)
 
 
 def run_network_server(
@@ -122,13 +153,13 @@ def run_network_server(
     with socket.create_server((host, port), reuse_port=False) as listener:
         listener.settimeout(0.5)
         actual_host, actual_port = listener.getsockname()[:2]
-        print(f"Server gestartet auf {actual_host}:{actual_port}", flush=True)
+        _log(f"server started on {actual_host}:{actual_port}")
         server_handle = ServerHandle(host=actual_host, port=actual_port)
         local_server = LocalServer(rng=rng, seat_count=seat_count, server_handle=server_handle)
         network_server = NetworkServer(server=local_server)
         while True:
             if network_server.should_shutdown():
-                print("Keine Teilnehmer mehr verbunden. Server beendet sich.", flush=True)
+                _log("no participants connected anymore; server shutting down")
                 break
             try:
                 conn, addr = listener.accept()
@@ -140,3 +171,8 @@ def run_network_server(
                 daemon=True,
             )
             thread.start()
+
+
+def _log(message: str) -> None:
+    timestamp = datetime.now().isoformat(sep=" ", timespec="seconds")
+    print(f"{timestamp} [server] {message}", flush=True)

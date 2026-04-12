@@ -104,9 +104,14 @@ class ClientSession:
                         state = result.state
                         self.own_client_id = state.own_client_id
                         if result.outbound_message is not None:
-                            await asyncio.to_thread(self.transport.send, result.outbound_message)
+                            with suppress(Exception):
+                                await asyncio.to_thread(self.transport.send, result.outbound_message)
+                        if state.should_exit and state.suppress_final_result:
+                            break
                         await self._refresh_screen(console, state)
 
+            if state.suppress_final_result or state.session_error is not None:
+                return None
             return state.public_state
         finally:
             if server_task is not None:

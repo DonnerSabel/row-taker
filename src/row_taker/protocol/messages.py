@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game.state import DeltaPublicState, PlayerState, PublicState
@@ -67,6 +68,11 @@ class RequestStartGame:
 
 
 @dataclass(frozen=True, slots=True)
+class LeaveSession:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class SubmitCard:
     player_id: PlayerID
     card_value: int
@@ -85,6 +91,7 @@ ClientToServerMessage = (
     | CreateLocalBotOnSeat
     | ClearSeat
     | RequestStartGame
+    | LeaveSession
     | SubmitCard
     | SubmitRowChoice
 )
@@ -149,6 +156,22 @@ class TrickResolved:
     game_finished: bool
 
 
+
+
+class SessionEndReason(StrEnum):
+    QUIT = "quit"
+    DISCONNECT = "disconnect"
+    KICKED = "kicked"
+
+
+@dataclass(frozen=True, slots=True)
+class SessionEnded:
+    message: str
+    reason: SessionEndReason
+    client_id: str | None = None
+    display_name: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class ServerError:
     message: str
@@ -164,6 +187,7 @@ ServerToClientMessage = (
     | ChooseCardRequested
     | ChooseRowRequested
     | TrickResolved
+    | SessionEnded
     | ServerError
 )
 

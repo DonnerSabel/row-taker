@@ -10,6 +10,9 @@ from row_taker.engine.game.state import DeltaPublicState
 from row_taker.protocol.messages import (
     ChooseCardRequested,
     PlayedCardView,
+    LeaveSession,
+    SessionEnded,
+    SessionEndReason,
     StateUpdated,
     TrickResolved,
     TrickRevealed,
@@ -107,3 +110,21 @@ def test_trick_revealed_is_stored_for_following_waiting_or_choose_row_screens() 
 
     assert state.public_state == player_state.public_state
     assert state.revealed_trick == revealed
+
+
+def test_uppercase_x_triggers_leave_session_and_suppresses_final_result() -> None:
+    result = reduce_user_input(CliState(), "X")
+
+    assert result.outbound_message == LeaveSession()
+    assert result.state.should_exit is True
+    assert result.state.suppress_final_result is True
+
+
+def test_session_ended_exits_immediately() -> None:
+    state = reduce_server_message(
+        CliState(),
+        SessionEnded(message="Spiel abgebrochen", reason=SessionEndReason.QUIT, client_id="client-0", display_name="Alice"),
+    )
+
+    assert state.should_exit is True
+    assert state.session_error == "Spiel abgebrochen"

@@ -19,6 +19,7 @@ from row_taker.protocol.messages import (
     GameStarting,
     IdentityAssigned,
     JoinLobby,
+    LeaveSession,
     LobbyActionRejected,
     LobbyParticipantView,
     LobbySeatView,
@@ -26,6 +27,8 @@ from row_taker.protocol.messages import (
     LobbyView,
     PlayedCardView,
     RequestStartGame,
+    SessionEnded,
+    SessionEndReason,
     ServerError,
     ServerToClientMessage,
     SetDisplayName,
@@ -137,6 +140,8 @@ def client_message_to_dict(message: ClientToServerMessage) -> dict[str, object]:
         return {"type": "clear_seat", "seat_index": message.seat_index}
     if isinstance(message, RequestStartGame):
         return {"type": "request_start_game"}
+    if isinstance(message, LeaveSession):
+        return {"type": "leave_session"}
     if isinstance(message, SubmitCard):
         return {"type": "submit_card", "player_id": str(message.player_id), "card_value": message.card_value}
     if isinstance(message, SubmitRowChoice):
@@ -160,6 +165,8 @@ def client_message_from_dict(data: dict[str, object]) -> ClientToServerMessage:
         return ClearSeat(seat_index=int(data["seat_index"]))
     if message_type == "request_start_game":
         return RequestStartGame()
+    if message_type == "leave_session":
+        return LeaveSession()
     if message_type == "submit_card":
         return SubmitCard(player_id=PlayerID(str(data["player_id"])), card_value=int(data["card_value"]))
     if message_type == "submit_row_choice":
@@ -197,6 +204,14 @@ def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
             "new_round_started": message.new_round_started,
             "game_finished": message.game_finished,
         }
+    if isinstance(message, SessionEnded):
+        return {
+            "type": "session_ended",
+            "message": message.message,
+            "reason": message.reason.value,
+            "client_id": message.client_id,
+            "display_name": message.display_name,
+        }
     if isinstance(message, ServerError):
         return {"type": "server_error", "message": message.message}
     raise TypeError(f"unsupported server message type: {type(message)!r}")
@@ -231,6 +246,15 @@ def server_message_from_dict(data: dict[str, object]) -> ServerToClientMessage:
             deltas=tuple(delta_public_state_from_dict(delta) for delta in data["deltas"]),
             new_round_started=bool(data["new_round_started"]),
             game_finished=bool(data["game_finished"]),
+        )
+    if message_type == "session_ended":
+        client_id = data.get("client_id")
+        display_name = data.get("display_name")
+        return SessionEnded(
+            message=str(data["message"]),
+            reason=SessionEndReason(str(data["reason"])),
+            client_id=None if client_id is None else str(client_id),
+            display_name=None if display_name is None else str(display_name),
         )
     if message_type == "server_error":
         return ServerError(message=str(data["message"]))

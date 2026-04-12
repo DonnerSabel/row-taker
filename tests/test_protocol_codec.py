@@ -15,12 +15,15 @@ from row_taker.protocol.messages import (
     GameStarting,
     IdentityAssigned,
     JoinLobby,
+    LeaveSession,
     LobbyActionRejected,
     LobbyParticipantView,
     LobbySeatView,
     LobbyStateUpdated,
     LobbyView,
     PlayedCardView,
+    SessionEnded,
+    SessionEndReason,
     RequestStartGame,
     ServerError,
     SetDisplayName,
@@ -77,6 +80,7 @@ def test_client_messages_roundtrip() -> None:
         CreateLocalBotOnSeat(seat_index=2, display_name="Bot_X"),
         ClearSeat(seat_index=2),
         RequestStartGame(),
+        LeaveSession(),
         SubmitCard(player_id=PlayerID("player-0"), card_value=42),
         SubmitRowChoice(player_id=PlayerID("player-1"), row_id=RowID("row-2")),
     ]:
@@ -111,6 +115,7 @@ def test_server_messages_roundtrip() -> None:
             active_player_id=PlayerID("player-0"),
             pending_card_value=17,
         ),
+        SessionEnded(message="left", reason=SessionEndReason.QUIT, client_id="client-0", display_name="Alice"),
         ServerError(message="boom"),
     ]
     for message in messages:

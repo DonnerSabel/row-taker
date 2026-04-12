@@ -17,7 +17,9 @@ from row_taker.protocol.messages import (
     LobbyActionRejected,
     LobbyStateUpdated,
     RequestStartGame,
+    LeaveSession,
     ServerError,
+    SessionEnded,
     ServerToClientMessage,
     SetDisplayName,
     StateUpdated,
@@ -92,11 +94,22 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 flash_message=None,
                 revealed_trick=None,
             )
+        case SessionEnded(message=text):
+            return replace(
+                state,
+                session_error=text,
+                exit_on_ack=False,
+                suppress_final_result=True,
+                should_exit=True,
+                flash_message=None,
+                modal=None,
+            )
         case ServerError(message=text):
             return replace(
                 state,
                 session_error=text,
                 exit_on_ack=True,
+                suppress_final_result=True,
                 flash_message=None,
                 modal=None,
             )
@@ -106,6 +119,12 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
 
 def reduce_user_input(state: CliState, text: str) -> UserInputResult:
     normalized = text.strip()
+
+    if normalized == "X":
+        return UserInputResult(
+            state=replace(state, should_exit=True, suppress_final_result=True),
+            outbound_message=LeaveSession(),
+        )
 
     if state.session_error is not None:
         return _reduce_session_error_input(state, normalized)

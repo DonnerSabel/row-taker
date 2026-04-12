@@ -7,7 +7,10 @@ from row_taker.protocol.messages import (
     CreateLocalBotOnSeat,
     GameStarting,
     JoinLobby,
+    LeaveSession,
     RequestStartGame,
+    SessionEnded,
+    SessionEndReason,
     SetDisplayName,
     StateUpdated,
 )
@@ -147,3 +150,28 @@ def test_registry_is_only_source_of_participant_metadata() -> None:
     participant = server.registry.get_participant("client-0")
     assert participant.display_name == "Alicia"
     assert not hasattr(server.lobby_state, "clients")
+
+
+def test_leave_session_aborts_active_match_for_remaining_clients() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=2)
+    server.register_connection("client-0", endpoint_display="10.0.0.1:1000")
+    server.register_connection("client-1", endpoint_display="10.0.0.2:1000")
+    server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
+    server.handle_client_message("client-1", JoinLobby(display_name="Bob"))
+    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
+    server.handle_client_message("client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1"))
+    server.drain_outbox()
+
+    server.handle_client_message("client-0", RequestStartGame())
+    server.drain_outbox()
+
+    server.handle_client_message("client-0", LeaveSession())
+    envelopes = server.drain_outbox()
+
+    session_ended = [
+        envelope for envelope in envelopes if isinstance(envelope.message, SessionEnded)
+    ]
+    assert len(session_ended) == 1
+    assert session_ended[0].target_client_id == "client-1"
+    assert session_ended[0].message.reason == SessionEndReason.QUIT
+    assert "Alice" in session_ended[0].message.message
