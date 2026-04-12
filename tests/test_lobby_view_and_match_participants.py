@@ -15,8 +15,9 @@ def test_lobby_view_uses_registry_metadata_without_mutating_lobby_state() -> Non
         seat_count=2, seats=(LobbySeat(0, "client-0"), LobbySeat(1, None)), game_started=False
     )
 
-    lobby = build_lobby_view(lobby_state, registry)
+    lobby = build_lobby_view(lobby_state, registry, server_endpoint="127.0.0.1:8765")
     assert lobby.seats[0].occupant_display_name == "Alice"
+    assert lobby.server_endpoint == "127.0.0.1:8765"
     registry.set_display_name("client-0", "Alicia")
     updated_lobby = build_lobby_view(lobby_state, registry)
     assert updated_lobby.seats[0].occupant_display_name == "Alicia"

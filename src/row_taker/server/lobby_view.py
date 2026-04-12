@@ -16,6 +16,7 @@ def build_lobby_view(
     lobby_state: LobbyState,
     registry: ClientRegistry,
     pending_bot_display_names: Mapping[int, str] | None = None,
+    server_endpoint: str | None = None,
 ) -> LobbyView:
     pending_bot_display_names = pending_bot_display_names or {}
     participant_seat_map = {
@@ -74,6 +75,7 @@ def build_lobby_view(
         ),
         seats=tuple(seats),
         game_started=lobby_state.game_started,
+        server_endpoint=server_endpoint,
     )
 
 
@@ -81,7 +83,13 @@ def build_lobby_state_updated(
     lobby_state: LobbyState,
     registry: ClientRegistry,
     pending_bot_display_names: Mapping[int, str] | None = None,
+    server_endpoint: str | None = None,
 ) -> LobbyStateUpdated:
     return LobbyStateUpdated(
-        lobby=build_lobby_view(lobby_state, registry, pending_bot_display_names)
+        lobby=build_lobby_view(
+            lobby_state,
+            registry,
+            pending_bot_display_names,
+            server_endpoint=server_endpoint,
+        )
     )

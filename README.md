@@ -28,6 +28,7 @@ source .venv/bin/activate
 
 python -m pip install -e ".[dev]"
 pytest -q
+python -m row_taker.server
 python -m row_taker.cli
 ```
 

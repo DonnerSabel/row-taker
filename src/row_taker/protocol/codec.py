@@ -89,17 +89,20 @@ def _lobby_view_to_dict(lobby: LobbyView) -> dict[str, object]:
         "participants": [_lobby_participant_to_dict(participant) for participant in lobby.participants],
         "seats": [_lobby_seat_to_dict(seat) for seat in lobby.seats],
         "game_started": lobby.game_started,
+        "server_endpoint": lobby.server_endpoint,
     }
 
 
 def _lobby_view_from_dict(data: object) -> LobbyView:
     if not isinstance(data, dict):
         raise TypeError(f"lobby view data must be a dict, got {type(data)!r}")
+    server_endpoint = data.get("server_endpoint")
     return LobbyView(
         seat_count=int(data["seat_count"]),
         participants=tuple(_lobby_participant_from_dict(participant) for participant in data["participants"]),
         seats=tuple(_lobby_seat_from_dict(seat) for seat in data["seats"]),
         game_started=bool(data["game_started"]),
+        server_endpoint=None if server_endpoint is None else str(server_endpoint),
     )
 
 

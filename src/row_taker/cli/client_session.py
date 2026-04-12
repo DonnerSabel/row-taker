@@ -22,7 +22,10 @@ class ClientSession:
     own_client_id: str | None = None
 
     def run(self) -> PublicState | None:
-        return asyncio.run(self.run_async())
+        try:
+            return asyncio.run(self.run_async())
+        except KeyboardInterrupt:
+            return None
 
     async def run_async(self) -> PublicState | None:
         console = CliConsole()
@@ -71,7 +74,7 @@ class ClientSession:
                             state = replace(
                                 state,
                                 session_error="Die Verbindung zum Server wurde beendet.",
-                                exit_on_ack=True,
+                                exit_on_ack=False,
                             )
                             await self._refresh_screen(console, state)
                             server_task = None

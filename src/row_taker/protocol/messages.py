@@ -30,6 +30,7 @@ class LobbyView:
     participants: tuple[LobbyParticipantView, ...]
     seats: tuple[LobbySeatView, ...]
     game_started: bool
+    server_endpoint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

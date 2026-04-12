@@ -49,3 +49,9 @@ def test_two_humans_each_receive_their_own_identity_assigned() -> None:
     assert final_b == client_id_b
     assert IdentityAssigned(client_id=client_id_a) in transport_a.sent_messages
     assert IdentityAssigned(client_id=client_id_b) in transport_b.sent_messages
+
+
+def test_network_server_does_not_shutdown_before_first_connection() -> None:
+    network_server = NetworkServer(server=LocalServer(rng=random.Random(1234), seat_count=3))
+
+    assert network_server.should_shutdown() is False

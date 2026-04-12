@@ -168,7 +168,10 @@ def render_lobby_overview(state: CliState) -> str:
     lobby = state.lobby_view
     if lobby is None:
         return "\n".join(["Lobby", "-----", "Noch keine Lobby-Daten vorhanden."])
-    lines = ["Lobby", "-----", "", "Plätze:"]
+    lines = ["Lobby", "-----"]
+    if lobby.server_endpoint:
+        lines.extend(["", f"Server: {lobby.server_endpoint}"])
+    lines.extend(["", "Plätze:"])
     for seat in lobby.seats:
         lines.append(render_lobby_seat_line(state, seat.seat_index, seat))
     lines.extend(["", "Teilnehmer:"])
@@ -189,7 +192,10 @@ def render_lobby_overview_with_highlight(state: CliState, selected_seat_index: i
     lobby = state.lobby_view
     if lobby is None:
         return render_lobby_overview(state)
-    lines = ["Lobby", "-----", "", "Plätze:"]
+    lines = ["Lobby", "-----"]
+    if lobby.server_endpoint:
+        lines.extend(["", f"Server: {lobby.server_endpoint}"])
+    lines.extend(["", "Plätze:"])
     for seat in lobby.seats:
         prefix = ">" if seat.seat_index == selected_seat_index else " "
         lines.append(f"{prefix} [{seat.seat_index}] {_describe_lobby_seat(state, seat)}")
@@ -209,9 +215,8 @@ def render_lobby_overview_with_highlight(state: CliState, selected_seat_index: i
 
 def render_lobby_participant_line(state: CliState, participant: LobbyParticipantView) -> str:
     position = f"Platz {participant.seat_index}" if participant.seat_index is not None else "nicht gesetzt"
-    endpoint = f", {participant.endpoint}" if participant.endpoint else ""
     marker = " <- du" if participant.client_id == state.own_client_id else ""
-    return f"  {participant.display_name} ({participant.participant_kind}, {position}{endpoint}){marker}"
+    return f"  {participant.display_name} ({participant.participant_kind}, {position}){marker}"
 
 
 def render_lobby_seat_line(state: CliState, seat_index: int, seat: LobbySeatView) -> str:
@@ -221,8 +226,7 @@ def render_lobby_seat_line(state: CliState, seat_index: int, seat: LobbySeatView
 def _describe_lobby_seat(state: CliState, seat: LobbySeatView) -> str:
     if seat.occupant_display_name is None:
         return "(leer)"
-    endpoint = f", {seat.occupant_endpoint}" if seat.occupant_endpoint else ""
-    label = f"{seat.occupant_display_name} ({seat.occupant_kind}{endpoint})"
+    label = f"{seat.occupant_display_name} ({seat.occupant_kind})"
     if seat.occupant_client_id == state.own_client_id:
         label += " <- du"
     return label

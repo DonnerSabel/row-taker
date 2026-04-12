@@ -33,12 +33,14 @@ class NetworkServer:
     _connections: dict[str, _Connection] = field(default_factory=dict)
     _lock: threading.RLock = field(default_factory=threading.RLock)
     _client_counter: int = 0
+    _ever_had_connection: bool = False
 
     def add_connection(self, transport: ServerTransport, endpoint_display: str | None = None) -> str:
         with self._lock:
             client_id = f"client-{self._client_counter}"
             self._client_counter += 1
             self._connections[client_id] = _Connection(client_id=client_id, transport=transport)
+            self._ever_had_connection = True
             self.server.register_connection(client_id, endpoint_display=endpoint_display)
             return client_id
 
@@ -64,6 +66,10 @@ class NetworkServer:
                     connection.send_message(IdentityAssigned(client_id=client_id))
             self._dispatch_locked(self.server.drain_outbox())
             return client_id
+
+    def should_shutdown(self) -> bool:
+        with self._lock:
+            return self._ever_had_connection and self.server.should_shutdown and not self._connections
 
     def _rename_connection_locked(self, old_client_id: str, new_client_id: str) -> None:
         if new_client_id in self._connections:
@@ -114,59 +120,23 @@ def run_network_server(
     if rng is None:
         rng = random.Random()
     with socket.create_server((host, port), reuse_port=False) as listener:
-        server_handle = ServerHandle(host=host, port=listener.getsockname()[1])
+        listener.settimeout(0.5)
+        actual_host, actual_port = listener.getsockname()[:2]
+        print(f"Server gestartet auf {actual_host}:{actual_port}", flush=True)
+        server_handle = ServerHandle(host=actual_host, port=actual_port)
         local_server = LocalServer(rng=rng, seat_count=seat_count, server_handle=server_handle)
         network_server = NetworkServer(server=local_server)
         while True:
-            conn, addr = listener.accept()
+            if network_server.should_shutdown():
+                print("Keine Teilnehmer mehr verbunden. Server beendet sich.", flush=True)
+                break
+            try:
+                conn, addr = listener.accept()
+            except TimeoutError:
+                continue
             thread = threading.Thread(
                 target=_serve_connection,
                 args=(conn, network_server, _format_endpoint(addr)),
                 daemon=True,
             )
             thread.start()
-
-
-@dataclass(slots=True)
-class BackgroundServerHandle:
-    host: str
-    port: int
-    _thread: threading.Thread
-
-    def join(self, timeout: float | None = None) -> None:
-        self._thread.join(timeout)
-
-
-def start_background_network_server(
-    host: str = "127.0.0.1", port: int = 0, *, seat_count: int = 4
-) -> BackgroundServerHandle:
-    ready = threading.Event()
-    selected_port: list[int] = []
-
-    def worker() -> None:
-        with socket.create_server((host, port), reuse_port=False) as listener:
-            selected_port.append(listener.getsockname()[1])
-            server_handle = ServerHandle(host=host, port=selected_port[0])
-            ready.set()
-            network_server = NetworkServer(
-                server=LocalServer(
-                    rng=random.Random(),
-                    seat_count=seat_count,
-                    server_handle=server_handle,
-                )
-            )
-            while True:
-                conn, addr = listener.accept()
-                thread = threading.Thread(
-                    target=_serve_connection,
-                    args=(conn, network_server, _format_endpoint(addr)),
-                    daemon=True,
-                )
-                thread.start()
-
-    thread = threading.Thread(target=worker, daemon=True)
-    thread.start()
-    ready.wait(timeout=5)
-    if not selected_port:
-        raise RuntimeError("background network server failed to start")
-    return BackgroundServerHandle(host=host, port=selected_port[0], _thread=thread)

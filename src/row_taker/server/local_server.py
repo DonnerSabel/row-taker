@@ -147,7 +147,10 @@ class LocalServer:
                 self.outbox.append(
                     OutgoingEnvelope(
                         build_lobby_state_updated(
-                            self.lobby_state, self.registry, self._pending_bot_display_names()
+                            self.lobby_state,
+                            self.registry,
+                            self._pending_bot_display_names(),
+                            server_endpoint=self._server_endpoint_display(),
                         ),
                         target_client_id=reply_target,
                     )
@@ -294,6 +297,7 @@ class LocalServer:
                         self.lobby_state,
                         self.registry,
                         self._pending_bot_display_names(),
+                        server_endpoint=self._server_endpoint_display(),
                     )
                 )
             )
@@ -376,6 +380,26 @@ class LocalServer:
             game_started=False,
         )
 
+
+    @property
+    def should_shutdown(self) -> bool:
+        return (
+            self.active_match is None
+            and not self._start_in_progress
+            and not self.registry.records
+            and not self._pending_bot_starts
+            and not self._running_bot_processes_by_client_id
+        )
+
+    def _server_endpoint_display(self) -> str | None:
+        if self.server_handle is None:
+            return None
+        host = getattr(self.server_handle, "host", None)
+        port = getattr(self.server_handle, "port", None)
+        if host is None or port is None:
+            return None
+        return f"{host}:{port}"
+
     def _broadcast_lobby_state(self) -> None:
         self.outbox.append(
             OutgoingEnvelope(
@@ -383,6 +407,7 @@ class LocalServer:
                     self.lobby_state,
                     self.registry,
                     self._pending_bot_display_names(),
+                    server_endpoint=self._server_endpoint_display(),
                 ),
                 target_client_id=None,
             )
