@@ -38,13 +38,10 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
     match message:
         case IdentityAssigned(client_id=client_id):
             return replace(state, own_client_id=client_id)
-
         case LobbyStateUpdated(lobby=lobby):
             return replace(state, lobby_view=lobby)
-
         case LobbyActionRejected(message=text):
             return _with_flash(state, "error", text)
-
         case GameStarting(lobby=lobby):
             return replace(
                 state,
@@ -55,10 +52,8 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 flash_message=UiMessage(level="info", text="Spielstart..."),
                 revealed_trick=None,
             )
-
         case StateUpdated(state=public_state):
             return replace(state, public_state=public_state)
-
         case TrickRevealed() as revealed:
             return replace(
                 state,
@@ -66,7 +61,6 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 revealed_trick=revealed,
                 flash_message=None,
             )
-
         case ChooseCardRequested(player_id=player_id, state=player_state):
             return replace(
                 state,
@@ -75,7 +69,6 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 flash_message=None,
                 revealed_trick=None,
             )
-
         case ChooseRowRequested(player_id=player_id, state=player_state):
             return replace(
                 state,
@@ -83,7 +76,6 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 screen=GameScreen(kind="choose_row", player_state=player_state),
                 flash_message=None,
             )
-
         case TrickResolved() as resolved:
             next_screen = state.screen
             if isinstance(next_screen, GameScreen) and next_screen.kind == "choose_row":
@@ -100,10 +92,14 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 flash_message=None,
                 revealed_trick=None,
             )
-
         case ServerError(message=text):
-            return replace(state, session_error=text, should_exit=True)
-
+            return replace(
+                state,
+                session_error=text,
+                exit_on_ack=True,
+                flash_message=None,
+                modal=None,
+            )
         case _:
             raise TypeError(f"unsupported server message type: {type(message)!r}")
 
@@ -111,6 +107,8 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
 def reduce_user_input(state: CliState, text: str) -> UserInputResult:
     normalized = text.strip()
 
+    if state.session_error is not None:
+        return _reduce_session_error_input(state, normalized)
     if state.modal is not None:
         return _reduce_modal_input(state, normalized)
 
@@ -123,6 +121,10 @@ def reduce_user_input(state: CliState, text: str) -> UserInputResult:
             if seat_index is None:
                 raise TypeError("seat_edit screen requires seat_index")
             return _reduce_lobby_seat_edit_input(state, normalized, seat_index)
+        case LobbyScreen(kind="bot_name", seat_index=seat_index):
+            if seat_index is None:
+                raise TypeError("bot_name screen requires seat_index")
+            return _reduce_lobby_bot_name_input(state, normalized, seat_index)
         case GameScreen(kind="waiting"):
             return _reduce_game_waiting_input(state, normalized)
         case GameScreen(kind="choose_card", player_state=player_state):
@@ -143,6 +145,14 @@ def _with_flash(state: CliState, level: str, text: str) -> CliState:
     return replace(state, flash_message=UiMessage(level=level, text=text))
 
 
+def _reduce_session_error_input(state: CliState, text: str) -> UserInputResult:
+    if not state.exit_on_ack:
+        return UserInputResult(state=replace(state, should_exit=True))
+    if text != "":
+        return UserInputResult(state=state)
+    return UserInputResult(state=replace(state, should_exit=True))
+
+
 def _reduce_modal_input(state: CliState, text: str) -> UserInputResult:
     if text != "":
         return UserInputResult(state=_with_flash(state, "info", "Bitte mit Enter fortfahren."))
@@ -152,13 +162,11 @@ def _reduce_modal_input(state: CliState, text: str) -> UserInputResult:
 def _reduce_lobby_main_input(state: CliState, text: str) -> UserInputResult:
     if text == "n":
         return UserInputResult(state=replace(state, screen=LobbyScreen(kind="rename"), flash_message=None))
-
     if text == "g":
         return UserInputResult(
             state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
             outbound_message=RequestStartGame(),
         )
-
     if text.isdigit():
         seat_index = int(text)
         if not _is_valid_seat_index(state, seat_index):
@@ -166,7 +174,6 @@ def _reduce_lobby_main_input(state: CliState, text: str) -> UserInputResult:
         return UserInputResult(
             state=replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index), flash_message=None)
         )
-
     return UserInputResult(
         state=_with_flash(
             replace(state, screen=LobbyScreen(kind="main")),
@@ -185,20 +192,14 @@ def _reduce_lobby_rename_input(state: CliState, text: str) -> UserInputResult:
                 "Der Anzeigename darf nicht leer sein.",
             )
         )
-
     return UserInputResult(
         state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
         outbound_message=SetDisplayName(display_name=text),
     )
 
 
-def _reduce_lobby_seat_edit_input(
-    state: CliState,
-    text: str,
-    seat_index: int,
-) -> UserInputResult:
+def _reduce_lobby_seat_edit_input(state: CliState, text: str, seat_index: int) -> UserInputResult:
     seat_screen = LobbyScreen(kind="seat_edit", seat_index=seat_index)
-
     if text == "m":
         if state.own_client_id is None:
             return UserInputResult(
@@ -215,25 +216,17 @@ def _reduce_lobby_seat_edit_input(
                 target_client_id=state.own_client_id,
             ),
         )
-
     if text == "b":
         return UserInputResult(
-            state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
-            outbound_message=CreateLocalBotOnSeat(
-                seat_index=seat_index,
-                display_name=f"Bot_{seat_index}",
-            ),
+            state=replace(state, screen=LobbyScreen(kind="bot_name", seat_index=seat_index), flash_message=None)
         )
-
     if text == "c":
         return UserInputResult(
             state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
             outbound_message=ClearSeat(seat_index=seat_index),
         )
-
     if text == "x":
         return UserInputResult(state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None))
-
     return UserInputResult(
         state=_with_flash(
             replace(state, screen=seat_screen),
@@ -243,22 +236,36 @@ def _reduce_lobby_seat_edit_input(
     )
 
 
+def _current_bot_name(state: CliState, seat_index: int) -> str:
+    lobby = state.lobby_view
+    if lobby is not None:
+        for seat in lobby.seats:
+            if seat.seat_index == seat_index and seat.occupant_kind == "bot" and seat.occupant_display_name:
+                return seat.occupant_display_name
+    return f"Bot_{seat_index}"
+
+
+def _reduce_lobby_bot_name_input(state: CliState, text: str, seat_index: int) -> UserInputResult:
+    if text == "x":
+        return UserInputResult(state=replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index), flash_message=None))
+    display_name = text or _current_bot_name(state, seat_index)
+    return UserInputResult(
+        state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
+        outbound_message=CreateLocalBotOnSeat(seat_index=seat_index, display_name=display_name),
+    )
+
+
 def _reduce_game_waiting_input(state: CliState, text: str) -> UserInputResult:
     if text == "":
         return UserInputResult(state=state)
     return UserInputResult(state=_with_flash(state, "info", "Momentan ist keine Eingabe erforderlich."))
 
 
-def _reduce_game_choose_card_input(
-    state: CliState,
-    text: str,
-    player_state,
-) -> UserInputResult:
+def _reduce_game_choose_card_input(state: CliState, text: str, player_state) -> UserInputResult:
     if not text.isdigit():
         return UserInputResult(
             state=_with_flash(state, "error", "Bitte gib die Zahl einer Handkarte ein.")
         )
-
     card_value = int(text)
     try:
         validate_submit_card(player_state, card_value)
@@ -266,23 +273,14 @@ def _reduce_game_choose_card_input(
         return UserInputResult(
             state=_with_flash(state, "error", "Diese Karte befindet sich nicht auf deiner Hand.")
         )
-
     return UserInputResult(
         state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
-        outbound_message=SubmitCard(
-            player_id=player_state.self_player_id,
-            card_value=card_value,
-        ),
+        outbound_message=SubmitCard(player_id=player_state.self_player_id, card_value=card_value),
     )
 
 
-def _reduce_game_choose_row_input(
-    state: CliState,
-    text: str,
-    player_state,
-) -> UserInputResult:
+def _reduce_game_choose_row_input(state: CliState, text: str, player_state) -> UserInputResult:
     mapping = build_row_display_mapping(player_state.public_state)
-
     if not text.isdigit():
         return UserInputResult(
             state=_with_flash(
@@ -291,7 +289,6 @@ def _reduce_game_choose_row_input(
                 f"Bitte gib eine Zahl zwischen 1 und {mapping.max_cli_row()} ein.",
             )
         )
-
     cli_row = int(text)
     if not (1 <= cli_row <= mapping.max_cli_row()):
         return UserInputResult(
@@ -301,7 +298,6 @@ def _reduce_game_choose_row_input(
                 f"Ungültige Reihe. Erlaubt sind 1 bis {mapping.max_cli_row()}.",
             )
         )
-
     state_row_index = mapping.to_state_index(cli_row)
     row_id = player_state.rows[state_row_index].row_id
     try:
@@ -310,13 +306,9 @@ def _reduce_game_choose_row_input(
         return UserInputResult(
             state=_with_flash(state, "error", "Diese Reihe ist momentan nicht wählbar.")
         )
-
     return UserInputResult(
         state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
-        outbound_message=SubmitRowChoice(
-            player_id=player_state.self_player_id,
-            row_id=row_id,
-        ),
+        outbound_message=SubmitRowChoice(player_id=player_state.self_player_id, row_id=row_id),
     )
 
 

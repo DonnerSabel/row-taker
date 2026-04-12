@@ -32,6 +32,7 @@ class ClientRegistry:
                 display_name=display_name.strip(),
                 kind=participant.kind,
                 location=participant.location,
+                endpoint_display=participant.endpoint_display,
             ),
         )
 

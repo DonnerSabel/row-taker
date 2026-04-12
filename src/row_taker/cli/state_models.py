@@ -15,7 +15,7 @@ class UiMessage:
 
 @dataclass(frozen=True, slots=True)
 class LobbyScreen:
-    kind: Literal["main", "rename", "seat_edit"]
+    kind: Literal["main", "rename", "seat_edit", "bot_name"]
     seat_index: int | None = None
 
 
@@ -48,10 +48,10 @@ class CliState:
     flash_message: UiMessage | None = None
     revealed_trick: TrickRevealed | None = None
     session_error: str | None = None
+    exit_on_ack: bool = False
     should_exit: bool = False
 
 
-# Kompatibilitäts-Alias für ältere Tests/Hilfsfunktionen.
 LobbyStateMain = LobbyScreen
 LobbyStateRename = LobbyScreen
 LobbyStateSeatEdit = LobbyScreen

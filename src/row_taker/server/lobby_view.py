@@ -29,6 +29,7 @@ def build_lobby_view(
             display_name=participant.display_name,
             participant_kind=participant.kind.value,
             seat_index=participant_seat_map.get(participant.client_id),
+            endpoint=participant.endpoint_display,
         )
         for participant in registry.list_participants()
     ]
@@ -39,6 +40,7 @@ def build_lobby_view(
                 display_name=display_name,
                 participant_kind="bot",
                 seat_index=seat_index,
+                endpoint=None,
             )
         )
     seats = []
@@ -46,10 +48,12 @@ def build_lobby_view(
         occupant_client_id = seat.occupant_client_id
         occupant_display_name = None
         occupant_kind = None
+        occupant_endpoint = None
         if occupant_client_id is not None:
             participant = registry.get_participant(occupant_client_id)
             occupant_display_name = participant.display_name
             occupant_kind = participant.kind.value
+            occupant_endpoint = participant.endpoint_display
         elif seat.seat_index in pending_bot_display_names:
             occupant_client_id = f"pending-bot-seat-{seat.seat_index}"
             occupant_display_name = pending_bot_display_names[seat.seat_index]
@@ -60,6 +64,7 @@ def build_lobby_view(
                 occupant_client_id=occupant_client_id,
                 occupant_display_name=occupant_display_name,
                 occupant_kind=occupant_kind,
+                occupant_endpoint=occupant_endpoint,
             )
         )
     return LobbyView(

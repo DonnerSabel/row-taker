@@ -26,6 +26,7 @@ from row_taker.protocol.messages import (
     JoinLobby,
     LobbyActionRejected,
     RequestStartGame,
+    ServerError,
     ServerToClientMessage,
     SetDisplayName,
     SubmitCard,
@@ -76,27 +77,35 @@ class LocalServer:
     _pending_bot_starts: dict[str, PendingBotStart] = field(default_factory=dict)
     _running_bot_processes_by_client_id: dict[str, BotProcessHandle] = field(default_factory=dict)
     _start_in_progress: bool = False
+    _connection_endpoints: dict[str, str | None] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.lobby_state = LobbyState(seat_count=self.seat_count)
 
-    def register_connection(self, client_id: str) -> None:
-        pass
+    def register_connection(self, client_id: str, endpoint_display: str | None = None) -> None:
+        self._connection_endpoints[client_id] = endpoint_display
 
     def disconnect_client(self, client_id: str) -> None:
-        if self.registry.has(client_id):
-            kind = self.registry.get_participant(client_id).kind
-            if self.active_match is None:
-                self._remove_participant(client_id)
-                if self._start_in_progress and kind == ParticipantKind.BOT:
-                    self._abort_startup()
-                self._broadcast_lobby_state()
-            elif kind == ParticipantKind.HUMAN:
-                self.client_to_player_id.pop(client_id, None)
-                self.registry.remove_participant(client_id)
-            else:
-                self._close_running_bot(client_id)
-                self.registry.remove_participant(client_id)
+        endpoint = self._connection_endpoints.pop(client_id, None)
+        if not self.registry.has(client_id):
+            return
+        kind = self.registry.get_participant(client_id).kind
+        if self.active_match is None:
+            self._remove_participant(client_id)
+            if self._start_in_progress and kind == ParticipantKind.BOT:
+                self._abort_startup()
+            self._broadcast_lobby_state()
+            return
+        if kind == ParticipantKind.HUMAN:
+            name = self.registry.get_participant(client_id).display_name
+            self._abort_active_match(
+                f"Spielabbruch: {name} ({endpoint or 'unbekannte Verbindung'}) hat die Verbindung beendet.",
+                disconnecting_client_id=client_id,
+            )
+            return
+        self._close_running_bot(client_id)
+        self.registry.remove_participant(client_id)
+        self._abort_active_match("Spielabbruch: Ein Bot wurde getrennt.", disconnecting_client_id=client_id)
 
     def handle_client_message(
         self,
@@ -169,12 +178,15 @@ class LocalServer:
             pending = self._pending_bot_starts.get(requested_client_id)
             if pending is None:
                 raise ValueError("unexpected requested client id")
+            endpoint_display = self._connection_endpoints.pop(client_id, None)
+            self._connection_endpoints[requested_client_id] = endpoint_display
             self.registry.register_participant(
                 Participant(
                     client_id=requested_client_id,
                     display_name=pending.display_name,
                     kind=ParticipantKind.BOT,
                     location=ParticipantLocation.LOCAL,
+                    endpoint_display=endpoint_display,
                 )
             )
             self.lobby_state = assign_client_to_seat(
@@ -195,6 +207,7 @@ class LocalServer:
                 display_name=message.display_name.strip(),
                 kind=ParticipantKind.HUMAN,
                 location=ParticipantLocation.REMOTE,
+                endpoint_display=self._connection_endpoints.get(client_id),
             )
         )
         self._broadcast_lobby_state()
@@ -335,6 +348,33 @@ class LocalServer:
             pending.handle.close()
         self._pending_bot_starts.clear()
         self._start_in_progress = False
+
+    def _abort_active_match(self, reason: str, disconnecting_client_id: str | None = None) -> None:
+        remaining_client_ids = [
+            client_id for client_id in self.registry.records if client_id != disconnecting_client_id
+        ]
+        for client_id in remaining_client_ids:
+            self.outbox.append(OutgoingEnvelope(ServerError(message=reason), target_client_id=client_id))
+
+        bot_client_ids = [
+            client_id
+            for client_id, entry in self.registry.records.items()
+            if entry.participant.kind == ParticipantKind.BOT
+        ]
+        for bot_client_id in bot_client_ids:
+            self._remove_participant(bot_client_id)
+            self._connection_endpoints.pop(bot_client_id, None)
+        if disconnecting_client_id is not None:
+            self._remove_participant(disconnecting_client_id)
+
+        self.active_match = None
+        self.player_to_client_id.clear()
+        self.client_to_player_id.clear()
+        self.lobby_state = LobbyState(
+            seat_count=self.lobby_state.seat_count,
+            seats=self.lobby_state.seats,
+            game_started=False,
+        )
 
     def _broadcast_lobby_state(self) -> None:
         self.outbox.append(

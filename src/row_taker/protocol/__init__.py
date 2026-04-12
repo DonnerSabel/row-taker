@@ -19,6 +19,7 @@ from row_taker.protocol.messages import (
     LobbySeatView,
     LobbyStateUpdated,
     LobbyView,
+    PlayedCardView,
     RequestStartGame,
     ServerError,
     ServerToClientMessage,
@@ -27,6 +28,7 @@ from row_taker.protocol.messages import (
     SubmitCard,
     SubmitRowChoice,
     TrickResolved,
+    TrickRevealed,
 )
 
 __all__ = [
@@ -44,6 +46,7 @@ __all__ = [
     "LobbySeatView",
     "LobbyStateUpdated",
     "LobbyView",
+    "PlayedCardView",
     "RequestStartGame",
     "ServerError",
     "ServerToClientMessage",
@@ -52,6 +55,7 @@ __all__ = [
     "SubmitCard",
     "SubmitRowChoice",
     "TrickResolved",
+    "TrickRevealed",
     "client_message_from_dict",
     "client_message_to_dict",
     "server_message_from_dict",

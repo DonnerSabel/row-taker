@@ -20,3 +20,4 @@ class Participant:
     display_name: str
     kind: ParticipantKind
     location: ParticipantLocation
+    endpoint_display: str | None = None

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from row_taker.cli.console import CliConsole
+from row_taker.cli.console import CliConsole, InputAborted
 from row_taker.cli.render import build_view, render_public_state
 from row_taker.cli.state_machine import reduce_server_message, reduce_user_input
 from row_taker.cli.state_models import CliState, initial_cli_state
@@ -32,13 +32,12 @@ class ClientSession:
         )
         input_task: asyncio.Task[str] | None = None
         input_prompt: str | None = None
+        abort_requested = False
 
         try:
             await self._refresh_screen(console, state)
-
-            while not state.should_exit:
+            while not state.should_exit and not abort_requested:
                 current_prompt = build_view(state).prompt if self.interactive else None
-
                 if current_prompt is None:
                     if input_task is not None:
                         input_task.cancel()
@@ -68,21 +67,30 @@ class ClientSession:
                     try:
                         message = server_task.result()
                     except ConnectionClosed:
+                        if not state.should_exit and state.session_error is None:
+                            state = replace(
+                                state,
+                                session_error="Die Verbindung zum Server wurde beendet.",
+                                exit_on_ack=True,
+                            )
+                            await self._refresh_screen(console, state)
+                            server_task = None
+                            continue
                         break
-
                     state = reduce_server_message(state, message)
                     self.own_client_id = state.own_client_id
                     await self._refresh_screen(console, state)
-
                     if state.should_exit:
                         break
-
                     server_task = asyncio.create_task(asyncio.to_thread(self.transport.receive))
 
                 if input_task is not None and input_task in done:
                     try:
                         line = input_task.result()
                     except asyncio.CancelledError:
+                        line = None
+                    except InputAborted:
+                        abort_requested = True
                         line = None
 
                     input_task = None
@@ -100,11 +108,11 @@ class ClientSession:
         finally:
             if server_task is not None:
                 server_task.cancel()
-                with suppress(asyncio.CancelledError):
+                with suppress(asyncio.CancelledError, KeyboardInterrupt):
                     await server_task
             if input_task is not None:
                 input_task.cancel()
-                with suppress(asyncio.CancelledError):
+                with suppress(asyncio.CancelledError, InputAborted, KeyboardInterrupt):
                     await input_task
             await console.close()
             self.transport.close()
@@ -113,7 +121,6 @@ class ClientSession:
         view = build_view(state)
         prompt = view.prompt if self.interactive else None
         await console.render(view.body, prompt)
-
 
 
 def print_final_result(public_state: PublicState | None) -> None:

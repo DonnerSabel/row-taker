@@ -34,12 +34,12 @@ class NetworkServer:
     _lock: threading.RLock = field(default_factory=threading.RLock)
     _client_counter: int = 0
 
-    def add_connection(self, transport: ServerTransport) -> str:
+    def add_connection(self, transport: ServerTransport, endpoint_display: str | None = None) -> str:
         with self._lock:
             client_id = f"client-{self._client_counter}"
             self._client_counter += 1
             self._connections[client_id] = _Connection(client_id=client_id, transport=transport)
-            self.server.register_connection(client_id)
+            self.server.register_connection(client_id, endpoint_display=endpoint_display)
             return client_id
 
     def remove_connection(self, client_id: str) -> None:
@@ -83,9 +83,15 @@ class NetworkServer:
                     connection.send(envelope)
 
 
-def _serve_connection(conn: socket.socket, network_server: NetworkServer) -> None:
+def _format_endpoint(addr: object) -> str | None:
+    if isinstance(addr, tuple) and len(addr) >= 2:
+        return f"{addr[0]}:{addr[1]}"
+    return None if addr is None else str(addr)
+
+
+def _serve_connection(conn: socket.socket, network_server: NetworkServer, endpoint_display: str | None) -> None:
     transport = ServerTransport.from_socket(conn)
-    client_id = network_server.add_connection(transport)
+    client_id = network_server.add_connection(transport, endpoint_display=endpoint_display)
     try:
         while True:
             try:
@@ -112,9 +118,11 @@ def run_network_server(
         local_server = LocalServer(rng=rng, seat_count=seat_count, server_handle=server_handle)
         network_server = NetworkServer(server=local_server)
         while True:
-            conn, _addr = listener.accept()
+            conn, addr = listener.accept()
             thread = threading.Thread(
-                target=_serve_connection, args=(conn, network_server), daemon=True
+                target=_serve_connection,
+                args=(conn, network_server, _format_endpoint(addr)),
+                daemon=True,
             )
             thread.start()
 
@@ -148,9 +156,11 @@ def start_background_network_server(
                 )
             )
             while True:
-                conn, _addr = listener.accept()
+                conn, addr = listener.accept()
                 thread = threading.Thread(
-                    target=_serve_connection, args=(conn, network_server), daemon=True
+                    target=_serve_connection,
+                    args=(conn, network_server, _format_endpoint(addr)),
+                    daemon=True,
                 )
                 thread.start()
 

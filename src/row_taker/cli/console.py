@@ -7,6 +7,10 @@ from prompt_toolkit.application import run_in_terminal
 from prompt_toolkit.shortcuts import PromptSession
 
 
+class InputAborted(Exception):
+    pass
+
+
 class CliConsole:
     def __init__(self) -> None:
         self._session = PromptSession()
@@ -29,7 +33,10 @@ class CliConsole:
             raise RuntimeError("read_line() called without active prompt")
         self._input_active = True
         try:
-            return await self._session.prompt_async(self._prompt)
+            try:
+                return await self._session.prompt_async(self._prompt)
+            except KeyboardInterrupt as exc:
+                raise InputAborted() from exc
         finally:
             self._input_active = False
 

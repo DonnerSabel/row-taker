@@ -12,6 +12,7 @@ class LobbyParticipantView:
     display_name: str
     participant_kind: str
     seat_index: int | None
+    endpoint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +21,7 @@ class LobbySeatView:
     occupant_client_id: str | None
     occupant_display_name: str | None
     occupant_kind: str | None
+    occupant_endpoint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
