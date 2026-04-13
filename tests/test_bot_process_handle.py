@@ -80,4 +80,4 @@ def test_bot_process_joins_and_responds_over_tcp() -> None:
     assert results
     assert results[0] == JoinLobby(display_name="Bot_Bob", requested_client_id="bot-1")
     assert isinstance(results[1], SubmitCard)
-    assert results[1].player_id == PlayerID("player-0")
+    assert results[1].card_value in {11, 17}

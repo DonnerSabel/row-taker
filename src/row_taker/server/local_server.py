@@ -328,9 +328,7 @@ class LocalServer:
         expected_player_id = self.client_to_player_id.get(client_id)
         if expected_player_id is None:
             raise ValueError("client is not assigned to a player")
-        if message.player_id != expected_player_id:
-            raise ValueError("client may only act for its assigned player")
-        self.active_match.handle_client_message(message)
+        self.active_match.handle_client_message(expected_player_id, message)
         self._drive_match_until_idle()
 
     def _drive_match_until_idle(self) -> None:

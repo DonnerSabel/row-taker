@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 from row_taker.engine.game.models import PlayerID, RowID
-from row_taker.engine.game.state_mappers import (
-    delta_public_state_from_dict,
-    delta_public_state_to_dict,
-    player_state_from_dict,
-    player_state_to_dict,
-    public_state_from_dict,
-    public_state_to_dict,
-)
+from row_taker.engine.game.state_mappers import player_state_from_dict, player_state_to_dict, public_state_from_dict, public_state_to_dict
 from row_taker.protocol.messages import (
     AssignSeatToClient,
+    CardsRevealed,
     ChooseCardRequested,
     ChooseRowRequested,
     ClearSeat,
@@ -27,6 +21,7 @@ from row_taker.protocol.messages import (
     LobbyView,
     PlayedCardView,
     RequestStartGame,
+    RowChoiceCommitted,
     ServerError,
     ServerToClientMessage,
     SessionEnded,
@@ -35,8 +30,6 @@ from row_taker.protocol.messages import (
     StateUpdated,
     SubmitCard,
     SubmitRowChoice,
-    TrickResolved,
-    TrickRevealed,
 )
 
 
@@ -143,9 +136,9 @@ def client_message_to_dict(message: ClientToServerMessage) -> dict[str, object]:
     if isinstance(message, LeaveSession):
         return {"type": "leave_session"}
     if isinstance(message, SubmitCard):
-        return {"type": "submit_card", "player_id": str(message.player_id), "card_value": message.card_value}
+        return {"type": "submit_card", "card_value": message.card_value}
     if isinstance(message, SubmitRowChoice):
-        return {"type": "submit_row_choice", "player_id": str(message.player_id), "row_id": str(message.row_id)}
+        return {"type": "submit_row_choice", "row_id": str(message.row_id)}
     raise TypeError(f"unsupported client message type: {type(message)!r}")
 
 
@@ -168,10 +161,10 @@ def client_message_from_dict(data: dict[str, object]) -> ClientToServerMessage:
     if message_type == "leave_session":
         return LeaveSession()
     if message_type == "submit_card":
-        return SubmitCard(player_id=PlayerID(str(data["player_id"])), card_value=int(data["card_value"]))
+        return SubmitCard(card_value=int(data["card_value"]))
     if message_type == "submit_row_choice":
-        return SubmitRowChoice(player_id=PlayerID(str(data["player_id"])), row_id=RowID(str(data["row_id"])))
-    raise ValueError(f"unsupported client message type: {message_type!r}")
+        return SubmitRowChoice(row_id=RowID(str(data["row_id"])))
+    raise TypeError(f"unsupported client message type: {message_type!r}")
 
 
 def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
@@ -185,25 +178,14 @@ def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
         return {"type": "game_starting", "lobby": _lobby_view_to_dict(message.lobby)}
     if isinstance(message, StateUpdated):
         return {"type": "state_updated", "state": public_state_to_dict(message.state)}
-    if isinstance(message, TrickRevealed):
-        return {
-            "type": "trick_revealed",
-            "state": public_state_to_dict(message.state),
-            "played_cards": [_played_card_to_dict(card) for card in message.played_cards],
-            "active_player_id": None if message.active_player_id is None else str(message.active_player_id),
-            "pending_card_value": message.pending_card_value,
-        }
+    if isinstance(message, CardsRevealed):
+        return {"type": "cards_revealed", "played_cards": [_played_card_to_dict(card) for card in message.played_cards]}
+    if isinstance(message, RowChoiceCommitted):
+        return {"type": "row_choice_committed", "row_id": str(message.row_id)}
     if isinstance(message, ChooseCardRequested):
         return {"type": "choose_card_requested", "player_id": str(message.player_id), "state": player_state_to_dict(message.state)}
     if isinstance(message, ChooseRowRequested):
         return {"type": "choose_row_requested", "player_id": str(message.player_id), "state": player_state_to_dict(message.state)}
-    if isinstance(message, TrickResolved):
-        return {
-            "type": "trick_resolved",
-            "deltas": [delta_public_state_to_dict(delta) for delta in message.deltas],
-            "new_round_started": message.new_round_started,
-            "game_finished": message.game_finished,
-        }
     if isinstance(message, SessionEnded):
         return {
             "type": "session_ended",
@@ -229,24 +211,14 @@ def server_message_from_dict(data: dict[str, object]) -> ServerToClientMessage:
         return GameStarting(lobby=_lobby_view_from_dict(data["lobby"]))
     if message_type == "state_updated":
         return StateUpdated(state=public_state_from_dict(data["state"]))
-    if message_type == "trick_revealed":
-        active_player_id = data.get("active_player_id")
-        return TrickRevealed(
-            state=public_state_from_dict(data["state"]),
-            played_cards=tuple(_played_card_from_dict(card) for card in data["played_cards"]),
-            active_player_id=None if active_player_id is None else PlayerID(str(active_player_id)),
-            pending_card_value=None if data.get("pending_card_value") is None else int(data["pending_card_value"]),
-        )
+    if message_type == "cards_revealed":
+        return CardsRevealed(played_cards=tuple(_played_card_from_dict(card) for card in data["played_cards"]))
+    if message_type == "row_choice_committed":
+        return RowChoiceCommitted(row_id=RowID(str(data["row_id"])))
     if message_type == "choose_card_requested":
         return ChooseCardRequested(player_id=PlayerID(str(data["player_id"])), state=player_state_from_dict(data["state"]))
     if message_type == "choose_row_requested":
         return ChooseRowRequested(player_id=PlayerID(str(data["player_id"])), state=player_state_from_dict(data["state"]))
-    if message_type == "trick_resolved":
-        return TrickResolved(
-            deltas=tuple(delta_public_state_from_dict(delta) for delta in data["deltas"]),
-            new_round_started=bool(data["new_round_started"]),
-            game_finished=bool(data["game_finished"]),
-        )
     if message_type == "session_ended":
         client_id = data.get("client_id")
         display_name = data.get("display_name")
@@ -258,4 +230,4 @@ def server_message_from_dict(data: dict[str, object]) -> ServerToClientMessage:
         )
     if message_type == "server_error":
         return ServerError(message=str(data["message"]))
-    raise ValueError(f"unsupported server message type: {message_type!r}")
+    raise TypeError(f"unsupported server message type: {message_type!r}")

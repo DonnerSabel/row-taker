@@ -3,16 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from row_taker.cli.row_display import build_row_display_mapping
-from row_taker.cli.state_models import (
-    CliState,
-    GameScreen,
-    LobbyScreen,
-    TrickResolvedModal,
-    UiMessage,
-)
+from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, UiMessage
 from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
 from row_taker.protocol.messages import (
     AssignSeatToClient,
+    CardsRevealed,
     ChooseCardRequested,
     ChooseRowRequested,
     ClearSeat,
@@ -24,6 +19,7 @@ from row_taker.protocol.messages import (
     LobbyActionRejected,
     LobbyStateUpdated,
     RequestStartGame,
+    RowChoiceCommitted,
     ServerError,
     ServerToClientMessage,
     SessionEnded,
@@ -31,8 +27,6 @@ from row_taker.protocol.messages import (
     StateUpdated,
     SubmitCard,
     SubmitRowChoice,
-    TrickResolved,
-    TrickRevealed,
 )
 
 
@@ -56,19 +50,18 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 lobby_view=lobby,
                 public_state=None,
                 screen=GameScreen(kind="waiting"),
-                modal=None,
                 flash_message=UiMessage(level="info", text="Spielstart..."),
                 revealed_trick=None,
             )
         case StateUpdated(state=public_state):
-            return replace(state, public_state=public_state)
-        case TrickRevealed() as revealed:
-            return replace(
-                state,
-                public_state=revealed.state,
-                revealed_trick=revealed,
-                flash_message=None,
-            )
+            next_screen = state.screen
+            if isinstance(next_screen, GameScreen) and next_screen.kind == "choose_row":
+                next_screen = GameScreen(kind="waiting")
+            return replace(state, public_state=public_state, screen=next_screen, revealed_trick=None)
+        case CardsRevealed() as revealed:
+            return replace(state, revealed_trick=revealed, flash_message=None)
+        case RowChoiceCommitted():
+            return replace(state, screen=GameScreen(kind="waiting"), flash_message=None)
         case ChooseCardRequested(player_id=player_id, state=player_state):
             return replace(
                 state,
@@ -84,22 +77,6 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 screen=GameScreen(kind="choose_row", player_state=player_state),
                 flash_message=None,
             )
-        case TrickResolved() as resolved:
-            next_screen = state.screen
-            if isinstance(next_screen, GameScreen) and next_screen.kind == "choose_row":
-                next_screen = GameScreen(kind="waiting")
-            if resolved.game_finished:
-                next_screen = GameScreen(kind="ended")
-            return replace(
-                state,
-                screen=next_screen,
-                modal=TrickResolvedModal(
-                    public_state_before=state.public_state,
-                    resolved=resolved,
-                ),
-                flash_message=None,
-                revealed_trick=None,
-            )
         case SessionEnded(message=text):
             return replace(
                 state,
@@ -108,7 +85,6 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 suppress_final_result=True,
                 should_exit=True,
                 flash_message=None,
-                modal=None,
             )
         case ServerError(message=text):
             return replace(
@@ -117,7 +93,6 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 exit_on_ack=True,
                 suppress_final_result=True,
                 flash_message=None,
-                modal=None,
             )
         case _:
             raise TypeError(f"unsupported server message type: {type(message)!r}")
@@ -134,8 +109,6 @@ def reduce_user_input(state: CliState, text: str) -> UserInputResult:
 
     if state.session_error is not None:
         return _reduce_session_error_input(state, normalized)
-    if state.modal is not None:
-        return _reduce_modal_input(state, normalized)
 
     match state.screen:
         case LobbyScreen(kind="main"):
@@ -176,12 +149,6 @@ def _reduce_session_error_input(state: CliState, text: str) -> UserInputResult:
     if text != "":
         return UserInputResult(state=state)
     return UserInputResult(state=replace(state, should_exit=True))
-
-
-def _reduce_modal_input(state: CliState, text: str) -> UserInputResult:
-    if text != "":
-        return UserInputResult(state=_with_flash(state, "info", "Bitte mit Enter fortfahren."))
-    return UserInputResult(state=replace(state, modal=None, flash_message=None))
 
 
 def _reduce_lobby_main_input(state: CliState, text: str) -> UserInputResult:
@@ -300,7 +267,7 @@ def _reduce_game_choose_card_input(state: CliState, text: str, player_state) -> 
         )
     return UserInputResult(
         state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
-        outbound_message=SubmitCard(player_id=player_state.self_player_id, card_value=card_value),
+        outbound_message=SubmitCard(card_value=card_value),
     )
 
 
@@ -333,7 +300,7 @@ def _reduce_game_choose_row_input(state: CliState, text: str, player_state) -> U
         )
     return UserInputResult(
         state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
-        outbound_message=SubmitRowChoice(player_id=player_state.self_player_id, row_id=row_id),
+        outbound_message=SubmitRowChoice(row_id=row_id),
     )
 
 

@@ -2,21 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from row_taker.cli.row_display import build_row_display_mapping, format_public_deltas_for_cli
+from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.cli.state_models import (
     CliState,
     GameScreen,
     LobbyScreen,
-    TrickResolvedModal,
     UiMessage,
 )
-from row_taker.engine.game.public_state_ops import apply_deltas_public_state
 from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.protocol.messages import (
     LobbyParticipantView,
     LobbySeatView,
-    TrickResolved,
-    TrickRevealed,
+    CardsRevealed,
 )
 
 
@@ -32,8 +29,6 @@ def build_view(state: CliState) -> ScreenView:
     body = render_main_screen(state)
     if state.flash_message is not None:
         body = "\n\n".join([body, render_flash_message(state.flash_message)])
-    if state.modal is not None:
-        body = "\n\n".join([body, render_modal(state)])
     return ScreenView(body=body, prompt=determine_prompt(state))
 
 
@@ -48,8 +43,6 @@ def render_screen(state: CliState) -> str:
 def determine_prompt(state: CliState) -> str | None:
     if state.session_error is not None:
         return "Weiter mit Enter > " if state.exit_on_ack else None
-    if state.modal is not None:
-        return "Weiter mit Enter > "
     match state.screen:
         case LobbyScreen(kind="main"):
             return "Auswahl > "
@@ -99,18 +92,6 @@ def render_flash_message(message: UiMessage) -> str:
     title = "Fehler" if message.level == "error" else "Hinweis"
     return "\n".join([f"{title}: {message.text}"])
 
-
-def render_modal(state: CliState) -> str:
-    modal = state.modal
-    if not isinstance(modal, TrickResolvedModal):
-        raise TypeError(f"unsupported modal: {modal!r}")
-    lines = [
-        "Stich aufgelöst",
-        "---------------",
-        "",
-        render_trick_resolved_summary(modal.public_state_before, modal.resolved),
-    ]
-    return "\n".join(lines)
 
 
 def render_lobby_main(state: CliState) -> str:
@@ -330,22 +311,13 @@ def render_game_overview(state: CliState) -> str:
     return "\n".join(lines)
 
 
-def render_revealed_trick(revealed: TrickRevealed | None, *, own_player_id) -> str | None:
+def render_revealed_trick(revealed: CardsRevealed | None, *, own_player_id) -> str | None:
     if revealed is None:
         return None
     lines = ["Gespielte Karten:"]
     for card in revealed.played_cards:
         marker = " <- du" if card.player_id == own_player_id else ""
         lines.append(f"  {card.card_value:>3}  {card.player_name}{marker}")
-    if revealed.active_player_id is not None:
-        chooser_name = next(
-            (card.player_name for card in revealed.played_cards if card.player_id == revealed.active_player_id),
-            str(revealed.active_player_id),
-        )
-        if revealed.pending_card_value is None:
-            lines.append(f"{chooser_name} muss eine Reihe wählen.")
-        else:
-            lines.append(f"{chooser_name} muss für Karte {revealed.pending_card_value} eine Reihe wählen.")
     return "\n".join(lines)
 
 
@@ -357,42 +329,8 @@ def render_own_hand(player_state: PlayerState) -> str:
     ])
 
 
-def render_trick_resolved_summary(public_state_before: PublicState | None, resolved: TrickResolved) -> str:
-    lines: list[str] = []
-    if public_state_before is not None:
-        lines.extend(format_public_deltas_for_cli(public_state_before, resolved.deltas))
-    else:
-        lines.append("Die Stichauflösung ist abgeschlossen.")
-    if resolved.new_round_started:
-        lines.extend(["", "== Neue Runde wurde ausgeteilt. =="])
-    if resolved.game_finished:
-        lines.extend(["", "== Das Spiel ist beendet. =="])
-    return "\n".join(lines)
 
 
-def render_public_state(state: PublicState) -> None:
-    cli_state = CliState(public_state=state, screen=GameScreen(kind="waiting"))
-    print(render_game_overview(cli_state))
-
-
-def render_handcards(state: PlayerState) -> None:
-    print(render_own_hand(state))
-
-
-def render_player_state(state: PlayerState) -> None:
-    cli_state = CliState(
-        own_player_id=state.self_player_id,
-        public_state=state.public_state,
-        screen=GameScreen(kind="choose_card", player_state=state),
-    )
-    print(render_game_choose_card(cli_state))
-
-
-def render_trick_resolution(public_state_before: PublicState, message: TrickResolved) -> None:
-    public_state_after = apply_deltas_public_state(public_state_before, message.deltas)
-    cli_state = CliState(
-        public_state=public_state_after,
-        modal=TrickResolvedModal(public_state_before=public_state_before, resolved=message),
-        screen=GameScreen(kind="waiting"),
-    )
-    print(render_modal(cli_state))
+def render_public_state(public_state: PublicState) -> None:
+    state = CliState(public_state=public_state, screen=GameScreen(kind="waiting"))
+    print(render_game_overview(state))

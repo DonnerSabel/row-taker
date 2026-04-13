@@ -26,19 +26,13 @@ class RandomBotClient:
             state.validate_hand_not_empty()
 
             card = self.rng.choice(playable_cards(state))
-            return SubmitCard(
-                player_id=state.self_player_id,
-                card_value=card.value,
-            )
+            return SubmitCard(card_value=card.value)
 
         if isinstance(message, ChooseRowRequested):
             state = message.state
             state.validate_phase(Phase.CHOOSE_ROW)
 
             row_id = self.rng.choice(list(selectable_row_ids(state)))
-            return SubmitRowChoice(
-                player_id=state.self_player_id,
-                row_id=row_id,
-            )
+            return SubmitRowChoice(row_id=row_id)
 
         return None

@@ -3,13 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from row_taker.engine.game.phases import StepAction
-from row_taker.engine.game.public_state_ops import (
-    apply_delta_public_state,
-    classify_public_delta,
-    played_card_from_delta,
-    score_delta_for_public_delta,
-)
-from row_taker.engine.game.state import DeltaPublicState, PublicState
+from row_taker.engine.game.public_state_ops import apply_resolution_step
+from row_taker.engine.game.state import PublicState, TrickResolutionStep
 
 
 @dataclass(slots=True, frozen=True)
@@ -46,38 +41,33 @@ def build_row_display_mapping(state: PublicState) -> RowDisplayMapping:
     )
 
 
-def format_public_deltas_for_cli(
-    before_state: PublicState, deltas: list[DeltaPublicState] | tuple[DeltaPublicState, ...]
+def format_resolution_steps_for_cli(
+    before_state: PublicState, steps: list[TrickResolutionStep] | tuple[TrickResolutionStep, ...]
 ) -> list[str]:
     shadow_state = before_state
     lines: list[str] = []
 
-    for delta in deltas:
-        row_index = shadow_state.get_row_index(delta.affected_row_id)
+    for step in steps:
+        row_index = shadow_state.get_row_index(step.affected_row_id)
         mapping = build_row_display_mapping(shadow_state)
         cli_row = mapping.to_cli_row(row_index)
-        player = next(
-            player for player in shadow_state.players if player.player_id == delta.player_id
-        )
-        transition_kind = classify_public_delta(shadow_state, delta)
-        bullheads = score_delta_for_public_delta(shadow_state, delta)
-        played_card = played_card_from_delta(delta)
+        player = next(player for player in shadow_state.players if player.player_id == step.player_id)
 
-        if transition_kind == StepAction.PLACED:
-            lines.append(f"- {player.name} legt {played_card.value} an Reihe {cli_row}.")
-        elif transition_kind == StepAction.TOOK_ROW_SMALL:
+        if step.action == StepAction.PLACED:
+            lines.append(f"- {player.name} legt {step.played_card.value} an Reihe {cli_row}.")
+        elif step.action == StepAction.TOOK_ROW_SMALL:
             lines.append(
-                f"- {player.name} nimmt Reihe {cli_row} ({bullheads} Hornochsen) "
-                f"und startet mit {played_card.value}."
+                f"- {player.name} nimmt Reihe {cli_row} ({step.points_gained} Hornochsen) "
+                f"und startet mit {step.played_card.value}."
             )
-        elif transition_kind == StepAction.TOOK_ROW_OVERFLOW:
+        elif step.action == StepAction.TOOK_ROW_OVERFLOW:
             lines.append(
-                f"- {player.name} füllt Reihe {cli_row} (nimmt {bullheads} Hornochsen) "
-                f"und startet mit {played_card.value}."
+                f"- {player.name} füllt Reihe {cli_row} (nimmt {step.points_gained} Hornochsen) "
+                f"und startet mit {step.played_card.value}."
             )
         else:
-            raise ValueError(f"Unbekannte Delta-Klassifikation: {transition_kind}")
+            raise ValueError(f"Unbekannte Schritt-Klassifikation: {step.action}")
 
-        shadow_state = apply_delta_public_state(shadow_state, delta)
+        shadow_state = apply_resolution_step(shadow_state, step)
 
     return lines

@@ -2,11 +2,12 @@ from .cards import Card, Deck
 from .logic import (
     all_cards_selected,
     begin_trick_resolution,
+    current_revealed_plays,
     finish_trick,
     has_pending_resolution_step,
     has_pending_row_choice,
     make_deck,
-    resolve_next_delta_public_state,
+    resolve_next_trick_step,
     setup_game,
     submit_choose_row,
     submit_play_card,
@@ -14,15 +15,19 @@ from .logic import (
 )
 from .models import Player, PlayerID, PublicPlayerInfo, Row, RowID
 from .phases import Phase, PhaseInfo, StepAction
-from .public_state_ops import (
-    apply_delta_public_state,
-    apply_deltas_public_state,
-    classify_public_delta,
-    played_card_from_delta,
-    score_delta_for_public_delta,
-)
+from .public_state_ops import apply_resolution_step, apply_resolution_steps, played_card_from_step
 from .scoring import bullheads
-from .state import DeltaPublicState, GameState, PlayerState, PublicState, RulesConfig
+from .state import (
+    GameState,
+    PlayerState,
+    PublicState,
+    RevealedPlay,
+    RowChoiceRequired,
+    RulesConfig,
+    TrickResolutionCursor,
+    TrickResolutionStep,
+    TrickResolutionSummary,
+)
 from .views import build_player_state, build_public_state
 
 __all__ = [
@@ -36,26 +41,29 @@ __all__ = [
     "Phase",
     "PhaseInfo",
     "StepAction",
-    "DeltaPublicState",
     "GameState",
     "PlayerState",
     "PublicState",
+    "RevealedPlay",
+    "RowChoiceRequired",
     "RulesConfig",
+    "TrickResolutionCursor",
+    "TrickResolutionStep",
+    "TrickResolutionSummary",
     "all_cards_selected",
-    "apply_delta_public_state",
-    "apply_deltas_public_state",
+    "apply_resolution_step",
+    "apply_resolution_steps",
     "begin_trick_resolution",
     "build_player_state",
     "build_public_state",
     "bullheads",
-    "classify_public_delta",
+    "current_revealed_plays",
     "finish_trick",
     "has_pending_resolution_step",
     "has_pending_row_choice",
     "make_deck",
-    "played_card_from_delta",
-    "resolve_next_delta_public_state",
-    "score_delta_for_public_delta",
+    "played_card_from_step",
+    "resolve_next_trick_step",
     "setup_game",
     "submit_choose_row",
     "submit_play_card",

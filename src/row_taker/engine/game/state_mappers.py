@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import PlayerID, PublicPlayerInfo, Row, RowID
-from row_taker.engine.game.phases import Phase, PhaseInfo
-from row_taker.engine.game.state import DeltaPublicState, PlayerState, PublicState, RulesConfig
+from row_taker.engine.game.phases import Phase, PhaseInfo, StepAction
+from row_taker.engine.game.state import PlayerState, PublicState, RulesConfig, TrickResolutionStep
 
 
 def card_to_dict(card: Card) -> dict[str, int]:
@@ -67,12 +67,8 @@ def row_from_dict(data: dict[str, object]) -> Row:
 def phase_info_to_dict(phase_info: PhaseInfo) -> dict[str, object]:
     return {
         "phase": phase_info.phase.value,
-        "active_player_id": None
-        if phase_info.active_player_id is None
-        else str(phase_info.active_player_id),
-        "pending_card": None
-        if phase_info.pending_card is None
-        else card_to_dict(phase_info.pending_card),
+        "active_player_id": None if phase_info.active_player_id is None else str(phase_info.active_player_id),
+        "pending_card": None if phase_info.pending_card is None else card_to_dict(phase_info.pending_card),
         "selectable_row_ids": [str(row_id) for row_id in phase_info.selectable_row_ids],
         "message": phase_info.message,
     }
@@ -81,9 +77,7 @@ def phase_info_to_dict(phase_info: PhaseInfo) -> dict[str, object]:
 def phase_info_from_dict(data: dict[str, object]) -> PhaseInfo:
     return PhaseInfo(
         phase=Phase(str(data["phase"])),
-        active_player_id=None
-        if data["active_player_id"] is None
-        else PlayerID(str(data["active_player_id"])),
+        active_player_id=None if data["active_player_id"] is None else PlayerID(str(data["active_player_id"])),
         pending_card=None if data["pending_card"] is None else card_from_dict(data["pending_card"]),
         selectable_row_ids=tuple(RowID(str(row_id)) for row_id in data["selectable_row_ids"]),
         message=str(data["message"]),
@@ -128,17 +122,25 @@ def player_state_from_dict(data: dict[str, object]) -> PlayerState:
     )
 
 
-def delta_public_state_to_dict(delta: DeltaPublicState) -> dict[str, object]:
+def trick_resolution_step_to_dict(step: TrickResolutionStep) -> dict[str, object]:
     return {
-        "player_id": str(delta.player_id),
-        "affected_row_id": str(delta.affected_row_id),
-        "new_row_cards": [card_to_dict(card) for card in delta.new_row_cards],
+        "action": step.action.value,
+        "player_id": str(step.player_id),
+        "affected_row_id": str(step.affected_row_id),
+        "played_card": card_to_dict(step.played_card),
+        "taken_cards": [card_to_dict(card) for card in step.taken_cards],
+        "points_gained": step.points_gained,
+        "new_row_cards": [card_to_dict(card) for card in step.new_row_cards],
     }
 
 
-def delta_public_state_from_dict(data: dict[str, object]) -> DeltaPublicState:
-    return DeltaPublicState(
+def trick_resolution_step_from_dict(data: dict[str, object]) -> TrickResolutionStep:
+    return TrickResolutionStep(
+        action=StepAction(str(data["action"])),
         player_id=PlayerID(str(data["player_id"])),
         affected_row_id=RowID(str(data["affected_row_id"])),
+        played_card=card_from_dict(data["played_card"]),
+        taken_cards=tuple(card_from_dict(card) for card in data["taken_cards"]),
+        points_gained=int(data["points_gained"]),
         new_row_cards=tuple(card_from_dict(card) for card in data["new_row_cards"]),
     )

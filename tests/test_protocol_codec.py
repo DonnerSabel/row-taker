@@ -10,6 +10,7 @@ from row_taker.protocol.codec import (
 )
 from row_taker.protocol.messages import (
     AssignSeatToClient,
+    CardsRevealed,
     ClearSeat,
     CreateLocalBotOnSeat,
     GameStarting,
@@ -23,13 +24,14 @@ from row_taker.protocol.messages import (
     LobbyView,
     PlayedCardView,
     RequestStartGame,
+    RowChoiceCommitted,
     ServerError,
     SessionEnded,
     SessionEndReason,
     SetDisplayName,
+    StateUpdated,
     SubmitCard,
     SubmitRowChoice,
-    TrickRevealed,
 )
 
 
@@ -81,8 +83,8 @@ def test_client_messages_roundtrip() -> None:
         ClearSeat(seat_index=2),
         RequestStartGame(),
         LeaveSession(),
-        SubmitCard(player_id=PlayerID("player-0"), card_value=42),
-        SubmitRowChoice(player_id=PlayerID("player-1"), row_id=RowID("row-2")),
+        SubmitCard(card_value=42),
+        SubmitRowChoice(row_id=RowID("row-2")),
     ]:
         assert client_message_from_dict(client_message_to_dict(message)) == message
 
@@ -103,8 +105,8 @@ def test_server_messages_roundtrip() -> None:
                 game_started=True,
             )
         ),
-        TrickRevealed(
-            state=public_state,
+        StateUpdated(state=public_state),
+        CardsRevealed(
             played_cards=(
                 PlayedCardView(
                     player_id=PlayerID("player-0"),
@@ -112,9 +114,8 @@ def test_server_messages_roundtrip() -> None:
                     card_value=17,
                 ),
             ),
-            active_player_id=PlayerID("player-0"),
-            pending_card_value=17,
         ),
+        RowChoiceCommitted(row_id=RowID("row-0")),
         SessionEnded(message="left", reason=SessionEndReason.QUIT, client_id="client-0", display_name="Alice"),
         ServerError(message="boom"),
     ]

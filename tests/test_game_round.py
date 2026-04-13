@@ -3,19 +3,14 @@ from row_taker.engine.game import (
     begin_trick_resolution,
     has_pending_resolution_step,
     has_pending_row_choice,
-    resolve_next_delta_public_state,
+    resolve_next_trick_step,
     submit_choose_row,
     submit_play_card,
 )
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import Player, PlayerID, Row, RowID
 from row_taker.engine.game.phases import Phase, PhaseInfo, StepAction
-from row_taker.engine.game.public_state_ops import (
-    apply_delta_public_state,
-    classify_public_delta,
-    played_card_from_delta,
-    score_delta_for_public_delta,
-)
+from row_taker.engine.game.public_state_ops import apply_resolution_step
 from row_taker.engine.game.state import GameState, RulesConfig
 
 
@@ -47,7 +42,7 @@ def _make_state(*, p0_hand: list[int], p1_hand: list[int], rows: list[list[int]]
     )
 
 
-def test_resolution_produces_public_deltas_in_ascending_order() -> None:
+def test_resolution_produces_steps_in_ascending_order() -> None:
     state = _make_state(
         p0_hand=[42],
         p1_hand=[35],
@@ -61,15 +56,15 @@ def test_resolution_produces_public_deltas_in_ascending_order() -> None:
     begin_trick_resolution(state)
     assert has_pending_resolution_step(state) is True
 
-    first = resolve_next_delta_public_state(state)
-    second = resolve_next_delta_public_state(state)
+    first = resolve_next_trick_step(state)
+    second = resolve_next_trick_step(state)
 
     assert first is not None
     assert second is not None
-    assert [played_card_from_delta(delta).value for delta in [first, second]] == [35, 42]
+    assert [first.played_card.value, second.played_card.value] == [35, 42]
 
 
-def test_choose_row_delta_can_be_applied_to_public_state() -> None:
+def test_choose_row_step_can_be_applied_to_public_state() -> None:
     state = _make_state(
         p0_hand=[1],
         p1_hand=[90],
@@ -83,14 +78,14 @@ def test_choose_row_delta_can_be_applied_to_public_state() -> None:
     ).build_public_state(state)
 
     begin_trick_resolution(state)
-    delta = resolve_next_delta_public_state(state)
-    assert delta is None
+    prompt = resolve_next_trick_step(state)
+    assert prompt is not None
     assert has_pending_row_choice(state) is True
 
-    choose_delta = submit_choose_row(state, PlayerID("player-0"), RowID("row-1"))
-    updated = apply_delta_public_state(public_before, choose_delta)
+    choose_step = submit_choose_row(state, PlayerID("player-0"), RowID("row-1"))
+    updated = apply_resolution_step(public_before, choose_step)
 
-    assert classify_public_delta(public_before, choose_delta) == StepAction.TOOK_ROW_SMALL
-    assert score_delta_for_public_delta(public_before, choose_delta) == Card(20).bullheads
+    assert choose_step.action == StepAction.TOOK_ROW_SMALL
+    assert choose_step.points_gained == Card(20).bullheads
     assert [card.value for card in updated.rows[1].cards] == [1]
     assert updated.players[0].score == Card(20).bullheads

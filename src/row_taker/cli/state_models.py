@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from row_taker.engine.game.state import PlayerState, PublicState
-from row_taker.protocol.messages import LobbyView, TrickResolved, TrickRevealed
+from row_taker.protocol.messages import CardsRevealed, LobbyView
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,24 +29,14 @@ Screen = LobbyScreen | GameScreen
 
 
 @dataclass(frozen=True, slots=True)
-class TrickResolvedModal:
-    public_state_before: PublicState | None
-    resolved: TrickResolved
-
-
-ModalDialog = TrickResolvedModal
-
-
-@dataclass(frozen=True, slots=True)
 class CliState:
     own_client_id: str | None = None
     own_player_id: str | None = None
     lobby_view: LobbyView | None = None
     public_state: PublicState | None = None
     screen: Screen = field(default_factory=lambda: LobbyScreen(kind="main"))
-    modal: ModalDialog | None = None
     flash_message: UiMessage | None = None
-    revealed_trick: TrickRevealed | None = None
+    revealed_trick: CardsRevealed | None = None
     session_error: str | None = None
     exit_on_ack: bool = False
     suppress_final_result: bool = False
@@ -60,7 +50,6 @@ GameStateWaiting = GameScreen
 GameStateChooseCard = GameScreen
 GameStateChooseRow = GameScreen
 GameStateEnded = GameScreen
-GameStateTrickResolved = TrickResolvedModal
 
 
 def initial_cli_state(own_client_id: str | None = None) -> CliState:

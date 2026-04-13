@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from .cards import Card
 from .models import Player, PlayerID, PublicPlayerInfo, Row, RowID
-from .phases import Phase, PhaseInfo
+from .phases import Phase, PhaseInfo, StepAction
 
 
 def get_player_index(players: Sequence[Player | PublicPlayerInfo], player_id: PlayerID) -> int:
@@ -36,23 +36,38 @@ class RulesConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class DeltaPublicState:
+class RevealedPlay:
+    player_id: PlayerID
+    card: Card
+
+
+@dataclass(frozen=True, slots=True)
+class RowChoiceRequired:
+    player_id: PlayerID
+    card: Card
+    selectable_row_ids: tuple[RowID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TrickResolutionStep:
+    action: StepAction
     player_id: PlayerID
     affected_row_id: RowID
+    played_card: Card
+    taken_cards: tuple[Card, ...]
+    points_gained: int
     new_row_cards: tuple[Card, ...]
 
-    def validate(self) -> None:
-        if not self.new_row_cards:
-            raise ValueError("delta public state must contain at least one row card")
 
-    def played_card(self) -> Card:
-        self.validate()
-        return self.new_row_cards[-1]
+@dataclass(slots=True)
+class TrickResolutionCursor:
+    remaining_player_ids: list[PlayerID] = field(default_factory=list)
+    steps: list[TrickResolutionStep] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
 class TrickResolutionSummary:
-    deltas: tuple[DeltaPublicState, ...]
+    steps: tuple[TrickResolutionStep, ...]
     new_round_started: bool
     game_finished: bool
 
@@ -70,8 +85,8 @@ class GameState:
     phase_info: PhaseInfo = field(default_factory=lambda: PhaseInfo(phase=Phase.ROUND_SETUP))
 
     selected_cards: dict[PlayerID, Card] = field(default_factory=dict)
-    resolve_order: list[PlayerID] = field(default_factory=list)
-    current_trick_deltas: list[DeltaPublicState] = field(default_factory=list)
+    current_trick_revealed_plays: tuple[RevealedPlay, ...] = ()
+    resolution_cursor: TrickResolutionCursor | None = None
 
     def validate_player_id(self, player_id: PlayerID) -> None:
         get_player_index(self.players, player_id)

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from row_taker.engine.game.models import PlayerID, RowID
-from row_taker.engine.game.state import DeltaPublicState, PlayerState, PublicState
+from row_taker.engine.game.state import PlayerState, PublicState
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,13 +74,11 @@ class LeaveSession:
 
 @dataclass(frozen=True, slots=True)
 class SubmitCard:
-    player_id: PlayerID
     card_value: int
 
 
 @dataclass(frozen=True, slots=True)
 class SubmitRowChoice:
-    player_id: PlayerID
     row_id: RowID
 
 
@@ -130,11 +128,13 @@ class PlayedCardView:
 
 
 @dataclass(frozen=True, slots=True)
-class TrickRevealed:
-    state: PublicState
+class CardsRevealed:
     played_cards: tuple[PlayedCardView, ...]
-    active_player_id: PlayerID | None = None
-    pending_card_value: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RowChoiceCommitted:
+    row_id: RowID
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,15 +147,6 @@ class ChooseCardRequested:
 class ChooseRowRequested:
     player_id: PlayerID
     state: PlayerState
-
-
-@dataclass(frozen=True, slots=True)
-class TrickResolved:
-    deltas: tuple[DeltaPublicState, ...]
-    new_round_started: bool
-    game_finished: bool
-
-
 
 
 class SessionEndReason(StrEnum):
@@ -183,13 +174,13 @@ ServerToClientMessage = (
     | LobbyActionRejected
     | GameStarting
     | StateUpdated
-    | TrickRevealed
+    | CardsRevealed
+    | RowChoiceCommitted
     | ChooseCardRequested
     | ChooseRowRequested
-    | TrickResolved
     | SessionEnded
     | ServerError
 )
 
 GameClientMessage = SubmitCard | SubmitRowChoice
-GameServerMessage = StateUpdated | TrickRevealed | ChooseCardRequested | ChooseRowRequested | TrickResolved
+GameServerMessage = StateUpdated | CardsRevealed | RowChoiceCommitted | ChooseCardRequested | ChooseRowRequested

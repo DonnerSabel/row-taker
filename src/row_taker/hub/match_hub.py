@@ -5,30 +5,30 @@ from dataclasses import dataclass, field
 from row_taker.engine.game import (
     all_cards_selected,
     begin_trick_resolution,
+    current_revealed_plays,
     finish_trick,
     has_pending_resolution_step,
     has_pending_row_choice,
-    resolve_next_delta_public_state,
+    resolve_next_trick_step,
     submit_choose_row,
     submit_play_card,
     trick_resolution_finished,
 )
 from row_taker.engine.game.models import PlayerID
 from row_taker.engine.game.phases import Phase
-from row_taker.engine.game.rules import target_row_index
-from row_taker.engine.game.state import GameState, PlayerState, PublicState
+from row_taker.engine.game.state import GameState, PlayerState, PublicState, RevealedPlay, RowChoiceRequired, TrickResolutionStep
 from row_taker.engine.game.views import build_player_state, build_public_state
 from row_taker.protocol.messages import (
+    CardsRevealed,
     ChooseCardRequested,
     ChooseRowRequested,
     GameClientMessage,
     GameServerMessage,
     PlayedCardView,
+    RowChoiceCommitted,
     StateUpdated,
     SubmitCard,
     SubmitRowChoice,
-    TrickResolved,
-    TrickRevealed,
 )
 
 
@@ -41,12 +41,12 @@ class MatchHub:
         self.outbox.append(StateUpdated(state=self.build_public_state()))
         self._request_choose_cards_for_current_trick()
 
-    def handle_client_message(self, message: GameClientMessage) -> None:
+    def handle_client_message(self, player_id: PlayerID, message: GameClientMessage) -> None:
         if isinstance(message, SubmitCard):
-            self._handle_submit_card(message)
+            self._handle_submit_card(player_id, message)
             return
         if isinstance(message, SubmitRowChoice):
-            self._handle_submit_row_choice(message)
+            self._handle_submit_row_choice(player_id, message)
             return
         raise TypeError(f"unsupported client message type: {type(message)!r}")
 
@@ -73,17 +73,18 @@ class MatchHub:
                 )
             )
 
-    def _handle_submit_card(self, message: SubmitCard) -> None:
-        submit_play_card(self.state, message.player_id, message.card_value)
+    def _handle_submit_card(self, player_id: PlayerID, message: SubmitCard) -> None:
+        submit_play_card(self.state, player_id, message.card_value)
         if not all_cards_selected(self.state):
             return
 
-        begin_trick_resolution(self.state)
-        self.outbox.append(self._build_trick_revealed())
+        revealed_plays = begin_trick_resolution(self.state)
+        self.outbox.append(self._build_cards_revealed(revealed_plays))
         self._advance_resolution_until_blocked()
 
-    def _handle_submit_row_choice(self, message: SubmitRowChoice) -> None:
-        submit_choose_row(self.state, message.player_id, message.row_id)
+    def _handle_submit_row_choice(self, player_id: PlayerID, message: SubmitRowChoice) -> None:
+        submit_choose_row(self.state, player_id, message.row_id)
+        self.outbox.append(RowChoiceCommitted(row_id=message.row_id))
         self._advance_resolution_until_blocked()
 
     def _advance_resolution_until_blocked(self) -> None:
@@ -101,8 +102,9 @@ class MatchHub:
                 return
 
             if has_pending_resolution_step(self.state):
-                resolve_next_delta_public_state(self.state)
-                continue
+                step_or_prompt = resolve_next_trick_step(self.state)
+                if isinstance(step_or_prompt, RowChoiceRequired | TrickResolutionStep):
+                    continue
 
             if trick_resolution_finished(self.state):
                 self._finish_current_trick()
@@ -112,42 +114,18 @@ class MatchHub:
 
     def _finish_current_trick(self) -> None:
         result = finish_trick(self.state)
-        self.outbox.append(
-            TrickResolved(
-                deltas=result.deltas,
-                new_round_started=result.new_round_started,
-                game_finished=result.game_finished,
-            )
-        )
-        public_state = self.build_public_state()
-        self.outbox.append(StateUpdated(state=public_state))
-
+        self.outbox.append(StateUpdated(state=self.build_public_state()))
         if not result.game_finished:
             self._request_choose_cards_for_current_trick()
 
-    def _build_trick_revealed(self) -> TrickRevealed:
-        played_cards = tuple(
-            PlayedCardView(
-                player_id=player_id,
-                player_name=self.state.get_player_by_id(player_id).name,
-                card_value=card.value,
+    def _build_cards_revealed(self, plays: tuple[RevealedPlay, ...]) -> CardsRevealed:
+        return CardsRevealed(
+            played_cards=tuple(
+                PlayedCardView(
+                    player_id=play.player_id,
+                    player_name=self.state.get_player_by_id(play.player_id).name,
+                    card_value=play.card.value,
+                )
+                for play in plays
             )
-            for player_id, card in sorted(
-                self.state.selected_cards.items(),
-                key=lambda item: item[1].value,
-            )
-        )
-        active_player_id: PlayerID | None = None
-        pending_card_value: int | None = None
-        if self.state.resolve_order:
-            first_player_id = self.state.resolve_order[0]
-            first_card = self.state.selected_cards[first_player_id]
-            if target_row_index(self.state.rows, first_card) is None:
-                active_player_id = first_player_id
-                pending_card_value = first_card.value
-        return TrickRevealed(
-            state=self.build_public_state(),
-            played_cards=played_cards,
-            active_player_id=active_player_id,
-            pending_card_value=pending_card_value,
         )

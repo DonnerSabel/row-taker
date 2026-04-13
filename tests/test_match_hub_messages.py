@@ -1,23 +1,21 @@
 from row_taker.engine.game import setup_game
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import PlayerID, RowID
-from row_taker.engine.game.public_state_ops import played_card_from_delta
 from row_taker.hub.match_hub import MatchHub
 from row_taker.protocol.messages import (
+    CardsRevealed,
     ChooseCardRequested,
     ChooseRowRequested,
+    RowChoiceCommitted,
     StateUpdated,
     SubmitCard,
     SubmitRowChoice,
-    TrickResolved,
-    TrickRevealed,
 )
 
 
 def test_match_hub_drives_trick_via_messages() -> None:
     state = setup_game(["A", "B"])
 
-    # deterministischer Zustand für den Test
     state.players[0].hand = [Card(1)]
     state.players[1].hand = [Card(90)]
     for index, row in enumerate(state.rows):
@@ -33,15 +31,14 @@ def test_match_hub_drives_trick_via_messages() -> None:
     ]
     assert len(choose_card_messages) == 2
 
-    hub.handle_client_message(SubmitCard(PlayerID("player-0"), 1))
-    hub.handle_client_message(SubmitCard(PlayerID("player-1"), 90))
+    hub.handle_client_message(PlayerID("player-0"), SubmitCard(1))
+    hub.handle_client_message(PlayerID("player-1"), SubmitCard(90))
 
     messages = hub.drain_outbox()
-    reveal_messages = [message for message in messages if isinstance(message, TrickRevealed)]
+    reveal_messages = [message for message in messages if isinstance(message, CardsRevealed)]
     assert len(reveal_messages) == 1
     reveal = reveal_messages[0]
     assert [card.card_value for card in reveal.played_cards] == [1, 90]
-    assert reveal.active_player_id == PlayerID("player-0")
 
     choose_row_messages = [
         message for message in messages if isinstance(message, ChooseRowRequested)
@@ -49,10 +46,8 @@ def test_match_hub_drives_trick_via_messages() -> None:
     assert len(choose_row_messages) == 1
     assert choose_row_messages[0].player_id == PlayerID("player-0")
 
-    hub.handle_client_message(SubmitRowChoice(PlayerID("player-0"), RowID("row-1")))
+    hub.handle_client_message(PlayerID("player-0"), SubmitRowChoice(RowID("row-1")))
     messages = hub.drain_outbox()
 
-    trick_messages = [message for message in messages if isinstance(message, TrickResolved)]
-    assert len(trick_messages) == 1
-    trick = trick_messages[0]
-    assert [played_card_from_delta(delta).value for delta in trick.deltas] == [1, 90]
+    assert any(isinstance(message, RowChoiceCommitted) for message in messages)
+    assert any(isinstance(message, StateUpdated) for message in messages)
