@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from row_taker.engine.game.state import PlayerState, PublicState
+from row_taker.cli.local_resolution import LocalResolutionState
 from row_taker.protocol.messages import CardsRevealed, LobbyView
 
 
@@ -37,6 +38,8 @@ class CliState:
     screen: Screen = field(default_factory=lambda: LobbyScreen(kind="main"))
     flash_message: UiMessage | None = None
     revealed_trick: CardsRevealed | None = None
+    local_resolution: LocalResolutionState | None = None
+    resolution_lines: tuple[str, ...] = ()
     received_game_revision: int | None = None
     applied_game_revision: int | None = None
     session_error: str | None = None

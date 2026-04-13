@@ -242,6 +242,9 @@ def render_game_waiting(state: CliState) -> str:
     revealed = render_revealed_trick(state.revealed_trick, own_player_id=state.own_player_id)
     if revealed is not None:
         lines.extend(["", revealed])
+    resolution = render_resolution_lines(state)
+    if resolution is not None:
+        lines.extend(["", resolution])
     lines.extend(["", "Warten auf andere Spieler...", "X beendet die Sitzung sofort."])
     return "\n".join(lines)
 
@@ -273,6 +276,9 @@ def render_game_choose_row(state: CliState) -> str:
     revealed = render_revealed_trick(state.revealed_trick, own_player_id=state.own_player_id)
     if revealed is not None:
         lines.extend(["", revealed])
+    resolution = render_resolution_lines(state)
+    if resolution is not None:
+        lines.extend(["", resolution])
     lines.extend(
         [
             "",
@@ -323,6 +329,14 @@ def render_revealed_trick(revealed: CardsRevealed | None, *, own_player_id) -> s
         lines.append(f"  {card.card_value:>3}  {card.player_name}{marker}")
     return "\n".join(lines)
 
+
+
+def render_resolution_lines(state: CliState) -> str | None:
+    if not state.resolution_lines:
+        return None
+    lines = ["Lokale Auflösung:"]
+    lines.extend(f"  {line}" for line in state.resolution_lines)
+    return "\n".join(lines)
 
 def render_own_hand(player_state: PlayerState) -> str:
     cards = " ".join(f"|{card.value} {card.bullheads * '🐮'}|" for card in player_state.hand)

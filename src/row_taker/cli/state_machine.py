@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from row_taker.cli.local_resolution import apply_local_row_choice, start_local_resolution
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, UiMessage
 from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
@@ -52,16 +53,31 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 screen=GameScreen(kind="waiting"),
                 flash_message=UiMessage(level="info", text="Spielstart..."),
                 revealed_trick=None,
+                local_resolution=None,
+                resolution_lines=(),
             )
         case StateUpdated(state=public_state):
             next_screen = state.screen
             if isinstance(next_screen, GameScreen) and next_screen.kind == "choose_row":
                 next_screen = GameScreen(kind="waiting")
-            return replace(state, public_state=public_state, screen=next_screen, revealed_trick=None)
+            next_local_resolution = state.local_resolution
+            if next_local_resolution is not None and next_local_resolution.pending_row_choice is None:
+                next_local_resolution = None
+            return replace(state, public_state=public_state, screen=next_screen, revealed_trick=None, local_resolution=next_local_resolution)
         case CardsRevealed() as revealed:
-            return replace(state, revealed_trick=revealed, flash_message=None)
-        case RowChoiceCommitted():
-            return replace(state, screen=GameScreen(kind="waiting"), flash_message=None)
+            local_resolution = None
+            resolution_lines = ()
+            if state.public_state is not None:
+                local_resolution = start_local_resolution(state.public_state, revealed)
+                resolution_lines = local_resolution.lines
+            return replace(state, revealed_trick=revealed, local_resolution=local_resolution, resolution_lines=resolution_lines, flash_message=None)
+        case RowChoiceCommitted(row_id=row_id):
+            local_resolution = state.local_resolution
+            resolution_lines = state.resolution_lines
+            if local_resolution is not None and local_resolution.pending_row_choice is not None:
+                local_resolution = apply_local_row_choice(local_resolution, row_id)
+                resolution_lines = local_resolution.lines
+            return replace(state, screen=GameScreen(kind="waiting"), local_resolution=local_resolution, resolution_lines=resolution_lines, flash_message=None)
         case ChooseCardRequested(player_id=player_id, state=player_state):
             return replace(
                 state,
@@ -69,6 +85,8 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 screen=GameScreen(kind="choose_card", player_state=player_state),
                 flash_message=None,
                 revealed_trick=None,
+                local_resolution=None,
+                resolution_lines=(),
             )
         case ChooseRowRequested(player_id=player_id, state=player_state):
             return replace(

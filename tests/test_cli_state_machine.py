@@ -10,6 +10,7 @@ from row_taker.protocol.messages import (
     LeaveSession,
     PlayedCardView,
     SessionEnded,
+    RowChoiceCommitted,
     SessionEndReason,
     StateUpdated,
 )
@@ -78,3 +79,51 @@ def test_session_ended_exits_immediately() -> None:
 
     assert state.should_exit is True
     assert state.session_error == "Spiel abgebrochen"
+
+
+def test_cards_revealed_builds_local_resolution_lines() -> None:
+    player_state = _player_state_for(0)
+    revealed = CardsRevealed(
+        plays=(
+            PlayedCardView(
+                player_id=player_state.public_state.players[0].player_id,
+                player_name=player_state.public_state.players[0].name,
+                card_value=104,
+            ),
+            PlayedCardView(
+                player_id=player_state.public_state.players[1].player_id,
+                player_name=player_state.public_state.players[1].name,
+                card_value=103,
+            ),
+        ),
+    )
+
+    state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
+
+    assert state.local_resolution is not None
+    assert state.resolution_lines
+
+
+def test_row_choice_committed_advances_local_resolution() -> None:
+    player_state = _player_state_for(0)
+    lowest = min(row.cards[-1].value for row in player_state.public_state.rows)
+    revealed = CardsRevealed(
+        plays=(
+            PlayedCardView(
+                player_id=player_state.self_player_id,
+                player_name=player_state.self_player_name(),
+                card_value=lowest - 1,
+            ),
+        ),
+    )
+
+    state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
+    assert state.local_resolution is not None
+    assert state.local_resolution.pending_row_choice is not None
+
+    row_id = player_state.public_state.rows[0].row_id
+    state = reduce_server_message(state, RowChoiceCommitted(row_id=row_id))
+
+    assert state.local_resolution is not None
+    assert state.local_resolution.pending_row_choice is None
+    assert any('startet mit' in line for line in state.resolution_lines)
