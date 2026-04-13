@@ -3,29 +3,70 @@ import pygame
 from row_taker.gui.card import Card
 from row_taker.gui.constants import (
     BACKGROUND_COLOR,
+    BOARD_PLAY_AREA_HEIGHT_RATIO,
+    BOARD_PLAY_AREA_WIDTH_RATIO,
+    BOARD_PLAY_AREA_X_RATIO,
+    BOARD_PLAY_AREA_Y_RATIO,
+    CARD_ASPECT_RATIO,
     CARD_GAP,
-    DEMO_CARD_VALUES,
+    CARD_SCALE,
     FPS,
-    WINDOW_HEIGHT,
     WINDOW_TITLE,
-    WINDOW_WIDTH,
 )
 from row_taker.gui.spielfeld import Spielfeld
 
 
 def create_demo_cards(window_width: int, window_height: int) -> list[Card]:
-    deck = [Card(value) for value in DEMO_CARD_VALUES]
+    rows = 4
+    columns = 6
+
+    # Calculate play area in pixels from ratios
+    play_area_x = int(window_width * BOARD_PLAY_AREA_X_RATIO)
+    play_area_y = int(window_height * BOARD_PLAY_AREA_Y_RATIO)
+    play_area_width = int(window_width * BOARD_PLAY_AREA_WIDTH_RATIO)
+    play_area_height = int(window_height * BOARD_PLAY_AREA_HEIGHT_RATIO)
+
+    deck = [Card(value) for value in range(1, rows * columns + 1)]
 
     for card in deck:
         card.scale(window_width)
 
-    x_pos = CARD_GAP
-    for card in deck:
+    if deck and deck[0].image is not None:
+        # Calculate target dimensions to fit the board play area
+        available_width = play_area_width - columns * CARD_GAP
+        available_height = play_area_height - rows * CARD_GAP
+        target_width_from_width = available_width / columns
+        target_width_from_height = (available_height / rows) / CARD_ASPECT_RATIO
+        target_width = min(target_width_from_width, target_width_from_height)
+
+        # Calculate effective window width for scaling
+        effective_window_width = int(target_width / CARD_SCALE)
+
+        # Rescale cards
+        for card in deck:
+            card.scale(effective_window_width)
+
+    card_width = (
+        deck[0].image.get_width()
+        if deck and deck[0].image is not None
+        else int(window_width * CARD_SCALE)
+    )
+    card_height = (
+        deck[0].image.get_height()
+        if deck and deck[0].image is not None
+        else int(card_width * CARD_ASPECT_RATIO)
+    )
+    total_height = rows * card_height + (rows + 1) * CARD_GAP
+    y_start = play_area_y + max(CARD_GAP, (play_area_height - total_height) // 2)
+
+    for index, card in enumerate(deck):
         if card.image is None:
             continue
-        card.x = x_pos
-        card.y = window_height // 2 - card.image.get_height() // 2
-        x_pos += card.image.get_width() + CARD_GAP
+
+        row = index // columns
+        column = index % columns
+        card.x = play_area_x + CARD_GAP + column * (card_width + CARD_GAP)
+        card.y = y_start + row * (card_height + CARD_GAP)
 
     return deck
 
@@ -39,7 +80,7 @@ def run() -> int:
         pygame.display.set_caption(WINDOW_TITLE)
         clock = pygame.time.Clock()
 
-        deck = create_demo_cards(WINDOW_WIDTH, WINDOW_HEIGHT)
+        deck = create_demo_cards(*spielfeld.get_image_size())
 
         running = True
         while running:

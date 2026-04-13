@@ -71,7 +71,7 @@ class Card:
         local_x = mouse_pos[0] - self.rect.x
         local_y = mouse_pos[1] - self.rect.y
         if 0 <= local_x < self.rect.width and 0 <= local_y < self.rect.height:
-            return self.mask.get_at((local_x, local_y))
+            return bool(self.mask.get_at((local_x, local_y)))
         return False
 
     def draw(self, surface: pygame.Surface, mouse_pos: tuple[int, int] | None = None) -> None:
@@ -81,7 +81,7 @@ class Card:
 
         self.rect.topleft = (self.x, self.y)
 
-        if mouse_pos and self.is_mouse_over(mouse_pos):
+        if mouse_pos and self.is_mouse_over(mouse_pos) and self.hover_image is not None:
             hover_x = self.rect.x - (self.hover_image.get_width() - self.rect.width) // 2
             hover_y = self.rect.y - (self.hover_image.get_height() - self.rect.height) // 2
             surface.blit(self.hover_image, (hover_x, hover_y))
