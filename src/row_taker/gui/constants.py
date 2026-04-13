@@ -7,8 +7,14 @@ BACKGROUND_COLOR = (0, 120, 0)
 
 FPS = 60
 
-CARD_SCALE = 0.15
+CARD_SCALE = 0.1
 CARD_ASPECT_RATIO = 1.5
-CARD_GAP = 50
+CARD_GAP = 10
+
+# Board play area ratios (relative to board image size)
+BOARD_PLAY_AREA_X_RATIO = 0.02  # 2% from left
+BOARD_PLAY_AREA_Y_RATIO = 0.05  # 5% from top
+BOARD_PLAY_AREA_WIDTH_RATIO = 0.8  # 80% of width
+BOARD_PLAY_AREA_HEIGHT_RATIO = 0.7  # 70% of height
 
 DEMO_CARD_VALUES = [1, 2, 3, 4, 5]
