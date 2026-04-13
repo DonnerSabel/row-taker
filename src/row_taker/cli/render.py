@@ -298,7 +298,10 @@ def render_game_overview(state: CliState) -> str:
     public_state = state.public_state
     if public_state is None:
         return "\n".join(["Spiel", "-----", "Noch kein öffentlicher Spielzustand vorhanden."])
-    lines = [f"Runde: {public_state.round_no}", f"Stich: {public_state.trick_no}", "", "Reihen:"]
+    lines = [f"Runde: {public_state.round_no}", f"Stich: {public_state.trick_no}"]
+    if state.applied_game_revision is not None:
+        lines.append(f"Revision: {state.applied_game_revision}")
+    lines.extend(["", "Reihen:"])
     mapping = build_row_display_mapping(public_state)
     for cli_row, state_row_index in enumerate(mapping.row_order, start=1):
         row = public_state.rows[state_row_index]
@@ -315,7 +318,7 @@ def render_revealed_trick(revealed: CardsRevealed | None, *, own_player_id) -> s
     if revealed is None:
         return None
     lines = ["Gespielte Karten:"]
-    for card in revealed.played_cards:
+    for card in revealed.plays:
         marker = " <- du" if card.player_id == own_player_id else ""
         lines.append(f"  {card.card_value:>3}  {card.player_name}{marker}")
     return "\n".join(lines)

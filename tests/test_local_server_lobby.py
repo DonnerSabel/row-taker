@@ -1,6 +1,7 @@
 import random
 from dataclasses import dataclass, field
 
+from row_taker.engine.game.cards import Card
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     ChooseCardRequested,
@@ -175,3 +176,35 @@ def test_leave_session_aborts_active_match_for_remaining_clients() -> None:
     assert session_ended[0].target_client_id == "client-1"
     assert session_ended[0].message.reason == SessionEndReason.QUIT
     assert "Alice" in session_ended[0].message.message
+
+
+from row_taker.protocol.messages import SubmitCard, StateUpdated, CardsRevealed, ChooseRowRequested
+
+
+def test_game_messages_are_revisioned_when_routed() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=2)
+    server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
+    server.handle_client_message("client-1", JoinLobby(display_name="Bob"))
+    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
+    server.handle_client_message("client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1"))
+    server.drain_outbox()
+
+    server.handle_client_message("client-0", RequestStartGame(), reply_target_client_id="client-0")
+    envelopes = server.drain_outbox()
+    revisions = [env.message.revision for env in envelopes if isinstance(env.message, StateUpdated)]
+    assert revisions == [1]
+
+    match = server.active_match
+    assert match is not None
+    state = match.state
+    state.players[0].hand = [Card(1)]
+    state.players[1].hand = [Card(90)]
+    for index, row in enumerate(state.rows):
+        row.cards = [Card((index + 1) * 10)]
+
+    server.handle_client_message("client-0", SubmitCard(card_value=1), reply_target_client_id="client-0")
+    server.drain_outbox()
+    server.handle_client_message("client-1", SubmitCard(card_value=90), reply_target_client_id="client-1")
+    envelopes = server.drain_outbox()
+    tagged = [env.message for env in envelopes if isinstance(env.message, CardsRevealed | ChooseRowRequested)]
+    assert [message.revision for message in tagged] == [4, 5]

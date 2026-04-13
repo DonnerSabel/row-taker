@@ -47,7 +47,7 @@ def test_choose_card_requested_enters_choose_card_screen() -> None:
 def test_cards_revealed_is_stored_for_waiting_screen() -> None:
     player_state = _player_state_for(0)
     revealed = CardsRevealed(
-        played_cards=(
+        plays=(
             PlayedCardView(
                 player_id=player_state.self_player_id,
                 player_name=player_state.self_player_name(),

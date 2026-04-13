@@ -38,7 +38,7 @@ def test_match_hub_drives_trick_via_messages() -> None:
     reveal_messages = [message for message in messages if isinstance(message, CardsRevealed)]
     assert len(reveal_messages) == 1
     reveal = reveal_messages[0]
-    assert [card.card_value for card in reveal.played_cards] == [1, 90]
+    assert [card.card_value for card in reveal.plays] == [1, 90]
 
     choose_row_messages = [
         message for message in messages if isinstance(message, ChooseRowRequested)

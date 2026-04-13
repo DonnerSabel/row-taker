@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass, replace
 
@@ -11,7 +12,7 @@ from row_taker.cli.state_models import CliState, initial_cli_state
 from row_taker.cli.terminal import clear_screen
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.errors import ConnectionClosed
-from row_taker.protocol.messages import ServerToClientMessage
+from row_taker.protocol.messages import ServerToClientMessage, get_game_message_revision
 from row_taker.protocol.transport import ClientTransport
 
 
@@ -30,6 +31,7 @@ class ClientSession:
     async def run_async(self) -> PublicState | None:
         console = CliConsole()
         state = initial_cli_state(self.own_client_id)
+        server_inbox: deque[ServerToClientMessage] = deque()
         server_task: asyncio.Task[ServerToClientMessage] | None = asyncio.create_task(
             asyncio.to_thread(self.transport.receive)
         )
@@ -40,6 +42,12 @@ class ClientSession:
         try:
             await self._refresh_screen(console, state)
             while not state.should_exit and not abort_requested:
+                state = self._apply_pending_server_messages(state, server_inbox)
+                await self._refresh_screen(console, state)
+                if state.should_exit:
+                    input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
+                    break
+
                 current_prompt = build_view(state).prompt if self.interactive else None
                 if current_prompt is None:
                     input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
@@ -72,13 +80,10 @@ class ClientSession:
                             server_task = None
                             continue
                         break
-                    state = reduce_server_message(state, message)
-                    self.own_client_id = state.own_client_id
-                    await self._refresh_screen(console, state)
-                    if state.should_exit:
-                        input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
-                        await self._refresh_screen(console, state)
-                        break
+                    server_inbox.append(message)
+                    revision = get_game_message_revision(message)
+                    if revision is not None:
+                        state = replace(state, received_game_revision=revision)
                     server_task = asyncio.create_task(asyncio.to_thread(self.transport.receive))
 
                 if input_task is not None and input_task in done:
@@ -120,6 +125,22 @@ class ClientSession:
                     await input_task
             await console.close()
             self.transport.close()
+
+    def _apply_pending_server_messages(
+        self,
+        state: CliState,
+        server_inbox: deque[ServerToClientMessage],
+    ) -> CliState:
+        while server_inbox:
+            message = server_inbox.popleft()
+            state = reduce_server_message(state, message)
+            revision = get_game_message_revision(message)
+            if revision is not None:
+                state = replace(state, applied_game_revision=revision)
+            self.own_client_id = state.own_client_id
+            if state.should_exit:
+                break
+        return state
 
     async def _refresh_screen(self, console: CliConsole, state: CliState) -> None:
         view = build_view(state)

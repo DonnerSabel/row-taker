@@ -37,6 +37,8 @@ class CliState:
     screen: Screen = field(default_factory=lambda: LobbyScreen(kind="main"))
     flash_message: UiMessage | None = None
     revealed_trick: CardsRevealed | None = None
+    received_game_revision: int | None = None
+    applied_game_revision: int | None = None
     session_error: str | None = None
     exit_on_ack: bool = False
     suppress_final_result: bool = False

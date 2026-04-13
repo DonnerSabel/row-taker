@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 from row_taker.engine.game.models import PlayerID, RowID
-from row_taker.engine.game.state_mappers import player_state_from_dict, player_state_to_dict, public_state_from_dict, public_state_to_dict
+from row_taker.engine.game.state_mappers import (
+    game_state_from_dict,
+    game_state_to_dict,
+    player_state_from_dict,
+    player_state_to_dict,
+    public_state_from_dict,
+    public_state_to_dict,
+)
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     CardsRevealed,
+    DebugStateSnapshot,
     ChooseCardRequested,
     ChooseRowRequested,
     ClearSeat,
@@ -177,15 +185,17 @@ def server_message_to_dict(message: ServerToClientMessage) -> dict[str, object]:
     if isinstance(message, GameStarting):
         return {"type": "game_starting", "lobby": _lobby_view_to_dict(message.lobby)}
     if isinstance(message, StateUpdated):
-        return {"type": "state_updated", "state": public_state_to_dict(message.state)}
+        return {"type": "state_updated", "state": public_state_to_dict(message.state), "revision": message.revision}
     if isinstance(message, CardsRevealed):
-        return {"type": "cards_revealed", "played_cards": [_played_card_to_dict(card) for card in message.played_cards]}
+        return {"type": "cards_revealed", "plays": [_played_card_to_dict(card) for card in message.plays], "revision": message.revision}
     if isinstance(message, RowChoiceCommitted):
-        return {"type": "row_choice_committed", "row_id": str(message.row_id)}
+        return {"type": "row_choice_committed", "row_id": str(message.row_id), "revision": message.revision}
     if isinstance(message, ChooseCardRequested):
-        return {"type": "choose_card_requested", "player_id": str(message.player_id), "state": player_state_to_dict(message.state)}
+        return {"type": "choose_card_requested", "player_id": str(message.player_id), "state": player_state_to_dict(message.state), "revision": message.revision}
     if isinstance(message, ChooseRowRequested):
-        return {"type": "choose_row_requested", "player_id": str(message.player_id), "state": player_state_to_dict(message.state)}
+        return {"type": "choose_row_requested", "player_id": str(message.player_id), "state": player_state_to_dict(message.state), "revision": message.revision}
+    if isinstance(message, DebugStateSnapshot):
+        return {"type": "debug_state_snapshot", "revision": message.revision, "game_state": game_state_to_dict(message.game_state)}
     if isinstance(message, SessionEnded):
         return {
             "type": "session_ended",
@@ -210,15 +220,22 @@ def server_message_from_dict(data: dict[str, object]) -> ServerToClientMessage:
     if message_type == "game_starting":
         return GameStarting(lobby=_lobby_view_from_dict(data["lobby"]))
     if message_type == "state_updated":
-        return StateUpdated(state=public_state_from_dict(data["state"]))
+        revision = data.get("revision")
+        return StateUpdated(state=public_state_from_dict(data["state"]), revision=None if revision is None else int(revision))
     if message_type == "cards_revealed":
-        return CardsRevealed(played_cards=tuple(_played_card_from_dict(card) for card in data["played_cards"]))
+        revision = data.get("revision")
+        return CardsRevealed(plays=tuple(_played_card_from_dict(card) for card in data["plays"]), revision=None if revision is None else int(revision))
     if message_type == "row_choice_committed":
-        return RowChoiceCommitted(row_id=RowID(str(data["row_id"])))
+        revision = data.get("revision")
+        return RowChoiceCommitted(row_id=RowID(str(data["row_id"])), revision=None if revision is None else int(revision))
     if message_type == "choose_card_requested":
-        return ChooseCardRequested(player_id=PlayerID(str(data["player_id"])), state=player_state_from_dict(data["state"]))
+        revision = data.get("revision")
+        return ChooseCardRequested(player_id=PlayerID(str(data["player_id"])), state=player_state_from_dict(data["state"]), revision=None if revision is None else int(revision))
     if message_type == "choose_row_requested":
-        return ChooseRowRequested(player_id=PlayerID(str(data["player_id"])), state=player_state_from_dict(data["state"]))
+        revision = data.get("revision")
+        return ChooseRowRequested(player_id=PlayerID(str(data["player_id"])), state=player_state_from_dict(data["state"]), revision=None if revision is None else int(revision))
+    if message_type == "debug_state_snapshot":
+        return DebugStateSnapshot(revision=int(data["revision"]), game_state=game_state_from_dict(data["game_state"]))
     if message_type == "session_ended":
         client_id = data.get("client_id")
         display_name = data.get("display_name")

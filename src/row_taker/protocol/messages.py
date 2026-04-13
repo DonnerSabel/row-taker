@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from row_taker.engine.game.models import PlayerID, RowID
-from row_taker.engine.game.state import PlayerState, PublicState
+from row_taker.engine.game.state import GameState, PlayerState, PublicState
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +118,7 @@ class GameStarting:
 @dataclass(frozen=True, slots=True)
 class StateUpdated:
     state: PublicState
+    revision: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,24 +130,34 @@ class PlayedCardView:
 
 @dataclass(frozen=True, slots=True)
 class CardsRevealed:
-    played_cards: tuple[PlayedCardView, ...]
+    plays: tuple[PlayedCardView, ...]
+    revision: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class RowChoiceCommitted:
     row_id: RowID
+    revision: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ChooseCardRequested:
     player_id: PlayerID
     state: PlayerState
+    revision: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ChooseRowRequested:
     player_id: PlayerID
     state: PlayerState
+    revision: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DebugStateSnapshot:
+    revision: int
+    game_state: GameState
 
 
 class SessionEndReason(StrEnum):
@@ -178,9 +189,18 @@ ServerToClientMessage = (
     | RowChoiceCommitted
     | ChooseCardRequested
     | ChooseRowRequested
+    | DebugStateSnapshot
     | SessionEnded
     | ServerError
 )
 
 GameClientMessage = SubmitCard | SubmitRowChoice
 GameServerMessage = StateUpdated | CardsRevealed | RowChoiceCommitted | ChooseCardRequested | ChooseRowRequested
+
+
+def get_game_message_revision(message: ServerToClientMessage) -> int | None:
+    if isinstance(message, StateUpdated | CardsRevealed | RowChoiceCommitted | ChooseCardRequested | ChooseRowRequested):
+        return message.revision
+    if isinstance(message, DebugStateSnapshot):
+        return message.revision
+    return None

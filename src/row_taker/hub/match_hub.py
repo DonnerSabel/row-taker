@@ -120,7 +120,7 @@ class MatchHub:
 
     def _build_cards_revealed(self, plays: tuple[RevealedPlay, ...]) -> CardsRevealed:
         return CardsRevealed(
-            played_cards=tuple(
+            plays=tuple(
                 PlayedCardView(
                     player_id=play.player_id,
                     player_name=self.state.get_player_by_id(play.player_id).name,

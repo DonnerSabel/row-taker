@@ -7,6 +7,7 @@ from row_taker.protocol.codec import (
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     CardsRevealed,
+    DebugStateSnapshot,
     ChooseCardRequested,
     ChooseRowRequested,
     ClearSeat,
@@ -24,6 +25,7 @@ from row_taker.protocol.messages import (
     PlayedCardView,
     RequestStartGame,
     RowChoiceCommitted,
+    get_game_message_revision,
     ServerError,
     ServerToClientMessage,
     SessionEnded,
@@ -37,6 +39,7 @@ from row_taker.protocol.messages import (
 __all__ = [
     "AssignSeatToClient",
     "CardsRevealed",
+    "DebugStateSnapshot",
     "ChooseCardRequested",
     "ChooseRowRequested",
     "ClearSeat",
@@ -56,6 +59,7 @@ __all__ = [
     "SessionEndReason",
     "RequestStartGame",
     "RowChoiceCommitted",
+    "get_game_message_revision",
     "ServerError",
     "ServerToClientMessage",
     "SetDisplayName",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 
 from row_taker.engine.game import setup_game
@@ -81,6 +81,7 @@ class LocalServer:
     _running_bot_processes_by_client_id: dict[str, BotProcessHandle] = field(default_factory=dict)
     _start_in_progress: bool = False
     _connection_endpoints: dict[str, str | None] = field(default_factory=dict)
+    _next_game_revision: int = 1
 
     def __post_init__(self) -> None:
         self.lobby_state = LobbyState(seat_count=self.seat_count)
@@ -347,11 +348,17 @@ class LocalServer:
         return True
 
     def _route_match_message(self, message: GameServerMessage) -> None:
-        if isinstance(message, ChooseCardRequested | ChooseRowRequested):
-            target_client_id = self.player_to_client_id[message.player_id]
-            self.outbox.append(OutgoingEnvelope(message=message, target_client_id=target_client_id))
+        stamped_message = self._stamp_game_message_revision(message)
+        if isinstance(stamped_message, ChooseCardRequested | ChooseRowRequested):
+            target_client_id = self.player_to_client_id[stamped_message.player_id]
+            self.outbox.append(OutgoingEnvelope(message=stamped_message, target_client_id=target_client_id))
             return
-        self.outbox.append(OutgoingEnvelope(message=message, target_client_id=None))
+        self.outbox.append(OutgoingEnvelope(message=stamped_message, target_client_id=None))
+
+    def _stamp_game_message_revision(self, message: GameServerMessage) -> GameServerMessage:
+        revision = self._next_game_revision
+        self._next_game_revision += 1
+        return replace(message, revision=revision)
 
     def _handle_departure(
         self,

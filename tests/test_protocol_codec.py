@@ -22,6 +22,7 @@ from row_taker.protocol.messages import (
     LobbySeatView,
     LobbyStateUpdated,
     LobbyView,
+    DebugStateSnapshot,
     PlayedCardView,
     RequestStartGame,
     RowChoiceCommitted,
@@ -105,17 +106,19 @@ def test_server_messages_roundtrip() -> None:
                 game_started=True,
             )
         ),
-        StateUpdated(state=public_state),
+        StateUpdated(state=public_state, revision=1),
         CardsRevealed(
-            played_cards=(
+            plays=(
                 PlayedCardView(
                     player_id=PlayerID("player-0"),
                     player_name="Alice",
                     card_value=17,
                 ),
             ),
+            revision=2,
         ),
-        RowChoiceCommitted(row_id=RowID("row-0")),
+        RowChoiceCommitted(row_id=RowID("row-0"), revision=3),
+        DebugStateSnapshot(revision=4, game_state=game),
         SessionEnded(message="left", reason=SessionEndReason.QUIT, client_id="client-0", display_name="Alice"),
         ServerError(message="boom"),
     ]
