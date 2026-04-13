@@ -1,148 +1,191 @@
 # Architektur
 
+## Zweck dieses Dokuments
+
+Dieses Dokument beschreibt die Zielarchitektur des Projekts in kompakter Form.
+Es darf dem aktuellen Codezustand voraus sein.
+
+Für die ausführlichere Begründung und die wichtigen Designentscheidungen ist
+`docs/row_taker_design_decisions.md` maßgeblich.
+
+---
+
 ## Leitidee
 
-Das Projekt trennt bewusst drei Ebenen:
+Das Projekt trennt bewusst vier Ebenen:
 
-- **Engine** – kennt die fachlichen Regeln und Zustandsübergänge
-- **Hub** – orchestriert ein laufendes Spiel über Messages
-- **Clients** – reagieren auf Hub-Messages und senden Antworten zurück
+- **Engine/Game** – kennt die fachlichen Regeln und Zustandsübergänge
+- **Engine/Lobby** – kennt die minimale Sitzplatz- und Lobbylogik
+- **Server** – orchestriert Prozesse, Teilnehmer und Protokollfluss
+- **Clients** – verwenden dieselbe Engine lokal zur Interpretation und Darstellung
 
-Der Hub ist dabei **nicht** der zweite Regelkern. Er benutzt die Engine.
+Der Server ist **nicht** der zweite Regelkern.
+Die fachliche Wahrheit liegt in der Engine.
+
+---
 
 ## Zentrale Zustände
 
 ### `GameState`
-Der autoritative interne Spielzustand des Hubs.
 
-Enthält unter anderem:
-- Spieler mit echten Händen und Punkteständen
+Der vollständige fachliche Spielzustand.
+
+Er enthält unter anderem:
+- Spieler mit Händen und Punkteständen
 - Reihen auf dem Tisch
 - Deck
 - Phasen- und Auflösungskontext
 
-`GameState` bleibt im Hub und wird nicht als Nachricht verteilt.
+Der `GameState` ist kein reguläres Spielfluss-Nachrichtenformat.
+Er ist ein Engine-Zustand.
 
 ### `PublicState`
+
 Der fachliche öffentliche Zustand des Spiels.
 
-Er enthält genau die Informationen, die alle Clients sehen dürfen, zum Beispiel:
-- öffentliche Spielerdaten (`name`, `score`, `hand_count`)
-- Reihen auf dem Tisch
-- Runde, Stich und Phase
+Er enthält nur Informationen, die alle sehen dürfen.
 
 ### `PlayerState`
+
 Ein spielerspezifischer Sichtzustand.
 
-Er besteht aus:
-- einem `PublicState`
-- der eigenen Hand des betroffenen Spielers
-- Hilfsinformationen für die aktuelle Entscheidung
+Er besteht fachlich aus:
+- öffentlichem Zustand
+- eigener Hand
+- entscheidungsrelevanten Zusatzinformationen
 
-### `DeltaPublicState`
-Ein einzelner öffentlicher Zustandsübergang während der Auflösung eines Tricks.
+---
 
-Leitidee:
+## Protokollgrundsatz
 
-```text
-PublicState + DeltaPublicState -> neuer PublicState
-```
+Das Spielprotokoll soll **minimal, aber fachlich vollständig** sein.
 
-Ein kompletter Trick ergibt daher eine geordnete Folge von `DeltaPublicState`-Objekten.
+Die zentralen Synchronisationspunkte sind:
+- gemeinsamer Spiel- oder Rundenstart mit denselben Ausgangsdaten
+- vollständige Offenlegung aller gespielten Karten eines Stichs
+- Reihenwahl, wenn erforderlich
+- administrative Nachrichten wie Spielende, Abbruch, Disconnect oder Spieler weg
 
-## Engine
+Nicht Ziel des Spielfluss-Protokolls sind:
+- permanente Zustands-Snapshots
+- Zwischenstände jeder Mikroauflösung
+- Darstellungshilfen, die lokal aus der Engine berechnet werden können
 
-Die Engine enthält:
+Kurz:
 
-- Zustandsdataklassen in `engine/state.py`
-- Regeloperationen in `engine/game.py` und `engine/rules.py`
-- öffentliche Zustandsoperationen in `engine/public_state_ops.py`
-- spielerspezifische Hilfen in `engine/player_state_ops.py`
-- Projektionen von `GameState` nach `PublicState` bzw. `PlayerState` in `engine/views.py`
+**Arm im Protokoll, reich in der Engine.**
 
-Wichtiger Grundsatz:
+---
 
-- **fachliche Wahrheit** liegt in der Engine
-- **Darstellung für Menschen** liegt außerhalb der Engine
+## Wichtige Folge daraus
 
-### Beispiele für Engine-Verantwortung
+Nach den Synchronisationspunkten wird der sichtbare weitere Ablauf des Stichs lokal
+in jedem Prozess mit Hilfe der Engine berechnet.
 
-- Auswahl einer Karte gegen `PlayerState` validieren
-- Reihenwahl validieren
-- Trickauflösung starten und fortsetzen
-- `DeltaPublicState` erzeugen
-- `PublicState` durch Deltas fortschreiben
+Dazu gehören insbesondere:
+- normale Kartenplatzierung
+- Überlauf einer Reihe
+- kleinste Karte mit notwendiger Reihenwahl
+- betroffener Spieler
+- genommene Karten und daraus folgende Hornochsen
 
-## Hub
+Diese fachliche Auflösung soll nicht durch eine Explosion von Hub- oder
+Server-Messages beschrieben werden.
 
-Der Hub hält:
-- einen `GameState`
-- eine Outbox von Hub-Messages
+---
 
-Der Hub macht im Wesentlichen nur noch dies:
+## `CardsRevealed`
 
-1. Client-Message entgegennehmen
-2. passende Engine-Operation aufrufen
-3. neue Hub-Messages in die Outbox legen
+Die Offenlegung der gespielten Karten ist fachlich eine vollständige Sammlung aller
+gewählten Karten eines Stichs.
 
-Typische Hub-Messages sind:
-- `StateUpdated`
-- `ChooseCardRequested`
-- `ChooseRowRequested`
-- `TrickResolved`
+Wichtig:
 
-## Clients
+- die JSON-Liste ist nur ein Transportgefäß
+- ihre Reihenfolge hat keine fachliche Bedeutung
+- die Engine bestimmt lokal selbst die regelkonforme Auflösungsreihenfolge
 
-Clients sind austauschbar und verwenden dieselben Hub-Messages.
+---
 
-Aktuell gibt es:
-- `CliClient`
-- `RandomBotClient`
+## Empfang, Anwendung, Darstellung
 
-Später kann ein weiterer Client hinzukommen, ohne den Regelkern zu duplizieren.
+Durch TCP mit zeilenbasiertem Framing bleibt die Nachrichtenreihenfolge pro
+Verbindung erhalten.
 
-Wichtige Regel:
+Daraus folgt aber **nicht**, dass eine GUI eingehende Nachrichten sofort sichtbar
+"abspielen" muss.
 
-Clients dürfen eigene **Darstellungsstrukturen** besitzen, aber keine eigene Spiellogik.
+Jeder Client muss sauber trennen zwischen:
 
-Erlaubt sind also zum Beispiel:
-- sortierte Reihenanzeige in der CLI
-- GUI-spezifische Bounding Boxes
-- lokale Visualisierungscaches
+1. **empfangen**
+2. **fachlich anwenden**
+3. **darstellen / animieren**
+
+Diese Trennung ist zentral für robuste GUI-Arbeit.
+
+---
+
+## Trickauflösung: Resolver / Stepper
+
+Die Zielarchitektur für die Trickauflösung ist ein lokaler **Resolver / Stepper**.
+
+Das bedeutet:
+- die Engine erzeugt ein lokales Auflösungsobjekt
+- dieses liefert jeweils den nächsten fachlichen Schritt
+- bei externer Wahl, insbesondere Reihenwahl, pausiert es sauber
+- nach der Wahl läuft die Auflösung weiter
+
+Die GUI oder CLI beobachtet diese fachlichen Schritte.
+Sie wird nicht per Callback aus der Engine heraus gesteuert.
+
+---
+
+## GUI- und CLI-Prinzip
+
+GUI und CLI dürfen eigene Darstellungsstrukturen besitzen.
+Sie dürfen aber keine eigene Spiellogik neu erfinden.
+
+Erlaubt sind zum Beispiel:
+- Bounding Boxes
+- Sortier- oder Layout-Hilfen
+- Animationszustände
+- Darstellungscaches
 
 Nicht in Clients gehören:
-- Regelvalidierung, die schon in der Engine lebt
-- öffentliche Zustandsfortschreibung außerhalb der Engine
-- zweite Varianten der Trickauflösung
+- zweite Regelvalidierung
+- zweite Trickauflösung
+- lokale Sonderlogik, die der Engine widerspricht
 
-## Message-Fluss
+---
 
-Typischer Ablauf eines Stichs:
+## Debugging
 
-1. Hub sendet `StateUpdated`
-2. Hub sendet pro Spieler `ChooseCardRequested`
-3. Clients antworten mit `SubmitCard`
-4. Bei Bedarf sendet der Hub `ChooseRowRequested`
-5. Betroffener Client antwortet mit `SubmitRowChoice`
-6. Hub sendet `TrickResolved`
-7. Hub sendet den nächsten `StateUpdated`
+Das Projekt trennt bewusst:
+- **Spielfluss-Protokoll**
+- **optionales reichhaltiges Debugging**
 
-`TrickResolved` ist bewusst schlank gehalten. Die eigentliche öffentliche Fortschreibung kann mit der Engine aus dem letzten `PublicState` und den gelieferten Deltas nachvollzogen werden.
+Im normalen Spielfluss bleibt das Protokoll minimal.
 
-## Aktuelle Vereinfachungsrichtung
+Im Debugging darf bewusst "volle Bazooka" erlaubt sein, zum Beispiel:
+- vollständiger `GameState`
+- weitere Projektionen
+- interner Serverkontext
+- semantische Schrittspuren
 
-Die bisherige Entwicklung folgt diesen Leitlinien:
+Wichtig ist nur:
+- Debugging ist Zusatzsicht
+- Debugging ersetzt nicht die fachliche Vollständigkeit des Spielfluss-Protokolls
 
-- keine direkte Hub↔Client-Callback-API mehr
-- keine Commands-Schicht neben den Messages
-- keine zweite Spiellogik in Hub, CLI oder Bot
-- zentrale fachliche Arbeit mit `GameState`, `PublicState`, `PlayerState` und `DeltaPublicState`
+---
 
-## Noch bewusst offen
+## Praktische Leitfrage
 
-Noch **nicht** das aktuelle Arbeitsthema:
-- echter JSON-Transport
-- Socket-Kommunikation
-- persistente Spielhistorie
+Bei späteren Umbauten sollte immer zuerst gefragt werden:
 
-Die Architektur ist darauf vorbereitet, aber im Moment steht die saubere Python-interne Struktur im Vordergrund.
+- bleibt die Engine der eigentliche Bedeutungsträger?
+- bleibt das Protokoll minimal, aber vollständig?
+- bleibt die Reihenfolge von empfangen, anwenden und darstellen sauber getrennt?
+- bleibt die Trickauflösung als Resolver / Stepper lokal in der Engine?
+
+Wenn hier ein Nein auftaucht, läuft die Architektur sehr wahrscheinlich in die falsche
+Richtung.
