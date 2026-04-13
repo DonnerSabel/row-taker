@@ -43,6 +43,8 @@ def render_screen(state: CliState) -> str:
 def determine_prompt(state: CliState) -> str | None:
     if state.session_error is not None:
         return "Weiter mit Enter > " if state.exit_on_ack else None
+    if state.pending_resolution_lines:
+        return None
     match state.screen:
         case LobbyScreen(kind="main"):
             return "Auswahl > "
@@ -332,10 +334,12 @@ def render_revealed_trick(revealed: CardsRevealed | None, *, own_player_id) -> s
 
 
 def render_resolution_lines(state: CliState) -> str | None:
-    if not state.resolution_lines:
+    if not state.resolution_lines and not state.pending_resolution_lines:
         return None
     lines = ["Lokale Auflösung:"]
     lines.extend(f"  {line}" for line in state.resolution_lines)
+    if state.pending_resolution_lines:
+        lines.append(f"  ... {len(state.pending_resolution_lines)} weiterer Schritt(e) in der Warteschlange")
     return "\n".join(lines)
 
 def render_own_hand(player_state: PlayerState) -> str:

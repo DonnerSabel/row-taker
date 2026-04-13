@@ -82,6 +82,7 @@ class LocalServer:
     _start_in_progress: bool = False
     _connection_endpoints: dict[str, str | None] = field(default_factory=dict)
     _next_game_revision: int = 1
+    _match_abort_in_progress: bool = False
 
     def __post_init__(self) -> None:
         self.lobby_state = LobbyState(seat_count=self.seat_count)
@@ -376,8 +377,13 @@ class LocalServer:
         )
         if self.active_match is None:
             self._remove_participant(client_id)
+            self._connection_endpoints.pop(client_id, None)
             if self._start_in_progress and participant.kind == ParticipantKind.BOT:
                 self._abort_startup()
+            if self._match_abort_in_progress:
+                if not self.registry.records:
+                    self._match_abort_in_progress = False
+                return
             self._broadcast_lobby_state()
             return
 
@@ -438,14 +444,7 @@ class LocalServer:
                 )
             )
 
-        bot_client_ids = [
-            client_id
-            for client_id, entry in self.registry.records.items()
-            if entry.participant.kind == ParticipantKind.BOT
-        ]
-        for bot_client_id in bot_client_ids:
-            self._remove_participant(bot_client_id)
-            self._connection_endpoints.pop(bot_client_id, None)
+        self._match_abort_in_progress = True
         self._remove_participant(departing_client_id)
         self._connection_endpoints.pop(departing_client_id, None)
 

@@ -208,3 +208,24 @@ def test_game_messages_are_revisioned_when_routed() -> None:
     envelopes = server.drain_outbox()
     tagged = [env.message for env in envelopes if isinstance(env.message, CardsRevealed | ChooseRowRequested)]
     assert [message.revision for message in tagged] == [4, 5]
+
+
+def test_match_abort_does_not_broadcast_lobby_state_during_session_teardown() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=2)
+    server.register_connection("client-0", endpoint_display="10.0.0.1:1000")
+    server.register_connection("client-1", endpoint_display="10.0.0.2:1000")
+    server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
+    server.handle_client_message("client-1", JoinLobby(display_name="Bob"))
+    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
+    server.handle_client_message("client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1"))
+    server.drain_outbox()
+
+    server.handle_client_message("client-0", RequestStartGame())
+    server.drain_outbox()
+
+    server.handle_client_message("client-0", LeaveSession())
+    server.drain_outbox()
+    server.disconnect_client("client-1")
+    envelopes = server.drain_outbox()
+
+    assert not any(hasattr(envelope.message, "lobby") for envelope in envelopes)

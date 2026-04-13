@@ -37,6 +37,27 @@ class UserInputResult:
     outbound_message: ClientToServerMessage | None = None
 
 
+def append_resolution_lines(state: CliState, lines: tuple[str, ...]) -> CliState:
+    if not lines:
+        return state
+    return replace(state, pending_resolution_lines=state.pending_resolution_lines + lines)
+
+
+def reset_resolution_presentation(state: CliState) -> CliState:
+    return replace(state, resolution_lines=(), pending_resolution_lines=())
+
+
+def advance_presentation_queue(state: CliState) -> CliState:
+    if not state.pending_resolution_lines:
+        return state
+    next_line = state.pending_resolution_lines[0]
+    return replace(
+        state,
+        resolution_lines=state.resolution_lines + (next_line,),
+        pending_resolution_lines=state.pending_resolution_lines[1:],
+    )
+
+
 def reduce_server_message(state: CliState, message: ServerToClientMessage) -> CliState:
     match message:
         case IdentityAssigned(client_id=client_id):
@@ -55,6 +76,7 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 revealed_trick=None,
                 local_resolution=None,
                 resolution_lines=(),
+                pending_resolution_lines=(),
             )
         case StateUpdated(state=public_state):
             next_screen = state.screen
@@ -66,18 +88,21 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
             return replace(state, public_state=public_state, screen=next_screen, revealed_trick=None, local_resolution=next_local_resolution)
         case CardsRevealed() as revealed:
             local_resolution = None
-            resolution_lines = ()
+            queued_lines: tuple[str, ...] = ()
             if state.public_state is not None:
                 local_resolution = start_local_resolution(state.public_state, revealed)
-                resolution_lines = local_resolution.lines
-            return replace(state, revealed_trick=revealed, local_resolution=local_resolution, resolution_lines=resolution_lines, flash_message=None)
+                queued_lines = local_resolution.lines
+            next_state = replace(state, revealed_trick=revealed, local_resolution=local_resolution, flash_message=None)
+            return append_resolution_lines(next_state, queued_lines)
         case RowChoiceCommitted(row_id=row_id):
             local_resolution = state.local_resolution
-            resolution_lines = state.resolution_lines
+            newly_queued_lines: tuple[str, ...] = ()
             if local_resolution is not None and local_resolution.pending_row_choice is not None:
+                previous_count = len(local_resolution.lines)
                 local_resolution = apply_local_row_choice(local_resolution, row_id)
-                resolution_lines = local_resolution.lines
-            return replace(state, screen=GameScreen(kind="waiting"), local_resolution=local_resolution, resolution_lines=resolution_lines, flash_message=None)
+                newly_queued_lines = local_resolution.lines[previous_count:]
+            next_state = replace(state, screen=GameScreen(kind="waiting"), local_resolution=local_resolution, flash_message=None)
+            return append_resolution_lines(next_state, newly_queued_lines)
         case ChooseCardRequested(player_id=player_id, state=player_state):
             return replace(
                 state,
@@ -87,6 +112,7 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 revealed_trick=None,
                 local_resolution=None,
                 resolution_lines=(),
+                pending_resolution_lines=(),
             )
         case ChooseRowRequested(player_id=player_id, state=player_state):
             return replace(

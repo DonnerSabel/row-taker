@@ -101,7 +101,7 @@ def test_cards_revealed_builds_local_resolution_lines() -> None:
     state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
 
     assert state.local_resolution is not None
-    assert state.resolution_lines
+    assert state.pending_resolution_lines
 
 
 def test_row_choice_committed_advances_local_resolution() -> None:
@@ -126,4 +126,32 @@ def test_row_choice_committed_advances_local_resolution() -> None:
 
     assert state.local_resolution is not None
     assert state.local_resolution.pending_row_choice is None
-    assert any('startet mit' in line for line in state.resolution_lines)
+    assert any('startet mit' in line for line in state.pending_resolution_lines)
+
+
+def test_cards_revealed_queues_resolution_lines_before_display() -> None:
+    player_state = _player_state_for(0)
+    revealed = CardsRevealed(
+        plays=(
+            PlayedCardView(
+                player_id=player_state.public_state.players[0].player_id,
+                player_name=player_state.public_state.players[0].name,
+                card_value=104,
+            ),
+        ),
+    )
+
+    state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
+
+    assert state.resolution_lines == ()
+    assert state.pending_resolution_lines
+
+
+def test_pending_resolution_hides_prompt_until_queue_is_empty() -> None:
+    from row_taker.cli.render import determine_prompt
+    state = CliState(
+        screen=GameScreen(kind="choose_row", player_state=_player_state_for(0)),
+        pending_resolution_lines=("- Alice legt 1 an Reihe 1.",),
+    )
+
+    assert determine_prompt(state) is None

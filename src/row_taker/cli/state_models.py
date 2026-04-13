@@ -40,6 +40,7 @@ class CliState:
     revealed_trick: CardsRevealed | None = None
     local_resolution: LocalResolutionState | None = None
     resolution_lines: tuple[str, ...] = ()
+    pending_resolution_lines: tuple[str, ...] = ()
     received_game_revision: int | None = None
     applied_game_revision: int | None = None
     session_error: str | None = None
