@@ -47,7 +47,15 @@ class ClientSession:
         try:
             await self._refresh_screen(console, state)
             while not state.should_exit and not abort_requested:
-                state = self._apply_pending_server_messages(state, server_inbox)
+                state, applied_message = self._apply_next_server_message(state, server_inbox)
+                if applied_message:
+                    await self._refresh_screen(console, state)
+                    if state.should_exit:
+                        input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
+                        break
+                    presentation_task = self._ensure_presentation_task(state, presentation_task)
+                    continue
+
                 await self._refresh_screen(console, state)
                 if state.should_exit:
                     input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
@@ -156,21 +164,38 @@ class ClientSession:
             return asyncio.create_task(asyncio.sleep(0.15))
         return presentation_task
 
-    def _apply_pending_server_messages(
+    def _apply_next_server_message(
         self,
         state: CliState,
         server_inbox: deque[ServerToClientMessage],
-    ) -> CliState:
-        while server_inbox:
-            message = server_inbox.popleft()
-            state = reduce_server_message(state, message)
-            revision = get_game_message_revision(message)
-            if revision is not None:
-                state = replace(state, applied_game_revision=revision)
-            self.own_client_id = state.own_client_id
-            if state.should_exit:
-                break
-        return state
+    ) -> tuple[CliState, bool]:
+        if not server_inbox:
+            return state, False
+        next_message = server_inbox[0]
+        if self._should_defer_server_message_application(state, next_message):
+            return state, False
+
+        message = server_inbox.popleft()
+        state = reduce_server_message(state, message)
+        revision = get_game_message_revision(message)
+        if revision is not None:
+            state = replace(state, applied_game_revision=revision)
+        self.own_client_id = state.own_client_id
+        return state, True
+
+    def _should_defer_server_message_application(
+        self,
+        state: CliState,
+        message: ServerToClientMessage,
+    ) -> bool:
+        if not state.pending_resolution_lines:
+            return False
+        return not state.should_exit and not self._is_immediate_server_message(message)
+
+    def _is_immediate_server_message(self, message: ServerToClientMessage) -> bool:
+        from row_taker.protocol.messages import ServerError, SessionEnded
+
+        return isinstance(message, (SessionEnded, ServerError))
 
     async def _refresh_screen(self, console: CliConsole, state: CliState) -> None:
         view = build_view(state)

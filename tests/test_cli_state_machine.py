@@ -155,3 +155,22 @@ def test_pending_resolution_hides_prompt_until_queue_is_empty() -> None:
     )
 
     assert determine_prompt(state) is None
+
+
+
+def test_choose_card_requested_clears_visible_and_pending_resolution_lines() -> None:
+    player_state = _player_state_for(0)
+    state = CliState(
+        public_state=player_state.public_state,
+        resolution_lines=("- Alice legt 1 an Reihe 1.",),
+        pending_resolution_lines=("- Bob legt 2 an Reihe 2.",),
+    )
+
+    from row_taker.protocol.messages import ChooseCardRequested
+    new_state = reduce_server_message(
+        state,
+        ChooseCardRequested(player_id=player_state.self_player_id, state=player_state),
+    )
+
+    assert new_state.resolution_lines == ()
+    assert new_state.pending_resolution_lines == ()
