@@ -60,3 +60,12 @@ GameStateEnded = GameScreen
 
 def initial_cli_state(own_client_id: str | None = None) -> CliState:
     return CliState(own_client_id=own_client_id)
+
+
+
+def has_pending_presentation(state: CliState) -> bool:
+    return bool(state.pending_resolution_lines)
+
+
+def has_visible_resolution(state: CliState) -> bool:
+    return bool(state.resolution_lines)

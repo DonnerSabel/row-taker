@@ -8,6 +8,7 @@ from row_taker.cli.state_models import (
     GameScreen,
     LobbyScreen,
     UiMessage,
+    has_pending_presentation,
 )
 from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.protocol.messages import (
@@ -43,8 +44,8 @@ def render_screen(state: CliState) -> str:
 def determine_prompt(state: CliState) -> str | None:
     if state.session_error is not None:
         return "Weiter mit Enter > " if state.exit_on_ack else None
-    if state.pending_resolution_lines:
-        return None
+    if has_pending_presentation(state):
+        return "Weiter mit Enter > "
     match state.screen:
         case LobbyScreen(kind="main"):
             return "Auswahl > "

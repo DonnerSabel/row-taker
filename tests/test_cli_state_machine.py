@@ -147,14 +147,37 @@ def test_cards_revealed_queues_resolution_lines_before_display() -> None:
     assert state.pending_resolution_lines
 
 
-def test_pending_resolution_hides_prompt_until_queue_is_empty() -> None:
-    from row_taker.cli.render import determine_prompt
+def test_pending_resolution_uses_enter_prompt_until_queue_is_empty() -> None:
     state = CliState(
         screen=GameScreen(kind="choose_row", player_state=_player_state_for(0)),
         pending_resolution_lines=("- Alice legt 1 an Reihe 1.",),
     )
 
-    assert determine_prompt(state) is None
+    assert determine_prompt(state) == "Weiter mit Enter > "
+
+
+def test_enter_advances_pending_resolution_queue() -> None:
+    state = CliState(
+        screen=GameScreen(kind="waiting"),
+        pending_resolution_lines=("- Alice legt 1 an Reihe 1.", "- Bob legt 2 an Reihe 2."),
+    )
+
+    result = reduce_user_input(state, "")
+
+    assert result.state.resolution_lines == ("- Alice legt 1 an Reihe 1.",)
+    assert result.state.pending_resolution_lines == ("- Bob legt 2 an Reihe 2.",)
+
+
+def test_non_enter_during_pending_resolution_shows_hint() -> None:
+    state = CliState(
+        screen=GameScreen(kind="waiting"),
+        pending_resolution_lines=("- Alice legt 1 an Reihe 1.",),
+    )
+
+    result = reduce_user_input(state, "foo")
+
+    assert result.state.flash_message is not None
+    assert "Enter" in result.state.flash_message.text
 
 
 

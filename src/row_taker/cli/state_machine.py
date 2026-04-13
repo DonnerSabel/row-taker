@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 
 from row_taker.cli.local_resolution import apply_local_row_choice, start_local_resolution
 from row_taker.cli.row_display import build_row_display_mapping
-from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, UiMessage
+from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, UiMessage, has_pending_presentation
 from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
 from row_taker.protocol.messages import (
     AssignSeatToClient,
@@ -153,6 +153,11 @@ def reduce_user_input(state: CliState, text: str) -> UserInputResult:
 
     if state.session_error is not None:
         return _reduce_session_error_input(state, normalized)
+
+    if has_pending_presentation(state):
+        if normalized == "":
+            return UserInputResult(state=advance_presentation_queue(state))
+        return UserInputResult(state=_with_flash(state, "info", "Bitte zuerst die lokale Auflösung mit Enter weiterführen."))
 
     match state.screen:
         case LobbyScreen(kind="main"):

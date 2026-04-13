@@ -41,7 +41,6 @@ class ClientSession:
         )
         input_task: asyncio.Task[str] | None = None
         input_prompt: str | None = None
-        presentation_task: asyncio.Task[None] | None = None
         abort_requested = False
 
         try:
@@ -53,7 +52,6 @@ class ClientSession:
                     if state.should_exit:
                         input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
                         break
-                    presentation_task = self._ensure_presentation_task(state, presentation_task)
                     continue
 
                 await self._refresh_screen(console, state)
@@ -61,7 +59,11 @@ class ClientSession:
                     input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
                     break
 
-                presentation_task = self._ensure_presentation_task(state, presentation_task)
+                if not self.interactive and state.pending_resolution_lines:
+                    state = advance_presentation_queue(state)
+                    await self._refresh_screen(console, state)
+                    continue
+
                 current_prompt = build_view(state).prompt if self.interactive else None
                 if current_prompt is None:
                     input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
@@ -75,8 +77,6 @@ class ClientSession:
                     wait_tasks.add(server_task)
                 if input_task is not None:
                     wait_tasks.add(input_task)
-                if presentation_task is not None:
-                    wait_tasks.add(presentation_task)
                 if not wait_tasks:
                     break
 
@@ -101,11 +101,6 @@ class ClientSession:
                     if revision is not None:
                         state = replace(state, received_game_revision=revision)
                     server_task = asyncio.create_task(asyncio.to_thread(self.transport.receive))
-
-                if presentation_task is not None and presentation_task in done:
-                    presentation_task = None
-                    state = advance_presentation_queue(state)
-                    await self._refresh_screen(console, state)
 
                 if input_task is not None and input_task in done:
                     try:
@@ -136,10 +131,6 @@ class ClientSession:
                 return None
             return state.public_state
         finally:
-            if presentation_task is not None:
-                presentation_task.cancel()
-                with suppress(asyncio.CancelledError, KeyboardInterrupt):
-                    await presentation_task
             if server_task is not None:
                 server_task.cancel()
                 with suppress(asyncio.CancelledError, KeyboardInterrupt):
@@ -150,19 +141,6 @@ class ClientSession:
                     await input_task
             await console.close()
             self.transport.close()
-
-    def _ensure_presentation_task(
-        self,
-        state: CliState,
-        presentation_task: asyncio.Task[None] | None,
-    ) -> asyncio.Task[None] | None:
-        if not state.pending_resolution_lines:
-            if presentation_task is not None:
-                presentation_task.cancel()
-            return None
-        if presentation_task is None or presentation_task.done():
-            return asyncio.create_task(asyncio.sleep(0.15))
-        return presentation_task
 
     def _apply_next_server_message(
         self,
