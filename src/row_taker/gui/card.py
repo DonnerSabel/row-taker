@@ -1,7 +1,10 @@
 # card.py
 from pathlib import Path
+
 import pygame
-from row_taker.gui.constants import CARD_SCALE, CARD_ASPECT_RATIO
+
+from row_taker.gui.constants import CARD_ASPECT_RATIO, CARD_SCALE
+
 
 class Card:
     """Darstellbare 6-nimmt!-Karte mit Hover und Alpha-Hitbox."""
