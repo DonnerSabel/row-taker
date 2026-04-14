@@ -79,7 +79,7 @@ def test_cards_revealed_builds_local_presentation_events() -> None:
 
     state = apply_server_message(ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
 
-    assert state.local_resolution is not None
+    assert state.trick_presentation_state is not None
     assert state.pending_presentation_events
     assert isinstance(state.pending_presentation_events[0], PresentationCardsRevealed)
 
@@ -98,14 +98,14 @@ def test_row_choice_committed_advances_local_resolution() -> None:
     )
 
     state = apply_server_message(ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
-    assert state.local_resolution is not None
-    assert state.local_resolution.pending_row_choice is not None
+    assert state.trick_presentation_state is not None
+    assert state.trick_presentation_state.pending_row_choice is not None
 
     row_id = player_state.public_state.rows[0].row_id
     state = apply_server_message(state, RowChoiceCommitted(row_id=row_id))
 
-    assert state.local_resolution is not None
-    assert state.local_resolution.pending_row_choice is None
+    assert state.trick_presentation_state is not None
+    assert state.trick_presentation_state.pending_row_choice is None
     assert any(isinstance(event, PresentationRowTaken) for event in state.pending_presentation_events)
 
 
