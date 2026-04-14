@@ -80,9 +80,10 @@ def main() -> int:
     parser.add_argument("--port", type=int)
     parser.add_argument("--seat-count", type=int)
     parser.add_argument("--log-level")
+    parser.add_argument("--log-file")
     args = parser.parse_args()
 
-    configure_logging(args.log_level)
+    configure_logging(args.log_level, log_file=args.log_file)
 
     host = args.host or _prompt_choice(
         _discover_local_ipv4_addresses(),

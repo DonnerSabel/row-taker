@@ -66,7 +66,7 @@ class NetworkServer:
                 connection.close()
             logger.info(f"connection closed: client_id={client_id}")
             self.server.disconnect_client(client_id)
-            self._dispatch_locked(self.server.drain_outbox())
+            self._drain_and_dispatch_locked()
 
     def handle_client_message(self, client_id: str, message: ClientToServerMessage) -> str:
         with self._lock:
@@ -83,8 +83,18 @@ class NetworkServer:
                 connection = self._connections.get(client_id)
                 if connection is not None:
                     connection.send_message(IdentityAssigned(client_id=client_id))
-            self._dispatch_locked(self.server.drain_outbox())
+            self._drain_and_dispatch_locked()
             return client_id
+
+
+    def _drain_and_dispatch_locked(self) -> None:
+        while True:
+            envelopes = self.server.drain_outbox()
+            if not envelopes:
+                logger.debug("outbox drain: empty")
+                return
+            logger.debug("outbox drain: envelopes=%s", len(envelopes))
+            self._dispatch_locked(envelopes)
 
     def should_shutdown(self) -> bool:
         with self._lock:
@@ -99,17 +109,22 @@ class NetworkServer:
 
     def _dispatch_locked(self, envelopes: list[OutgoingEnvelope]) -> None:
         failed_client_ids: set[str] = set()
+        logger.debug("dispatch envelopes start: count=%s", len(envelopes))
         for envelope in envelopes:
             if envelope.target_client_id is None:
                 recipients = list(self._connections.values())
+                logger.debug("dispatch envelope broadcast: type=%s recipients=%s", type(envelope.message).__name__, [c.client_id for c in recipients])
             else:
                 connection = self._connections.get(envelope.target_client_id)
                 recipients = [] if connection is None else [connection]
+                logger.debug("dispatch envelope targeted: type=%s target=%s connection_found=%s", type(envelope.message).__name__, envelope.target_client_id, connection is not None)
             for connection in recipients:
                 if connection.client_id in failed_client_ids:
                     continue
                 try:
+                    logger.debug("send envelope start: type=%s target_client_id=%s", type(envelope.message).__name__, connection.client_id)
                     connection.send(envelope)
+                    logger.debug("send envelope success: type=%s target_client_id=%s", type(envelope.message).__name__, connection.client_id)
                 except TransportError as exc:
                     failed_client_ids.add(connection.client_id)
                     logger.info(
@@ -121,9 +136,7 @@ class NetworkServer:
                 if connection is not None:
                     connection.close()
                 self.server.disconnect_client(client_id)
-            extra_envelopes = self.server.drain_outbox()
-            if extra_envelopes:
-                self._dispatch_locked(extra_envelopes)
+            self._drain_and_dispatch_locked()
 
 
 def _format_endpoint(addr: object) -> str | None:

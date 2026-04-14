@@ -37,9 +37,10 @@ def main() -> None:
     parser.add_argument("--port", type=int)
     parser.add_argument("--name")
     parser.add_argument("--log-level")
+    parser.add_argument("--log-file")
     args, _unknown = parser.parse_known_args()
 
-    configure_logging(args.log_level)
+    configure_logging(args.log_level, log_file=args.log_file)
 
     clear_screen()
     print("Row-Taker – CLI")

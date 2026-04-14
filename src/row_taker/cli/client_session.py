@@ -100,6 +100,7 @@ class ClientSession:
                                 session_error="Die Verbindung zum Server wurde beendet.",
                                 exit_on_ack=False,
                             )
+                            logger.debug("connection closed without explicit SessionEnded: session_error set")
                             await self._refresh_screen(console, state)
                             server_task = None
                             continue
@@ -109,7 +110,7 @@ class ClientSession:
                     revision = get_game_message_revision(message)
                     if revision is not None:
                         state = replace(state, received_game_revision=revision)
-                        logger.debug("server message enqueued: type=%s revision=%s inbox_size=%s", type(message).__name__, revision, len(server_inbox))
+                        logger.debug("server message enqueued: type=%s revision=%s inbox_size=%s applied_revision=%s", type(message).__name__, revision, len(server_inbox), state.applied_game_revision)
                     server_task = asyncio.create_task(asyncio.to_thread(self.transport.receive))
 
                 if input_task is not None and input_task in done:
@@ -171,7 +172,7 @@ class ClientSession:
             return state, False
 
         message = server_inbox.popleft()
-        logger.debug("applying server message: type=%s", type(message).__name__)
+        logger.debug("applying server message: type=%s inbox_remaining=%s pending_presentation=%s", type(message).__name__, len(server_inbox), len(state.pending_presentation_events))
         state = reduce_server_message(state, message)
         revision = get_game_message_revision(message)
         if revision is not None:
