@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import logging
 from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass, replace
@@ -169,11 +168,22 @@ class ClientSession:
                 logger.debug("awaiting server receive task shutdown")
                 with suppress(asyncio.CancelledError, KeyboardInterrupt, ConnectionClosed):
                     await server_task
+                logger.debug("server receive task shutdown complete")
+            else:
+                logger.debug("server receive task shutdown skipped")
             if input_task is not None:
+                logger.debug("client input task cancel requested")
                 input_task.cancel()
+                logger.debug("awaiting client input task shutdown")
                 with suppress(asyncio.CancelledError, InputAborted, KeyboardInterrupt):
                     await input_task
+                logger.debug("client input task shutdown complete")
+            else:
+                logger.debug("client input task shutdown skipped")
+            logger.debug("console close start")
             await console.close()
+            logger.debug("console close complete")
+            logger.debug("client session cleanup finished")
 
     def _apply_next_server_message(
         self,

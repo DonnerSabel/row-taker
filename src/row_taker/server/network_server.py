@@ -167,7 +167,13 @@ def _serve_connection(conn: socket.socket, network_server: NetworkServer, endpoi
 
 
 def run_network_server(
-    host: str, port: int, *, rng: random.Random | None = None, seat_count: int = 4
+    host: str,
+    port: int,
+    *,
+    rng: random.Random | None = None,
+    seat_count: int = 4,
+    log_level: str | None = None,
+    log_file: str | None = None,
 ) -> None:
     if rng is None:
         rng = random.Random()
@@ -175,7 +181,12 @@ def run_network_server(
         listener.settimeout(0.5)
         actual_host, actual_port = listener.getsockname()[:2]
         logger.info(f"server started on {actual_host}:{actual_port}")
-        server_handle = ServerHandle(host=actual_host, port=actual_port)
+        server_handle = ServerHandle(
+            host=actual_host,
+            port=actual_port,
+            log_level=log_level,
+            log_file=log_file,
+        )
         local_server = LocalServer(rng=rng, seat_count=seat_count, server_handle=server_handle)
         network_server = NetworkServer(server=local_server)
         while True:

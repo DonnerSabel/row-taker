@@ -91,7 +91,13 @@ def main() -> int:
     )
     port = args.port if args.port is not None else _prompt_port()
     seat_count = args.seat_count if args.seat_count is not None else _prompt_seat_count()
-    run_network_server(host, port, seat_count=seat_count)
+    run_network_server(
+        host,
+        port,
+        seat_count=seat_count,
+        log_level=args.log_level,
+        log_file=args.log_file,
+    )
     return 0
 
 

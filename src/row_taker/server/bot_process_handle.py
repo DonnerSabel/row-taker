@@ -19,23 +19,31 @@ class BotProcessHandle:
         client_id: str,
         seed: int,
         python_executable: str = sys.executable,
+        log_level: str | None = None,
+        log_file: str | None = None,
     ) -> BotProcessHandle:
+        argv = [
+            python_executable,
+            "-m",
+            "row_taker.bots.process_main",
+            "--host",
+            host,
+            "--port",
+            str(port),
+            "--display-name",
+            display_name,
+            "--client-id",
+            client_id,
+            "--seed",
+            str(seed),
+        ]
+        if log_level:
+            argv.extend(["--log-level", log_level])
+        if log_file:
+            argv.extend(["--log-file", log_file])
+
         process = subprocess.Popen(
-            [
-                python_executable,
-                "-m",
-                "row_taker.bots.process_main",
-                "--host",
-                host,
-                "--port",
-                str(port),
-                "--display-name",
-                display_name,
-                "--client-id",
-                client_id,
-                "--seed",
-                str(seed),
-            ],
+            argv,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

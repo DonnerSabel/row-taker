@@ -6,6 +6,7 @@ import random
 import sys
 
 from row_taker.clients.random_bot_client import RandomBotClient
+from row_taker.logging_utils import configure_logging
 from row_taker.protocol.errors import ConnectionClosed, TransportError
 from row_taker.protocol.messages import JoinLobby, SessionEnded
 from row_taker.protocol.transport import ClientTransport
@@ -21,7 +22,11 @@ def main() -> int:
     parser.add_argument("--display-name", required=True)
     parser.add_argument("--client-id", required=True)
     parser.add_argument("--seed", required=True, type=int)
+    parser.add_argument("--log-level")
+    parser.add_argument("--log-file")
     args = parser.parse_args()
+
+    configure_logging(args.log_level, log_file=args.log_file)
 
     bot = RandomBotClient(rng=random.Random(args.seed))
     transport = ClientTransport.connect(args.host, args.port)
@@ -50,7 +55,10 @@ def main() -> int:
         print(f"Bot transport error: {exc}", file=sys.stderr)
         return 1
     finally:
+        logger.debug("bot transport close start")
         transport.close()
+        logger.debug("bot transport close complete")
+        logger.debug("bot process main finished")
 
 
 if __name__ == "__main__":
