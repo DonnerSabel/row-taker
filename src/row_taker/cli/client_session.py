@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import logging
 from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass, replace
@@ -59,6 +60,11 @@ class ClientSession:
 
                 await self._refresh_screen(console, state)
                 if state.should_exit:
+                    logger.debug(
+                        "session ended state entered: session_error=%s suppress_final_result=%s",
+                        state.session_error,
+                        state.suppress_final_result,
+                    )
                     input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
                     break
 
@@ -106,6 +112,7 @@ class ClientSession:
                             continue
                         break
                     logger.debug("server message received: type=%s", type(message).__name__)
+                    logger.debug("server message queued from transport: type=%s", type(message).__name__)
                     server_inbox.append(message)
                     revision = get_game_message_revision(message)
                     if revision is not None:
@@ -139,20 +146,34 @@ class ClientSession:
                             break
                         await self._refresh_screen(console, state)
 
+            logger.debug(
+                "client main loop exiting: should_exit=%s suppress_final_result=%s session_error=%s",
+                state.should_exit,
+                state.suppress_final_result,
+                state.session_error,
+            )
             if state.suppress_final_result or state.session_error is not None:
                 return None
             return state.public_state
         finally:
+            logger.debug(
+                "client session cleanup start: server_task=%s input_task=%s",
+                server_task is not None,
+                input_task is not None,
+            )
+            logger.debug("transport close requested")
+            self.transport.close()
             if server_task is not None:
+                logger.debug("server receive task cancel requested")
                 server_task.cancel()
-                with suppress(asyncio.CancelledError, KeyboardInterrupt):
+                logger.debug("awaiting server receive task shutdown")
+                with suppress(asyncio.CancelledError, KeyboardInterrupt, ConnectionClosed):
                     await server_task
             if input_task is not None:
                 input_task.cancel()
                 with suppress(asyncio.CancelledError, InputAborted, KeyboardInterrupt):
                     await input_task
             await console.close()
-            self.transport.close()
 
     def _apply_next_server_message(
         self,
