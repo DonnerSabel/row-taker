@@ -3,30 +3,33 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from row_taker.cli.local_resolution import apply_local_row_choice, start_local_resolution
-from row_taker.cli.state_models import (
-    CliState,
-    GameScreen,
-    LobbyScreen,
-    UiMessage,
-    has_pending_presentation,
-    with_core_updates,
-    with_feedback_updates,
-    with_screen,
-)
 from row_taker.client.actions import (
-    UiAction,
-    UiActionAdvancePresentation,
-    UiActionAssignSelfToSeat,
-    UiActionChooseCard,
-    UiActionChooseRow,
-    UiActionClearSeat,
-    UiActionCreateBot,
-    UiActionLeaveSession,
-    UiActionRename,
-    UiActionStartGame,
+    ClientAction,
+    ClientActionAdvancePresentation,
+    ClientActionAssignSelfToSeat,
+    ClientActionChooseCard,
+    ClientActionChooseRow,
+    ClientActionClearSeat,
+    ClientActionCreateBot,
+    ClientActionLeaveSession,
+    ClientActionRename,
+    ClientActionStartGame,
 )
 from row_taker.client.core_state import ClientMode, PendingAction
 from row_taker.client.presentation_events import PresentationEvent
+from row_taker.client.state import (
+    ClientState,
+    UiMessage,
+    show_choose_card,
+    show_choose_row,
+    show_game_waiting,
+    show_lobby_bot_name,
+    show_lobby_main,
+    show_lobby_rename,
+    show_lobby_seat_edit,
+    with_core_updates,
+    with_feedback_updates,
+)
 from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
 from row_taker.protocol.messages import (
     AssignSeatToClient,
@@ -55,12 +58,13 @@ from row_taker.protocol.messages import (
 
 @dataclass(frozen=True, slots=True)
 class ActionResult:
-    state: CliState
+    state: ClientState
     outbound_message: ClientToServerMessage | None = None
     local_message: str | None = None
 
 
-def append_presentation_events(state: CliState, events: tuple[PresentationEvent, ...]) -> CliState:
+
+def append_presentation_events(state: ClientState, events: tuple[PresentationEvent, ...]) -> ClientState:
     if not events:
         return state
     return with_core_updates(
@@ -69,7 +73,8 @@ def append_presentation_events(state: CliState, events: tuple[PresentationEvent,
     )
 
 
-def advance_presentation_queue(state: CliState) -> CliState:
+
+def advance_presentation_queue(state: ClientState) -> ClientState:
     if not state.pending_presentation_events:
         return state
     next_event = state.pending_presentation_events[0]
@@ -80,7 +85,8 @@ def advance_presentation_queue(state: CliState) -> CliState:
     )
 
 
-def reduce_server_message(state: CliState, message: ServerToClientMessage) -> CliState:
+
+def reduce_server_message(state: ClientState, message: ServerToClientMessage) -> ClientState:
     match message:
         case IdentityAssigned(client_id=client_id):
             return with_core_updates(state, own_client_id=client_id)
@@ -89,7 +95,7 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
         case LobbyActionRejected(message=text):
             return with_feedback_updates(state, flash_message=UiMessage(level="error", text=text))
         case GameStarting(lobby=lobby):
-            next_state = with_screen(state, GameScreen(kind="waiting"))
+            next_state = show_game_waiting(state)
             next_state = with_core_updates(
                 next_state,
                 lobby_view=lobby,
@@ -104,7 +110,7 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
         case StateUpdated(state=public_state):
             next_state = state
             if next_state.pending_action == PendingAction.CHOOSE_ROW:
-                next_state = with_screen(next_state, GameScreen(kind="waiting", player_state=next_state.player_state))
+                next_state = show_game_waiting(next_state)
             next_local_resolution = next_state.local_resolution
             if next_local_resolution is not None and next_local_resolution.pending_row_choice is None:
                 next_local_resolution = None
@@ -134,12 +140,12 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 previous_count = len(local_resolution.events)
                 local_resolution = apply_local_row_choice(local_resolution, row_id)
                 newly_queued_events = local_resolution.events[previous_count:]
-            next_state = with_screen(state, GameScreen(kind="waiting", player_state=state.player_state))
+            next_state = show_game_waiting(state)
             next_state = with_core_updates(next_state, trick_presentation_state=local_resolution)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return append_presentation_events(next_state, newly_queued_events)
         case ChooseCardRequested(player_id=player_id, state=player_state):
-            next_state = with_screen(state, GameScreen(kind="choose_card", player_state=player_state))
+            next_state = show_choose_card(state, player_state)
             next_state = with_core_updates(
                 next_state,
                 own_player_id=player_id,
@@ -154,7 +160,7 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
             )
             return with_feedback_updates(next_state, flash_message=None)
         case ChooseRowRequested(player_id=player_id, state=player_state):
-            next_state = with_screen(state, GameScreen(kind="choose_row", player_state=player_state))
+            next_state = show_choose_row(state, player_state)
             next_state = with_core_updates(
                 next_state,
                 own_player_id=player_id,
@@ -166,102 +172,99 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
             return with_feedback_updates(next_state, flash_message=None)
         case SessionEnded(message=text):
             next_state = with_core_updates(state, session_error=text)
-            next_state = with_feedback_updates(
+            return with_feedback_updates(
                 next_state,
                 exit_on_ack=False,
                 suppress_final_result=True,
                 should_exit=True,
                 flash_message=None,
             )
-            return next_state
         case ServerError(message=text):
             next_state = with_core_updates(state, session_error=text)
-            next_state = with_feedback_updates(
+            return with_feedback_updates(
                 next_state,
                 exit_on_ack=True,
                 suppress_final_result=True,
                 flash_message=None,
             )
-            return next_state
         case _:
             raise TypeError(f"unsupported server message type: {type(message)!r}")
 
 
-def apply_ui_action(state: CliState, action: UiAction) -> ActionResult:
+
+def apply_ui_action(state: ClientState, action: ClientAction) -> ActionResult:
     match action:
-        case UiActionLeaveSession():
+        case ClientActionLeaveSession():
             return ActionResult(
                 state=with_feedback_updates(state, should_exit=True, suppress_final_result=True),
                 outbound_message=LeaveSession(),
             )
-        case UiActionAdvancePresentation():
+        case ClientActionAdvancePresentation():
             return ActionResult(state=advance_presentation_queue(state))
-        case UiActionRename(name=name):
-            next_state = with_screen(state, LobbyScreen(kind="main"))
+        case ClientActionRename(name=name):
+            next_state = show_lobby_main(state)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=SetDisplayName(display_name=name),
             )
-        case UiActionAssignSelfToSeat(seat_index=seat_index):
+        case ClientActionAssignSelfToSeat(seat_index=seat_index):
             if state.own_client_id is None:
                 return ActionResult(state=state, local_message="Eigene client_id unbekannt.")
-            next_state = with_screen(state, LobbyScreen(kind="main"))
+            next_state = show_lobby_main(state)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=AssignSeatToClient(seat_index=seat_index, target_client_id=state.own_client_id),
             )
-        case UiActionCreateBot(seat_index=seat_index, name=name):
-            next_state = with_screen(state, LobbyScreen(kind="main"))
+        case ClientActionCreateBot(seat_index=seat_index, name=name):
+            next_state = show_lobby_main(state)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=CreateLocalBotOnSeat(seat_index=seat_index, display_name=name),
             )
-        case UiActionClearSeat(seat_index=seat_index):
-            next_state = with_screen(state, LobbyScreen(kind="main"))
+        case ClientActionClearSeat(seat_index=seat_index):
+            next_state = show_lobby_main(state)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=ClearSeat(seat_index=seat_index),
             )
-        case UiActionStartGame():
-            next_state = with_screen(state, LobbyScreen(kind="main"))
+        case ClientActionStartGame():
+            next_state = show_lobby_main(state)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=RequestStartGame(),
             )
-        case UiActionChooseCard(card_value=value):
-            screen = state.screen
-            player_state = screen.player_state if isinstance(screen, GameScreen) and screen.kind == "choose_card" else None
+        case ClientActionChooseCard(card_value=value):
+            player_state = state.player_state if state.pending_action == PendingAction.CHOOSE_CARD else None
             if player_state is None:
                 return ActionResult(state=state, local_message="Keine Kartenauswahl aktiv.")
             try:
                 validate_submit_card(player_state, value)
             except Exception as exc:
                 return ActionResult(state=state, local_message=str(exc))
-            next_state = with_screen(state, GameScreen(kind="waiting", player_state=player_state))
+            next_state = show_game_waiting(state, player_state)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=SubmitCard(card_value=value),
             )
-        case UiActionChooseRow(row_id=row_id):
-            screen = state.screen
-            player_state = screen.player_state if isinstance(screen, GameScreen) and screen.kind == "choose_row" else None
+        case ClientActionChooseRow(row_id=row_id):
+            player_state = state.player_state if state.pending_action == PendingAction.CHOOSE_ROW else None
             if player_state is None:
                 return ActionResult(state=state, local_message="Keine Reihenwahl aktiv.")
             try:
                 validate_submit_row_choice(player_state, row_id)
             except Exception as exc:
                 return ActionResult(state=state, local_message=str(exc))
-            next_state = with_screen(state, GameScreen(kind="waiting", player_state=player_state))
+            next_state = show_game_waiting(state, player_state)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=SubmitRowChoice(row_id=row_id),
             )
         case _:
-            raise TypeError(f"unsupported ui action type: {type(action)!r}")
+            raise TypeError(f"unsupported client action type: {type(action)!r}")

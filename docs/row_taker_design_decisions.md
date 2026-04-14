@@ -676,3 +676,17 @@ Consequences:
 Target model:
 - human client = `GameClientCore` + frontend
 - bot = `GameClientCore` + decision layer
+
+### Current naming and module boundaries
+
+The shared client state now lives in `row_taker.client.state` as `ClientState`.
+It is no longer defined in `row_taker.cli.*`.
+
+Consequences:
+- the client core must not import state models from `row_taker.cli.*`
+- client actions live in `row_taker.client.actions` and use the neutral
+  `ClientAction...` naming scheme
+- CLI-specific screen projection lives in `row_taker.cli.screens`
+- the CLI frontend may derive `LobbyScreen` and `GameScreen` from `ClientState`,
+  but the core should operate on `ClientState`, `ClientMode`, and
+  `PendingAction`

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from row_taker.client.core_state import ClientCoreState
 
 from row_taker.cli.frontend import CliFrontend, set_flash
 from row_taker.cli.render import render_screen
-from row_taker.cli.state_models import CliState, LobbyScreen, with_screen
+from row_taker.cli.screens import LobbyScreen, current_screen
 from row_taker.client.game_client_core import GameClientCore
+from row_taker.client.state import ClientState, show_lobby_main, show_lobby_seat_edit
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     IdentityAssigned,
@@ -65,14 +64,17 @@ def _lobby() -> LobbyView:
     )
 
 
-def _apply_server_message(state: CliState, message) -> CliState:
+
+def _apply_server_message(state: ClientState, message) -> ClientState:
     core = GameClientCore(state)
-    update = core.on_server_message(message)
+    core.on_server_message(message)
     return core.state
 
 
-def _apply_user_input(state: CliState, text: str):
-    previous_screen = state.screen
+
+def _apply_user_input(state: ClientState, text: str):
+    previous_submenu = state.navigation_state.lobby_submenu
+    previous_seat = state.navigation_state.selected_seat_index
     parsed = _FRONTEND.handle_text_input(state, text)
     state = parsed.state
     if parsed.action is None:
@@ -81,46 +83,54 @@ def _apply_user_input(state: CliState, text: str):
     update = core.on_ui_action(parsed.action)
     state = core.state
     if update.local_messages:
-        state = with_screen(state, previous_screen)
+        if previous_submenu == "main":
+            state = show_lobby_main(state)
+        else:
+            assert previous_seat is not None
+            state = show_lobby_seat_edit(state, previous_seat)
         state = set_flash(state, "error", update.local_messages[-1])
         return state, None
     outbound = update.outbound_messages[0] if update.outbound_messages else None
     return state, outbound
 
 
+
 def test_reduce_server_message_stores_own_client_id_from_identity_assigned() -> None:
-    state = CliState()
+    state = ClientState()
 
     new_state = _apply_server_message(state, IdentityAssigned(client_id="client-1"))
 
     assert new_state.own_client_id == "client-1"
-    assert new_state.screen == LobbyScreen(kind="main")
+    assert current_screen(new_state) == LobbyScreen(kind="main")
+
 
 
 def test_reduce_user_input_assign_seat_uses_explicit_own_client_id() -> None:
-    state = CliState(core_state=ClientCoreState(own_client_id="client-1", lobby_view=_lobby()))
-    state = with_screen(state, LobbyScreen(kind="seat_edit", seat_index=0))
+    state = ClientState(core_state=ClientCoreState(own_client_id="client-1", lobby_view=_lobby()))
+    state = show_lobby_seat_edit(state, 0)
 
     state, outbound = _apply_user_input(state, "m")
 
-    assert state.screen == LobbyScreen(kind="main")
+    assert current_screen(state) == LobbyScreen(kind="main")
     assert outbound == AssignSeatToClient(seat_index=0, target_client_id="client-1")
 
 
+
 def test_reduce_user_input_assign_seat_without_identity_sets_local_error() -> None:
-    state = CliState(core_state=ClientCoreState(lobby_view=_lobby()))
-    state = with_screen(state, LobbyScreen(kind="seat_edit", seat_index=0))
+    state = ClientState(core_state=ClientCoreState(lobby_view=_lobby()))
+    state = show_lobby_seat_edit(state, 0)
 
     state, outbound = _apply_user_input(state, "m")
 
     assert outbound is None
-    assert state.screen == LobbyScreen(kind="seat_edit", seat_index=0)
+    assert current_screen(state) == LobbyScreen(kind="seat_edit", seat_index=0)
     assert "client_id" in (state.flash_message.text if state.flash_message else "")
 
 
+
 def test_render_lobby_shows_participants_and_marks_own_client() -> None:
-    state = CliState(core_state=ClientCoreState(own_client_id="client-1", lobby_view=_lobby()))
-    state = with_screen(state, LobbyScreen(kind="main"))
+    state = ClientState(core_state=ClientCoreState(own_client_id="client-1", lobby_view=_lobby()))
+    state = show_lobby_main(state)
 
     out = render_screen(state)
     assert "Teilnehmer" in out
@@ -129,11 +139,12 @@ def test_render_lobby_shows_participants_and_marks_own_client() -> None:
     assert "Bot_1 (bot, Platz 2)" in out
 
 
+
 def test_reduce_server_message_lobby_update_keeps_active_lobby_mode() -> None:
-    state = CliState(core_state=ClientCoreState(own_client_id="client-1"))
-    state = with_screen(state, LobbyScreen(kind="seat_edit", seat_index=2))
+    state = ClientState(core_state=ClientCoreState(own_client_id="client-1"))
+    state = show_lobby_seat_edit(state, 2)
 
     new_state = _apply_server_message(state, LobbyStateUpdated(lobby=_lobby()))
 
     assert new_state.lobby_view == _lobby()
-    assert new_state.screen == LobbyScreen(kind="seat_edit", seat_index=2)
+    assert current_screen(new_state) == LobbyScreen(kind="seat_edit", seat_index=2)

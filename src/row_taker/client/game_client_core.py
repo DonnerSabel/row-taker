@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from collections import deque
 
-from row_taker.cli.state_models import CliState, initial_cli_state, with_core_updates, with_feedback_updates
-from row_taker.client.actions import UiAction
+from row_taker.client.actions import ClientAction
 from row_taker.client.core_reducer import apply_ui_action, reduce_server_message
+from row_taker.client.state import ClientState, initial_client_state, with_core_updates, with_feedback_updates
 from row_taker.client.update import CoreUpdate
 from row_taker.protocol.messages import ServerError, ServerToClientMessage, SessionEnded, get_game_message_revision
 
 
 class GameClientCore:
-    def __init__(self, state: CliState | None = None) -> None:
-        self.state = initial_cli_state() if state is None else state
+    def __init__(self, state: ClientState | None = None) -> None:
+        self.state = initial_client_state() if state is None else state
         self._server_inbox: deque[ServerToClientMessage] = deque()
 
     @property
@@ -25,7 +25,7 @@ class GameClientCore:
             self.state = with_core_updates(self.state, received_game_revision=revision)
         return self._drain_server_inbox()
 
-    def on_ui_action(self, action: UiAction) -> CoreUpdate:
+    def on_ui_action(self, action: ClientAction) -> CoreUpdate:
         result = apply_ui_action(self.state, action)
         self.state = result.state
         first = CoreUpdate(

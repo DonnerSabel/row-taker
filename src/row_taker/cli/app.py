@@ -7,8 +7,8 @@ from contextlib import suppress
 from row_taker.cli.console import CliConsole, InputAborted
 from row_taker.cli.frontend import CliFrontend, set_flash
 from row_taker.cli.render import build_view
-from row_taker.cli.state_models import CliState, initial_cli_state
-from row_taker.client.actions import UiActionAdvancePresentation
+from row_taker.client.state import ClientState, initial_client_state
+from row_taker.client.actions import ClientActionAdvancePresentation
 from row_taker.client.game_client_core import GameClientCore
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.errors import ConnectionClosed
@@ -19,7 +19,7 @@ logger = logging.getLogger("row_taker.cli.app")
 
 
 class CliApp:
-    def __init__(self, transport: ClientTransport, own_client_id: str | None = None, *, interactive: bool = True, console_factory: type[CliConsole] = CliConsole, initial_state_factory=initial_cli_state) -> None:
+    def __init__(self, transport: ClientTransport, own_client_id: str | None = None, *, interactive: bool = True, console_factory: type[CliConsole] = CliConsole, initial_state_factory=initial_client_state) -> None:
         self.transport = transport
         self.own_client_id = own_client_id
         self.interactive = interactive
@@ -40,7 +40,7 @@ class CliApp:
             while not state.should_exit and not abort_requested:
                 state = core.state
                 if not self.interactive and core.has_pending_presentation():
-                    state, _ = await self._process_action(console, core, UiActionAdvancePresentation())
+                    state, _ = await self._process_action(console, core, ClientActionAdvancePresentation())
                     continue
 
                 current_prompt = build_view(state).prompt if self.interactive else None
@@ -130,12 +130,12 @@ class CliApp:
             logger.debug("console close complete")
             logger.debug("client session cleanup finished")
 
-    async def _process_action(self, console: CliConsole, core: GameClientCore, action: object) -> tuple[CliState, tuple[object, ...]]:
+    async def _process_action(self, console: CliConsole, core: GameClientCore, action: object) -> tuple[ClientState, tuple[object, ...]]:
         update = core.on_ui_action(action)
         state = await self._apply_update(console, core, update)
         return state, update.outbound_messages
 
-    async def _apply_update(self, console: CliConsole, core: GameClientCore, update) -> CliState:
+    async def _apply_update(self, console: CliConsole, core: GameClientCore, update) -> ClientState:
         state = core.state
         if update.local_messages:
             state = set_flash(state, "error", update.local_messages[-1])
@@ -146,7 +146,7 @@ class CliApp:
         self.own_client_id = core.state.own_client_id
         return core.state
 
-    async def _render(self, console: CliConsole, state: CliState) -> None:
+    async def _render(self, console: CliConsole, state: ClientState) -> None:
         view = build_view(state)
         prompt = view.prompt if self.interactive else None
         await console.render(view.body, prompt)

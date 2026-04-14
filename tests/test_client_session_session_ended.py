@@ -44,6 +44,7 @@ class _FakeTransport:
         self.closed = True
 
 
+
 def test_session_ended_clears_prompt_before_shutdown() -> None:
     transport = _FakeTransport()
     session = ClientSession(transport=transport, console_factory=_FakeConsole)
@@ -65,6 +66,7 @@ class _QueuedTransport:
 
     def receive(self) -> object:
         from row_taker.protocol.errors import ConnectionClosed
+
         if self._messages:
             return self._messages.pop(0)
         raise ConnectionClosed("done")
@@ -76,21 +78,22 @@ class _QueuedTransport:
         self.closed = True
 
 
+
 def test_client_session_applies_game_messages_one_by_one_around_presentation_queue() -> None:
+    import random
+
+    from row_taker.client.core_state import ClientCoreState
+    from row_taker.client.state import ClientState, show_game_waiting
     from row_taker.engine.game import build_player_state, setup_game
     from row_taker.protocol.messages import CardsRevealed, PlayedCardView, StateUpdated
-    import random
 
     game = setup_game(["Alice", "Bob"], rng=random.Random(123))
     player_state = build_player_state(game, game.players[0].player_id)
     public_state = player_state.public_state
 
-    from row_taker.cli.state_models import CliState, with_screen
-    from row_taker.client.core_state import ClientCoreState
-
-    def _initial_state(_own_client_id=None) -> CliState:
-        state = CliState(core_state=ClientCoreState(public_state=public_state))
-        return with_screen(state, __import__("row_taker.cli.state_models", fromlist=["GameScreen"]).GameScreen(kind="waiting"))
+    def _initial_state(_own_client_id=None) -> ClientState:
+        state = ClientState(core_state=ClientCoreState(public_state=public_state))
+        return show_game_waiting(state)
 
     messages = [
         StateUpdated(state=public_state),

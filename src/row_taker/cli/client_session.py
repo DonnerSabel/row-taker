@@ -5,13 +5,13 @@ import asyncio
 from row_taker.cli.app import CliApp
 from row_taker.cli.console import CliConsole as _CliConsole
 from row_taker.cli.render import render_public_state
-from row_taker.cli.state_models import initial_cli_state as _initial_cli_state
+from row_taker.client.state import initial_client_state as _initial_client_state
 from row_taker.cli.terminal import clear_screen
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.transport import ClientTransport
 
 CliConsole = _CliConsole
-initial_cli_state = _initial_cli_state
+initial_client_state = _initial_client_state
 
 
 class ClientSession:
@@ -19,7 +19,7 @@ class ClientSession:
         if console_factory is None:
             console_factory = CliConsole
         if initial_state_factory is None:
-            initial_state_factory = initial_cli_state
+            initial_state_factory = initial_client_state
         self.app = CliApp(transport=transport, own_client_id=own_client_id, interactive=interactive, console_factory=console_factory, initial_state_factory=initial_state_factory)
 
     @property

@@ -3,14 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from row_taker.cli.row_display import build_row_display_mapping
+from row_taker.cli.screens import GameScreen, LobbyScreen, current_screen
 from row_taker.client.core_state import ClientMode, PendingAction, initial_client_core_state
-from row_taker.cli.state_models import (
-    CliState,
-    GameScreen,
-    LobbyScreen,
-    UiMessage,
-    has_pending_presentation,
-)
+from row_taker.client.state import ClientState, UiMessage, has_pending_presentation
 from row_taker.client.presentation_events import (
     PresentationCardPlaced,
     PresentationCardsRevealed,
@@ -31,29 +26,31 @@ class ScreenView:
     prompt: str | None
 
 
-def build_view(state: CliState) -> ScreenView:
+def build_view(state: ClientState) -> ScreenView:
     if state.session_error is not None:
         return ScreenView(body=render_session_error(state.session_error), prompt=determine_prompt(state))
     body = render_main_screen(state)
     if state.flash_message is not None:
-        body = "\n\n".join([body, render_flash_message(state.flash_message)])
+        body = "
+
+".join([body, render_flash_message(state.flash_message)])
     return ScreenView(body=body, prompt=determine_prompt(state))
 
 
-def get_prompt(state: CliState) -> str | None:
+def get_prompt(state: ClientState) -> str | None:
     return build_view(state).prompt
 
 
-def render_screen(state: CliState) -> str:
+def render_screen(state: ClientState) -> str:
     return build_view(state).body
 
 
-def determine_prompt(state: CliState) -> str | None:
+def determine_prompt(state: ClientState) -> str | None:
     if state.session_error is not None:
         return "Weiter mit Enter > " if state.exit_on_ack else None
     if has_pending_presentation(state):
         return "Weiter mit Enter > "
-    match state.screen:
+    match current_screen(state):
         case LobbyScreen(kind="main"):
             return "Auswahl > "
         case LobbyScreen(kind="rename"):
@@ -70,11 +67,11 @@ def determine_prompt(state: CliState) -> str | None:
             return "Reihe > "
         case GameScreen(kind="ended"):
             return "Weiter mit Enter > "
-    raise TypeError(f"unsupported screen: {state.screen!r}")
+    raise TypeError(f"unsupported screen: {current_screen(state)!r}")
 
 
-def render_main_screen(state: CliState) -> str:
-    match state.screen:
+def render_main_screen(state: ClientState) -> str:
+    match current_screen(state):
         case LobbyScreen(kind="main"):
             return render_lobby_main(state)
         case LobbyScreen(kind="rename"):
@@ -91,20 +88,23 @@ def render_main_screen(state: CliState) -> str:
             return render_game_choose_row(state)
         case GameScreen(kind="ended"):
             return render_game_ended(state)
-    raise TypeError(f"unsupported screen: {state.screen!r}")
+    raise TypeError(f"unsupported screen: {current_screen(state)!r}")
 
 
 def render_session_error(message: str) -> str:
-    return "\n".join(["Spielabbruch", "-----------", message])
+    return "
+".join(["Spielabbruch", "-----------", message])
 
 
 def render_flash_message(message: UiMessage) -> str:
     title = "Fehler" if message.level == "error" else "Hinweis"
-    return "\n".join([f"{title}: {message.text}"])
+    return "
+".join([f"{title}: {message.text}"])
 
 
-def render_lobby_main(state: CliState) -> str:
-    return "\n".join(
+def render_lobby_main(state: ClientState) -> str:
+    return "
+".join(
         [
             render_lobby_overview(state),
             "",
@@ -117,8 +117,9 @@ def render_lobby_main(state: CliState) -> str:
     )
 
 
-def render_lobby_rename(state: CliState) -> str:
-    return "\n".join(
+def render_lobby_rename(state: ClientState) -> str:
+    return "
+".join(
         [
             render_lobby_overview(state),
             "",
@@ -130,11 +131,12 @@ def render_lobby_rename(state: CliState) -> str:
     )
 
 
-def render_lobby_seat_edit(state: CliState) -> str:
-    screen = state.screen
+def render_lobby_seat_edit(state: ClientState) -> str:
+    screen = current_screen(state)
     if not isinstance(screen, LobbyScreen) or screen.kind != "seat_edit" or screen.seat_index is None:
         raise TypeError("expected seat_edit screen")
-    return "\n".join(
+    return "
+".join(
         [
             render_lobby_overview_with_highlight(state, screen.seat_index),
             "",
@@ -149,12 +151,13 @@ def render_lobby_seat_edit(state: CliState) -> str:
     )
 
 
-def render_lobby_bot_name(state: CliState) -> str:
-    screen = state.screen
+def render_lobby_bot_name(state: ClientState) -> str:
+    screen = current_screen(state)
     if not isinstance(screen, LobbyScreen) or screen.kind != "bot_name" or screen.seat_index is None:
         raise TypeError("expected bot_name screen")
     current_name = _current_bot_name(state, screen.seat_index)
-    return "\n".join(
+    return "
+".join(
         [
             render_lobby_overview_with_highlight(state, screen.seat_index),
             "",
@@ -169,10 +172,11 @@ def render_lobby_bot_name(state: CliState) -> str:
     )
 
 
-def render_lobby_overview(state: CliState) -> str:
+def render_lobby_overview(state: ClientState) -> str:
     lobby = state.lobby_view
     if lobby is None:
-        return "\n".join(["Lobby", "-----", "Noch keine Lobby-Daten vorhanden."])
+        return "
+".join(["Lobby", "-----", "Noch keine Lobby-Daten vorhanden."])
     lines = ["Lobby", "-----"]
     if lobby.server_endpoint:
         lines.extend(["", f"Server: {lobby.server_endpoint}"])
@@ -190,10 +194,11 @@ def render_lobby_overview(state: CliState) -> str:
     )
     for participant in participants:
         lines.append(render_lobby_participant_line(state, participant))
-    return "\n".join(lines)
+    return "
+".join(lines)
 
 
-def render_lobby_overview_with_highlight(state: CliState, selected_seat_index: int) -> str:
+def render_lobby_overview_with_highlight(state: ClientState, selected_seat_index: int) -> str:
     lobby = state.lobby_view
     if lobby is None:
         return render_lobby_overview(state)
@@ -215,20 +220,21 @@ def render_lobby_overview_with_highlight(state: CliState, selected_seat_index: i
     )
     for participant in participants:
         lines.append(render_lobby_participant_line(state, participant))
-    return "\n".join(lines)
+    return "
+".join(lines)
 
 
-def render_lobby_participant_line(state: CliState, participant: LobbyParticipantView) -> str:
+def render_lobby_participant_line(state: ClientState, participant: LobbyParticipantView) -> str:
     position = f"Platz {participant.seat_index}" if participant.seat_index is not None else "nicht gesetzt"
     marker = " <- du" if participant.client_id == state.own_client_id else ""
     return f"  {participant.display_name} ({participant.participant_kind}, {position}){marker}"
 
 
-def render_lobby_seat_line(state: CliState, seat_index: int, seat: LobbySeatView) -> str:
+def render_lobby_seat_line(state: ClientState, seat_index: int, seat: LobbySeatView) -> str:
     return f"  [{seat_index}] {_describe_lobby_seat(state, seat)}"
 
 
-def _describe_lobby_seat(state: CliState, seat: LobbySeatView) -> str:
+def _describe_lobby_seat(state: ClientState, seat: LobbySeatView) -> str:
     if seat.occupant_display_name is None:
         return "(leer)"
     label = f"{seat.occupant_display_name} ({seat.occupant_kind})"
@@ -237,7 +243,7 @@ def _describe_lobby_seat(state: CliState, seat: LobbySeatView) -> str:
     return label
 
 
-def _current_bot_name(state: CliState, seat_index: int) -> str:
+def _current_bot_name(state: ClientState, seat_index: int) -> str:
     lobby = state.lobby_view
     if lobby is not None:
         for seat in lobby.seats:
@@ -246,17 +252,18 @@ def _current_bot_name(state: CliState, seat_index: int) -> str:
     return f"Bot_{seat_index}"
 
 
-def render_game_waiting(state: CliState) -> str:
+def render_game_waiting(state: ClientState) -> str:
     lines = [render_game_overview(state)]
     resolution = render_resolution_lines(state)
     if resolution is not None:
         lines.extend(["", resolution])
     lines.extend(["", "Warten auf andere Spieler...", "X beendet die Sitzung sofort."])
-    return "\n".join(lines)
+    return "
+".join(lines)
 
 
-def render_game_choose_card(state: CliState) -> str:
-    screen = state.screen
+def render_game_choose_card(state: ClientState) -> str:
+    screen = current_screen(state)
     if not isinstance(screen, GameScreen) or screen.kind != "choose_card" or screen.player_state is None:
         raise TypeError("expected choose_card screen")
     lines = [
@@ -268,11 +275,12 @@ def render_game_choose_card(state: CliState) -> str:
         "Wähle eine Karte aus deiner Hand.",
         "X beendet die Sitzung sofort.",
     ]
-    return "\n".join(lines)
+    return "
+".join(lines)
 
 
-def render_game_choose_row(state: CliState) -> str:
-    screen = state.screen
+def render_game_choose_row(state: ClientState) -> str:
+    screen = current_screen(state)
     if not isinstance(screen, GameScreen) or screen.kind != "choose_row" or screen.player_state is None:
         raise TypeError("expected choose_row screen")
     mapping = build_row_display_mapping(screen.player_state.public_state)
@@ -292,21 +300,24 @@ def render_game_choose_row(state: CliState) -> str:
             "X beendet die Sitzung sofort.",
         ]
     )
-    return "\n".join(lines)
+    return "
+".join(lines)
 
 
-def render_game_ended(state: CliState) -> str:
+def render_game_ended(state: ClientState) -> str:
     lines = ["Spiel beendet", "-------------"]
     if state.public_state is not None:
         lines.extend(["", render_game_overview(state)])
     lines.extend(["", "Enter beendet die Sitzung."])
-    return "\n".join(lines)
+    return "
+".join(lines)
 
 
-def render_game_overview(state: CliState) -> str:
+def render_game_overview(state: ClientState) -> str:
     public_state = state.public_state
     if public_state is None:
-        return "\n".join(["Spiel", "-----", "Noch kein öffentlicher Spielzustand vorhanden."])
+        return "
+".join(["Spiel", "-----", "Noch kein öffentlicher Spielzustand vorhanden."])
     lines = [f"Runde: {public_state.round_no}", f"Stich: {public_state.trick_no}"]
     if state.applied_game_revision is not None:
         lines.append(f"Revision: {state.applied_game_revision}")
@@ -320,10 +331,11 @@ def render_game_overview(state: CliState) -> str:
     for index, player in enumerate(public_state.players):
         marker = " <- du" if player.player_id == state.own_player_id else ""
         lines.append(f"  ({index}) {player.name}: {player.score}, {player.hand_count} Karten{marker}")
-    return "\n".join(lines)
+    return "
+".join(lines)
 
 
-def render_resolution_lines(state: CliState) -> str | None:
+def render_resolution_lines(state: ClientState) -> str | None:
     if not state.presentation_events and not state.pending_presentation_events:
         return None
     lines = ["Lokale Auflösung:"]
@@ -331,7 +343,8 @@ def render_resolution_lines(state: CliState) -> str | None:
         lines.extend(f"  {line}" for line in render_presentation_event(event, own_player_id=state.own_player_id))
     if state.pending_presentation_events:
         lines.append(f"  ... {len(state.pending_presentation_events)} weiterer Schritt(e) in der Warteschlange")
-    return "\n".join(lines)
+    return "
+".join(lines)
 
 
 def render_presentation_event(event: PresentationEvent, *, own_player_id: str | None) -> tuple[str, ...]:
@@ -363,14 +376,15 @@ def render_presentation_event(event: PresentationEvent, *, own_player_id: str | 
 
 def render_own_hand(player_state: PlayerState) -> str:
     cards = " ".join(f"|{card.value} {card.bullheads * '🐮'}|" for card in player_state.hand)
-    return "\n".join([
+    return "
+".join([
         f"{player_state.self_player_name()}: Deine Handkarten:",
         f"  {cards}" if cards else "  -",
     ])
 
 
 def render_public_state(public_state: PublicState) -> None:
-    state = CliState(
+    state = ClientState(
         core_state=replace(
             initial_client_core_state(),
             public_state=public_state,

@@ -36,7 +36,7 @@ Beide liefern ein `CoreUpdate`.
 
 ```python
 def on_card_clicked(card_value: int) -> None:
-    update = core.on_ui_action(UiActionChooseCard(card_value))
+    update = core.on_ui_action(ClientActionChooseCard(card_value))
 
     if update.local_messages:
         show_error(update.local_messages[-1])
@@ -65,8 +65,8 @@ def on_server_message(message) -> None:
 update = core.on_server_message(message)
 state = update.state
 
-if isinstance(state.screen, GameScreen) and state.screen.kind == "choose_card":
-    action = UiActionChooseCard(choose_bot_card(state.screen.player_state))
+if isinstance(current_screen(state), GameScreen) and current_screen(state).kind == "choose_card":
+    action = ClientActionChooseCard(choose_bot_card(current_screen(state).player_state))
     reply = core.on_ui_action(action)
     for outbound in reply.outbound_messages:
         transport.send(outbound)

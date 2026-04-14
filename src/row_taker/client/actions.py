@@ -3,51 +3,51 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-class UiAction:
+class ClientAction:
     pass
 
 
 @dataclass(frozen=True, slots=True)
-class UiActionRename(UiAction):
+class ClientActionRename(ClientAction):
     name: str
 
 
 @dataclass(frozen=True, slots=True)
-class UiActionAssignSelfToSeat(UiAction):
+class ClientActionAssignSelfToSeat(ClientAction):
     seat_index: int
 
 
 @dataclass(frozen=True, slots=True)
-class UiActionCreateBot(UiAction):
+class ClientActionCreateBot(ClientAction):
     seat_index: int
     name: str
 
 
 @dataclass(frozen=True, slots=True)
-class UiActionClearSeat(UiAction):
+class ClientActionClearSeat(ClientAction):
     seat_index: int
 
 
 @dataclass(frozen=True, slots=True)
-class UiActionStartGame(UiAction):
+class ClientActionStartGame(ClientAction):
     pass
 
 
 @dataclass(frozen=True, slots=True)
-class UiActionChooseCard(UiAction):
+class ClientActionChooseCard(ClientAction):
     card_value: int
 
 
 @dataclass(frozen=True, slots=True)
-class UiActionChooseRow(UiAction):
+class ClientActionChooseRow(ClientAction):
     row_id: object
 
 
 @dataclass(frozen=True, slots=True)
-class UiActionLeaveSession(UiAction):
+class ClientActionLeaveSession(ClientAction):
     pass
 
 
 @dataclass(frozen=True, slots=True)
-class UiActionAdvancePresentation(UiAction):
+class ClientActionAdvancePresentation(ClientAction):
     pass
