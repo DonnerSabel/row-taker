@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from row_taker.cli.local_resolution import LocalResolutionState
+from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction, initial_client_core_state
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.protocol.messages import CardsRevealed, LobbyView
@@ -48,6 +49,8 @@ class CliState:
     exit_on_ack: bool = False
     suppress_final_result: bool = False
     should_exit: bool = False
+    client_mode: ClientMode = ClientMode.LOBBY
+    pending_action: PendingAction = PendingAction.LOBBY_COMMAND
 
 
 LobbyStateMain = LobbyScreen
@@ -60,14 +63,50 @@ GameStateEnded = GameScreen
 
 
 def initial_cli_state(own_client_id: str | None = None) -> CliState:
-    return CliState(own_client_id=own_client_id)
-
+    core = initial_client_core_state(own_client_id=own_client_id)
+    return apply_client_core_state(CliState(), core)
 
 
 def has_pending_presentation(state: CliState) -> bool:
     return bool(state.pending_presentation_events)
 
 
-
 def has_visible_presentation(state: CliState) -> bool:
     return bool(state.presentation_events)
+
+
+def extract_client_core_state(state: CliState) -> ClientCoreState:
+    return ClientCoreState(
+        own_client_id=state.own_client_id,
+        own_player_id=state.own_player_id,
+        lobby_view=state.lobby_view,
+        public_state=state.public_state,
+        revealed_trick=state.revealed_trick,
+        trick_presentation_state=state.local_resolution,
+        presentation_events=state.presentation_events,
+        pending_presentation_events=state.pending_presentation_events,
+        received_game_revision=state.received_game_revision,
+        applied_game_revision=state.applied_game_revision,
+        session_error=state.session_error,
+        client_mode=state.client_mode,
+        pending_action=state.pending_action,
+    )
+
+
+def apply_client_core_state(state: CliState, core: ClientCoreState) -> CliState:
+    return replace(
+        state,
+        own_client_id=core.own_client_id,
+        own_player_id=core.own_player_id,
+        lobby_view=core.lobby_view,
+        public_state=core.public_state,
+        revealed_trick=core.revealed_trick,
+        local_resolution=core.trick_presentation_state,
+        presentation_events=core.presentation_events,
+        pending_presentation_events=core.pending_presentation_events,
+        received_game_revision=core.received_game_revision,
+        applied_game_revision=core.applied_game_revision,
+        session_error=core.session_error,
+        client_mode=core.client_mode,
+        pending_action=core.pending_action,
+    )

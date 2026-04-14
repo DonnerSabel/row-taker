@@ -3,31 +3,46 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, replace
 
-from row_taker.cli.local_resolution import apply_local_row_choice, start_local_resolution
 from row_taker.cli.row_display import build_row_display_mapping
-from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, UiMessage, has_pending_presentation
+from row_taker.cli.state_models import (
+    CliState,
+    GameScreen,
+    LobbyScreen,
+    UiMessage,
+    apply_client_core_state,
+    extract_client_core_state,
+    has_pending_presentation,
+)
+from row_taker.client.core_reducer import (
+    advance_presentation_queue as advance_core_presentation_queue,
+)
+from row_taker.client.core_reducer import (
+    append_presentation_events as append_core_presentation_events,
+)
+from row_taker.client.core_reducer import (
+    reduce_server_message as reduce_core_server_message,
+)
+from row_taker.client.core_reducer import (
+    reset_presentation_queue as reset_core_presentation_queue,
+)
+from row_taker.client.core_state import ClientMode, PendingAction
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
 from row_taker.protocol.messages import (
     AssignSeatToClient,
-    CardsRevealed,
     ChooseCardRequested,
     ChooseRowRequested,
     ClearSeat,
     ClientToServerMessage,
     CreateLocalBotOnSeat,
-    GameStarting,
     IdentityAssigned,
     LeaveSession,
     LobbyActionRejected,
-    LobbyStateUpdated,
     RequestStartGame,
-    RowChoiceCommitted,
     ServerError,
     ServerToClientMessage,
     SessionEnded,
     SetDisplayName,
-    StateUpdated,
     SubmitCard,
     SubmitRowChoice,
 )
@@ -42,95 +57,44 @@ class UserInputResult:
 
 
 def append_presentation_events(state: CliState, events: tuple[PresentationEvent, ...]) -> CliState:
-    if not events:
-        return state
-    return replace(state, pending_presentation_events=state.pending_presentation_events + events)
+    core = append_core_presentation_events(extract_client_core_state(state), events)
+    return apply_client_core_state(state, core)
 
 
 def reset_presentation_queue(state: CliState) -> CliState:
-    return replace(state, presentation_events=(), pending_presentation_events=())
+    core = reset_core_presentation_queue(extract_client_core_state(state))
+    return apply_client_core_state(state, core)
 
 
 def advance_presentation_queue(state: CliState) -> CliState:
     if not state.pending_presentation_events:
         return state
     next_event = state.pending_presentation_events[0]
-    logger.debug("presentation advanced: event=%s remaining_before=%s", type(next_event).__name__, len(state.pending_presentation_events))
-    return replace(
-        state,
-        presentation_events=state.presentation_events + (next_event,),
-        pending_presentation_events=state.pending_presentation_events[1:],
+    logger.debug(
+        "presentation advanced: event=%s remaining_before=%s",
+        type(next_event).__name__,
+        len(state.pending_presentation_events),
     )
+    core = advance_core_presentation_queue(extract_client_core_state(state))
+    return apply_client_core_state(state, core)
 
 
 def reduce_server_message(state: CliState, message: ServerToClientMessage) -> CliState:
+    core = reduce_core_server_message(extract_client_core_state(state), message)
+    state = apply_client_core_state(state, core)
+
     match message:
-        case IdentityAssigned(client_id=client_id):
-            return replace(state, own_client_id=client_id)
-        case LobbyStateUpdated(lobby=lobby):
-            return replace(state, lobby_view=lobby)
+        case IdentityAssigned():
+            return state
         case LobbyActionRejected(message=text):
             return _with_flash(state, "error", text)
-        case GameStarting(lobby=lobby):
-            return replace(
-                state,
-                lobby_view=lobby,
-                public_state=None,
-                screen=GameScreen(kind="waiting"),
-                flash_message=UiMessage(level="info", text="Spielstart..."),
-                revealed_trick=None,
-                local_resolution=None,
-                presentation_events=(),
-                pending_presentation_events=(),
-            )
-        case StateUpdated(state=public_state):
-            next_screen = state.screen
-            if isinstance(next_screen, GameScreen) and next_screen.kind == "choose_row":
-                next_screen = GameScreen(kind="waiting")
-            next_local_resolution = state.local_resolution
-            if next_local_resolution is not None and next_local_resolution.pending_row_choice is None:
-                next_local_resolution = None
-            return replace(state, public_state=public_state, screen=next_screen, revealed_trick=None, local_resolution=next_local_resolution)
-        case CardsRevealed() as revealed:
-            local_resolution = None
-            queued_events: tuple[PresentationEvent, ...] = ()
-            if state.public_state is not None:
-                local_resolution = start_local_resolution(state.public_state, revealed)
-                queued_events = local_resolution.events
-            next_state = replace(state, revealed_trick=revealed, local_resolution=local_resolution, flash_message=None)
-            return append_presentation_events(next_state, queued_events)
-        case RowChoiceCommitted(row_id=row_id):
-            local_resolution = state.local_resolution
-            newly_queued_events: tuple[PresentationEvent, ...] = ()
-            if local_resolution is not None and local_resolution.pending_row_choice is not None:
-                previous_count = len(local_resolution.events)
-                local_resolution = apply_local_row_choice(local_resolution, row_id)
-                newly_queued_events = local_resolution.events[previous_count:]
-            next_state = replace(state, screen=GameScreen(kind="waiting"), local_resolution=local_resolution, flash_message=None)
-            return append_presentation_events(next_state, newly_queued_events)
-        case ChooseCardRequested(player_id=player_id, state=player_state):
-            return replace(
-                state,
-                own_player_id=player_id,
-                screen=GameScreen(kind="choose_card", player_state=player_state),
-                flash_message=None,
-                revealed_trick=None,
-                local_resolution=None,
-                presentation_events=(),
-                pending_presentation_events=(),
-            )
-        case ChooseRowRequested(player_id=player_id, state=player_state):
-            return replace(
-                state,
-                own_player_id=player_id,
-                screen=GameScreen(kind="choose_row", player_state=player_state),
-                flash_message=None,
-            )
         case SessionEnded(message=text):
             logger.debug("session ended applied: message=%r", text)
             return replace(
                 state,
                 session_error=text,
+                client_mode=ClientMode.ENDED,
+                pending_action=PendingAction.NONE,
                 exit_on_ack=False,
                 suppress_final_result=True,
                 should_exit=True,
@@ -144,8 +108,26 @@ def reduce_server_message(state: CliState, message: ServerToClientMessage) -> Cl
                 suppress_final_result=True,
                 flash_message=None,
             )
+        case ChooseCardRequested(player_id=player_id, state=player_state):
+            return replace(
+                state,
+                own_player_id=player_id,
+                screen=GameScreen(kind="choose_card", player_state=player_state),
+                client_mode=ClientMode.GAME,
+                pending_action=PendingAction.CHOOSE_CARD,
+                flash_message=None,
+            )
+        case ChooseRowRequested(player_id=player_id, state=player_state):
+            return replace(
+                state,
+                own_player_id=player_id,
+                screen=GameScreen(kind="choose_row", player_state=player_state),
+                client_mode=ClientMode.GAME,
+                pending_action=PendingAction.CHOOSE_ROW,
+                flash_message=None,
+            )
         case _:
-            raise TypeError(f"unsupported server message type: {type(message)!r}")
+            return _sync_cli_screen_after_server_message(state)
 
 
 def reduce_user_input(state: CliState, text: str) -> UserInputResult:
@@ -192,6 +174,29 @@ def reduce_user_input(state: CliState, text: str) -> UserInputResult:
             return _reduce_game_ended_input(state, normalized)
 
     raise TypeError(f"unsupported screen: {state.screen!r}")
+
+
+def _sync_cli_screen_after_server_message(state: CliState) -> CliState:
+    if state.client_mode == ClientMode.LOBBY:
+        current = state.screen
+        if isinstance(current, LobbyScreen):
+            return state
+        return replace(state, screen=LobbyScreen(kind="main"))
+
+    if state.client_mode == ClientMode.ENDED:
+        return replace(state, screen=GameScreen(kind="ended"))
+
+    if state.pending_action == PendingAction.CHOOSE_CARD:
+        return state
+    if state.pending_action == PendingAction.CHOOSE_ROW:
+        return state
+
+    current = state.screen
+    if isinstance(current, GameScreen) and current.kind == "choose_row":
+        return replace(state, screen=GameScreen(kind="waiting"))
+    if isinstance(current, GameScreen):
+        return state
+    return replace(state, screen=GameScreen(kind="waiting"))
 
 
 def _with_flash(state: CliState, level: str, text: str) -> CliState:
@@ -275,48 +280,50 @@ def _reduce_lobby_seat_edit_input(state: CliState, text: str, seat_index: int) -
 
 def _reduce_lobby_bot_name_input(state: CliState, text: str, seat_index: int) -> UserInputResult:
     if text == "x":
-        return UserInputResult(state=replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index), flash_message=None))
-    display_name = text or f"Bot_{seat_index}"
+        return UserInputResult(
+            state=replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index), flash_message=None)
+        )
+    bot_name = text or _default_bot_name(state, seat_index)
     return UserInputResult(
         state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
-        outbound_message=CreateLocalBotOnSeat(seat_index=seat_index, display_name=display_name),
+        outbound_message=CreateLocalBotOnSeat(seat_index=seat_index, display_name=bot_name),
     )
 
 
 def _reduce_game_waiting_input(state: CliState, text: str) -> UserInputResult:
-    return UserInputResult(state=state)
+    if text == "":
+        return UserInputResult(state=state)
+    return UserInputResult(state=_with_flash(state, "info", "Bitte auf den nächsten Spielschritt warten."))
 
 
 def _reduce_game_choose_card_input(state: CliState, text: str, player_state) -> UserInputResult:
+    if text == "":
+        return UserInputResult(state=_with_flash(state, "error", "Bitte einen Kartenwert eingeben."))
     try:
-        value = int(text)
+        card_value = int(text)
     except ValueError:
-        return UserInputResult(state=_with_flash(state, "error", "Bitte eine Kartenzahl eingeben."))
+        return UserInputResult(state=_with_flash(state, "error", "Bitte einen gültigen Kartenwert eingeben."))
     try:
-        validate_submit_card(player_state, value)
-    except Exception as exc:
+        validate_submit_card(player_state, card_value)
+    except ValueError as exc:
         return UserInputResult(state=_with_flash(state, "error", str(exc)))
     return UserInputResult(
-        state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
-        outbound_message=SubmitCard(card_value=value),
+        state=replace(state, screen=GameScreen(kind="waiting"), pending_action=PendingAction.NONE, flash_message=None),
+        outbound_message=SubmitCard(card_value=card_value),
     )
 
 
 def _reduce_game_choose_row_input(state: CliState, text: str, player_state) -> UserInputResult:
-    try:
-        cli_row = int(text)
-    except ValueError:
-        return UserInputResult(state=_with_flash(state, "error", "Bitte eine Reihennummer eingeben."))
-    mapping = build_row_display_mapping(player_state.public_state)
-    if not mapping.is_valid_cli_row(cli_row):
-        return UserInputResult(state=_with_flash(state, "error", "Ungültige Reihennummer."))
-    row_id = mapping.row_id_for_cli_row(cli_row)
+    row_mapping = build_row_display_mapping(player_state.public_state.rows)
+    if text not in row_mapping:
+        return UserInputResult(state=_with_flash(state, "error", "Bitte eine gültige Reihennummer eingeben."))
+    row_id = row_mapping[text]
     try:
         validate_submit_row_choice(player_state, row_id)
-    except Exception as exc:
+    except ValueError as exc:
         return UserInputResult(state=_with_flash(state, "error", str(exc)))
     return UserInputResult(
-        state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
+        state=replace(state, screen=GameScreen(kind="waiting"), pending_action=PendingAction.NONE, flash_message=None),
         outbound_message=SubmitRowChoice(row_id=row_id),
     )
 
@@ -329,4 +336,16 @@ def _reduce_game_ended_input(state: CliState, text: str) -> UserInputResult:
 
 def _is_valid_seat_index(state: CliState, seat_index: int) -> bool:
     lobby = state.lobby_view
-    return lobby is not None and 0 <= seat_index < lobby.seat_count
+    if lobby is None:
+        return False
+    return any(seat.seat_index == seat_index for seat in lobby.seats)
+
+
+def _default_bot_name(state: CliState, seat_index: int) -> str:
+    lobby = state.lobby_view
+    if lobby is None:
+        return f"Bot {seat_index}"
+    for seat in lobby.seats:
+        if seat.seat_index == seat_index and seat.occupant_display_name:
+            return seat.occupant_display_name
+    return f"Bot {seat_index}"
