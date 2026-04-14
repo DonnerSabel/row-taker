@@ -195,7 +195,6 @@ class ClientSession:
         return None, None
 
 
-
 def print_final_result(public_state: PublicState | None) -> None:
     if public_state is None:
         return
