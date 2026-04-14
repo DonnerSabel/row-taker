@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+
 import asyncio
 
 from row_taker.cli.client_session import ClientSession, print_final_result
@@ -32,15 +33,6 @@ def _prompt_port(default: int = 8765) -> int:
         print("Bitte einen gültigen TCP-Port eingeben.")
 
 
-async def _run_session(host: str, port: int, display_name: str) -> None:
-    transport = ClientTransport.connect(host, port)
-    transport.send(JoinLobby(display_name=display_name))
-
-    session = ClientSession(transport=transport)
-    final_state = await session.run_async()
-    print_final_result(final_state)
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run a row-taker CLI client")
     parser.add_argument("--host")
@@ -60,7 +52,12 @@ def main() -> None:
     port = args.port if args.port is not None else _prompt_port()
     display_name = args.name or _prompt_name()
 
-    asyncio.run(_run_session(host, port, display_name))
+    transport = ClientTransport.connect(host, port)
+    transport.send(JoinLobby(display_name=display_name))
+
+    session = ClientSession(transport=transport)
+    final_state = asyncio.run(session.run_async())
+    print_final_result(final_state)
 
 
 def run() -> int:

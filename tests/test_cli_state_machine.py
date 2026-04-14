@@ -1,18 +1,18 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import random
 
 from row_taker.cli.frontend import CliFrontend, set_flash
 from row_taker.cli.render import determine_prompt, render_resolution_lines
-from row_taker.cli.state_models import CliState
-from row_taker.client.core_reducer import reduce_server_message as reduce_core_server_message
-from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction
+from row_taker.cli.state_models import CliState, GameScreen
 from row_taker.client.game_client_core import GameClientCore
+from row_taker.client.core_reducer import reduce_server_message as direct_reduce_server_message
 from row_taker.client.presentation_events import PresentationCardsRevealed, PresentationRowTaken
 from row_taker.engine.game import build_player_state, setup_game
 from row_taker.protocol.messages import (
     CardsRevealed,
-    ChooseCardRequested,
     LeaveSession,
     PlayedCardView,
     RowChoiceCommitted,
@@ -32,53 +32,28 @@ def _player_state_for(index: int):
 
 
 def _apply_server_message(state: CliState, message) -> CliState:
-    if isinstance(message, (RowChoiceCommitted, ChooseCardRequested)):
-        core_state = reduce_core_server_message(state.core_state, message)
-        state = CliState(
-            core_state=core_state,
-            navigation_state=state.navigation_state,
-            feedback_state=state.feedback_state,
-        )
-        return _FRONTEND.sync_to_core(state)
+    from row_taker.protocol.messages import ChooseCardRequested, RowChoiceCommitted
 
-    core = GameClientCore(state.core_state)
-    update = core.on_server_message(message)
-    state = CliState(
-        core_state=update.state,
-        navigation_state=state.navigation_state,
-        feedback_state=state.feedback_state,
-    )
-    state = _FRONTEND.sync_to_core(state)
-    return state
+    if isinstance(message, (RowChoiceCommitted, ChooseCardRequested)):
+        return direct_reduce_server_message(state, message)
+    core = GameClientCore(state)
+    core.on_server_message(message)
+    return core.state
 
 
 def _apply_user_input(state: CliState, text: str):
-    previous_navigation = state.navigation_state
+    previous_screen = state.screen
     parsed = _FRONTEND.handle_text_input(state, text)
     state = parsed.state
-
     if parsed.action is None:
         return state, None
-
-    core = GameClientCore(state.core_state)
+    core = GameClientCore(state)
     update = core.on_ui_action(parsed.action)
-
-    state = CliState(
-        core_state=update.state,
-        navigation_state=state.navigation_state,
-        feedback_state=state.feedback_state,
-    )
-    state = _FRONTEND.sync_to_core(state)
-
+    state = core.state
     if update.local_messages:
-        state = CliState(
-            core_state=state.core_state,
-            navigation_state=previous_navigation,
-            feedback_state=state.feedback_state,
-        )
+        state = replace(state, screen=previous_screen)
         state = set_flash(state, "error", update.local_messages[-1])
         return state, None
-
     outbound = update.outbound_messages[0] if update.outbound_messages else None
     return state, outbound
 
@@ -95,12 +70,14 @@ def test_choose_card_requested_enters_choose_card_screen() -> None:
     player_state = _player_state_for(0)
     state = CliState()
 
+    from row_taker.protocol.messages import ChooseCardRequested
     new_state = _apply_server_message(
         state,
         ChooseCardRequested(player_id=player_state.self_player_id, state=player_state),
     )
 
     assert new_state.own_player_id == player_state.self_player_id
+    assert isinstance(new_state.screen, GameScreen)
     assert new_state.screen.kind == "choose_card"
 
 
@@ -116,10 +93,7 @@ def test_cards_revealed_is_stored_for_waiting_screen() -> None:
         ),
     )
 
-    state = _apply_server_message(
-        CliState(core_state=ClientCoreState(public_state=player_state.public_state)),
-        revealed,
-    )
+    state = _apply_server_message(CliState(public_state=player_state.public_state), revealed)
 
     assert state.public_state == player_state.public_state
     assert state.revealed_trick == revealed
@@ -139,8 +113,8 @@ def test_session_ended_exits_immediately() -> None:
         SessionEnded(message="Spiel abgebrochen", reason=SessionEndReason.QUIT, client_id="client-0", display_name="Alice"),
     )
 
+    assert state.should_exit is True
     assert state.session_error == "Spiel abgebrochen"
-    assert state.client_mode == ClientMode.ENDED
 
 
 def test_cards_revealed_builds_local_presentation_events() -> None:
@@ -160,10 +134,7 @@ def test_cards_revealed_builds_local_presentation_events() -> None:
         ),
     )
 
-    state = _apply_server_message(
-        CliState(core_state=ClientCoreState(public_state=player_state.public_state)),
-        revealed,
-    )
+    state = _apply_server_message(CliState(public_state=player_state.public_state), revealed)
 
     assert state.local_resolution is not None
     assert state.pending_presentation_events
@@ -183,10 +154,7 @@ def test_row_choice_committed_advances_local_resolution() -> None:
         ),
     )
 
-    state = _apply_server_message(
-        CliState(core_state=ClientCoreState(public_state=player_state.public_state)),
-        revealed,
-    )
+    state = _apply_server_message(CliState(public_state=player_state.public_state), revealed)
     assert state.local_resolution is not None
     assert state.local_resolution.pending_row_choice is not None
 
@@ -210,39 +178,16 @@ def test_cards_revealed_queues_presentation_events_before_display() -> None:
         ),
     )
 
-    state = _apply_server_message(
-        CliState(core_state=ClientCoreState(public_state=player_state.public_state)),
-        revealed,
-    )
+    state = _apply_server_message(CliState(public_state=player_state.public_state), revealed)
 
     assert state.presentation_events == ()
     assert state.pending_presentation_events
 
 
-def test_choose_row_input_maps_cli_row_to_row_choice_action() -> None:
-    player_state = _player_state_for(0)
-    state = CliState(
-        core_state=ClientCoreState(
-            player_state=player_state,
-            client_mode=ClientMode.GAME,
-            pending_action=PendingAction.CHOOSE_ROW,
-        )
-    )
-
-    parsed = _FRONTEND.handle_text_input(state, "1")
-
-    assert parsed.action is not None
-    assert parsed.state.flash_message is None
-
-
 def test_pending_presentation_uses_enter_prompt_until_queue_is_empty() -> None:
     state = CliState(
-        core_state=ClientCoreState(
-            player_state=_player_state_for(0),
-            client_mode=ClientMode.GAME,
-            pending_action=PendingAction.CHOOSE_ROW,
-            pending_presentation_events=(PresentationCardsRevealed(plays=()),),
-        )
+        screen=GameScreen(kind="choose_row", player_state=_player_state_for(0)),
+        pending_presentation_events=(PresentationCardsRevealed(plays=()),),
     )
 
     assert determine_prompt(state) == "Weiter mit Enter > "
@@ -250,14 +195,8 @@ def test_pending_presentation_uses_enter_prompt_until_queue_is_empty() -> None:
 
 def test_enter_advances_pending_presentation_queue() -> None:
     state = CliState(
-        core_state=ClientCoreState(
-            client_mode=ClientMode.GAME,
-            pending_action=PendingAction.NONE,
-            pending_presentation_events=(
-                PresentationCardsRevealed(plays=()),
-                PresentationRowTaken("p1", "Alice", 1, (1, 2), 3, 5, (5,)),
-            ),
-        )
+        screen=GameScreen(kind="waiting"),
+        pending_presentation_events=(PresentationCardsRevealed(plays=()), PresentationRowTaken("p1", "Alice", 1, (1, 2), 3, 5, (5,))),
     )
 
     state, _ = _apply_user_input(state, "")
@@ -268,11 +207,8 @@ def test_enter_advances_pending_presentation_queue() -> None:
 
 def test_non_enter_during_pending_presentation_shows_hint() -> None:
     state = CliState(
-        core_state=ClientCoreState(
-            client_mode=ClientMode.GAME,
-            pending_action=PendingAction.NONE,
-            pending_presentation_events=(PresentationCardsRevealed(plays=()),),
-        )
+        screen=GameScreen(kind="waiting"),
+        pending_presentation_events=(PresentationCardsRevealed(plays=()),),
     )
 
     state, _ = _apply_user_input(state, "foo")
@@ -284,13 +220,12 @@ def test_non_enter_during_pending_presentation_shows_hint() -> None:
 def test_choose_card_requested_clears_visible_and_pending_presentation() -> None:
     player_state = _player_state_for(0)
     state = CliState(
-        core_state=ClientCoreState(
-            public_state=player_state.public_state,
-            presentation_events=(PresentationCardsRevealed(plays=()),),
-            pending_presentation_events=(PresentationCardsRevealed(plays=()),),
-        )
+        public_state=player_state.public_state,
+        presentation_events=(PresentationCardsRevealed(plays=()),),
+        pending_presentation_events=(PresentationCardsRevealed(plays=()),),
     )
 
+    from row_taker.protocol.messages import ChooseCardRequested
     new_state = _apply_server_message(
         state,
         ChooseCardRequested(player_id=player_state.self_player_id, state=player_state),
@@ -301,7 +236,7 @@ def test_choose_card_requested_clears_visible_and_pending_presentation() -> None
 
 
 def test_render_resolution_lines_renders_from_presentation_events() -> None:
-    state = CliState(core_state=ClientCoreState(own_player_id="p1", presentation_events=(PresentationCardsRevealed(plays=()),)))
+    state = CliState(own_player_id="p1", presentation_events=(PresentationCardsRevealed(plays=()),))
 
     rendered = render_resolution_lines(state)
     assert rendered is not None

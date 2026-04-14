@@ -1,66 +1,38 @@
 # GameClientCore API
 
-This document is intentionally written for later GUI work and for students.
+Diese Datei ist bewusst fuer den spaeteren GUI-Bau und fuer Schueler geschrieben.
 
-## Purpose
+## Idee
 
-`GameClientCore` is the canonical client pipeline.
+`GameClientCore` ist der fachliche Client-Kern.
 
-A frontend should not implement game-flow logic itself. Instead, it should:
+Ein Frontend soll nicht selbst ueberlegen, wie Servernachrichten, lokale Praesentation,
+Revisionsstand und Outbound-Nachrichten zusammenspielen. Stattdessen soll es:
 
-1. feed server messages into the core
-2. feed user actions into the core
-3. render the returned state
-4. send the returned outbound messages to the server
-5. optionally react to the returned effects
+1. Servernachrichten an den Core geben
+2. UI-Aktionen an den Core geben
+3. den neuen Zustand rendern
+4. die vom Core gelieferten Outbound-Nachrichten senden
 
-## The two main methods
+## Die zwei wichtigsten Methoden
 
 ```python
 update = core.on_server_message(message)
 update = core.on_ui_action(action)
 ```
 
-Both methods return a `CoreUpdate`.
+Beide liefern ein `CoreUpdate`.
 
 ## CoreUpdate
 
-A `CoreUpdate` contains:
+`CoreUpdate` enthaelt:
 
-- `state`: the new `ClientCoreState`
-- `applied_server_messages`: which queued server messages were really applied
-- `outbound_messages`: messages that the frontend must send to the server
-- `local_messages`: local validation messages for the frontend
-- `effects`: small frontend-visible transition hints
+- `state`: der neue Client-Zustand
+- `applied_server_messages`: welche Nachrichten aus der Inbox wirklich angewendet wurden
+- `outbound_messages`: diese Nachrichten muss das Frontend an den Server senden
+- `local_messages`: lokale Fehlermeldungen fuer das Frontend
 
-The frontend should treat `state` as the new truth.
-
-The additional fields exist so that the frontend does not have to infer every
-transition by manually diffing old and new states.
-
-## Minimal frontend pattern
-
-```python
-update = core.on_ui_action(UiActionChooseCard(card_value))
-
-for message in update.outbound_messages:
-    transport.send(message)
-
-render(update.state)
-```
-
-And for incoming network traffic:
-
-```python
-update = core.on_server_message(server_message)
-
-for message in update.outbound_messages:
-    transport.send(message)
-
-render(update.state)
-```
-
-## Example 1: choosing a card in a GUI
+## Beispiel: Karte in einer GUI anklicken
 
 ```python
 def on_card_clicked(card_value: int) -> None:
@@ -72,71 +44,46 @@ def on_card_clicked(card_value: int) -> None:
     for message in update.outbound_messages:
         transport.send(message)
 
-    render_from_core_state(update.state)
+    render_from_state(update.state)
 ```
 
-## Example 2: receiving CardsRevealed
+## Beispiel: Servernachricht empfangen
 
 ```python
 def on_server_message(message) -> None:
     update = core.on_server_message(message)
 
-    render_from_core_state(update.state)
+    for outbound in update.outbound_messages:
+        transport.send(outbound)
 
-    for effect in update.effects:
-        handle_effect(effect)
+    render_from_state(update.state)
 ```
 
-If the message is `CardsRevealed`, the core may:
-
-- queue local presentation events
-- keep later messages deferred internally
-- expose those queued presentation steps through the returned state and effects
-
-The frontend should not re-implement this logic.
-
-## Example 3: bot usage
+## Beispiel: Bot
 
 ```python
 update = core.on_server_message(message)
 state = update.state
 
-if state.pending_action == PendingAction.CHOOSE_CARD:
-    action = choose_bot_card(state.player_state)
+if isinstance(state.screen, GameScreen) and state.screen.kind == "choose_card":
+    action = UiActionChooseCard(choose_bot_card(state.screen.player_state))
     reply = core.on_ui_action(action)
     for outbound in reply.outbound_messages:
         transport.send(outbound)
 ```
 
-This is why the project treats `GameClientCore` as a shared networked-client layer for
-human clients and bots.
-
-## Boundaries
+## Grenzen
 
 ### Engine
-The engine is the authority over the game rules.
+Die Engine ist fuer Spielregeln und fachliche Wahrheit zustaendig.
 
 ### GameClientCore
-The core is the authority over the client-side processing of:
-
-- server messages
-- user actions
-- inbox and deferring
-- presentation queue
-- revision tracking
+Der Core ist fuer die clientseitige Verarbeitung von
+- Servernachrichten
+- UI-Aktionen
+- Inbox und Deferring
+- lokaler Praesentation
+zuständig.
 
 ### Frontend
-The frontend is responsible for:
-
-- text input or mouse/keyboard input
-- rendering
-- sending returned outbound messages
-- optionally reacting to effects
-
-## Rule of thumb
-
-If a GUI has to ask:
-What should I do after this click or this incoming server message?
-
-then the answer should usually come from `GameClientCore`, not from GUI-specific
-business logic.
+Das Frontend ist fuer Rendering, Eingabe und das Versenden der Outbound-Nachrichten zustaendig.

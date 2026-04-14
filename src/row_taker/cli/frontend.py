@@ -3,16 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from row_taker.cli.row_display import build_row_display_mapping
-from row_taker.cli.state_models import (
-    CliFeedbackState,
-    CliNavigationState,
-    CliState,
-    UiMessage,
-    apply_feedback_state,
-    apply_navigation_state,
-)
+from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, UiMessage, has_pending_presentation
 from row_taker.client.actions import (
-    UiAction,
     UiActionAdvancePresentation,
     UiActionAssignSelfToSeat,
     UiActionChooseCard,
@@ -23,18 +15,17 @@ from row_taker.client.actions import (
     UiActionRename,
     UiActionStartGame,
 )
-from row_taker.client.core_state import ClientMode, PendingAction
 
 
 @dataclass(frozen=True, slots=True)
 class FrontendInputResult:
     state: CliState
-    action: UiAction | None = None
+    action: object | None = None
 
 
 class CliFrontend:
     def sync_to_core(self, state: CliState) -> CliState:
-        return sync_frontend_to_core(state)
+        return state
 
     def handle_text_input(self, state: CliState, text: str) -> FrontendInputResult:
         return parse_text_to_action(state, text)
@@ -43,196 +34,114 @@ class CliFrontend:
         return clear_flash(state)
 
 
-
-def sync_frontend_to_core(state: CliState) -> CliState:
-    core = state.core_state
-
-    if core.client_mode == ClientMode.LOBBY:
-        return state
-
-    return apply_navigation_state(state, CliNavigationState())
-
-
-
 def set_flash(state: CliState, level: str, text: str) -> CliState:
-    return apply_feedback_state(state, replace(state.feedback_state, flash_message=UiMessage(level=level, text=text)))
-
+    return replace(state, flash_message=UiMessage(level=level, text=text))
 
 
 def clear_flash(state: CliState) -> CliState:
-    return apply_feedback_state(state, replace(state.feedback_state, flash_message=None))
-
-
-
-def mark_server_error(state: CliState) -> CliState:
-    return apply_feedback_state(
-        state,
-        replace(state.feedback_state, exit_on_ack=True, suppress_final_result=True, flash_message=None),
-    )
-
-
-
-def mark_session_ended(state: CliState) -> CliState:
-    return apply_feedback_state(
-        state,
-        replace(state.feedback_state, exit_on_ack=False, suppress_final_result=True, should_exit=True, flash_message=None),
-    )
-
-
-
-def mark_leave_requested(state: CliState) -> CliState:
-    return apply_feedback_state(
-        state,
-        replace(state.feedback_state, should_exit=True, suppress_final_result=True, flash_message=None),
-    )
-
-
-
-def acknowledge_session_error(state: CliState, text: str) -> FrontendInputResult:
-    if state.session_error is None:
-        return FrontendInputResult(state=state)
-    if not state.exit_on_ack:
-        return FrontendInputResult(state=apply_feedback_state(state, replace(state.feedback_state, should_exit=True)))
-    if text != "":
-        return FrontendInputResult(state=state)
-    return FrontendInputResult(state=apply_feedback_state(state, replace(state.feedback_state, should_exit=True)))
-
+    return replace(state, flash_message=None)
 
 
 def parse_text_to_action(state: CliState, text: str) -> FrontendInputResult:
     normalized = text.strip()
 
     if normalized == "X":
-        return FrontendInputResult(state=mark_leave_requested(state), action=UiActionLeaveSession())
+        return FrontendInputResult(state=replace(state, should_exit=True, suppress_final_result=True), action=UiActionLeaveSession())
 
     if state.session_error is not None:
-        return acknowledge_session_error(state, normalized)
+        if not state.exit_on_ack:
+            return FrontendInputResult(state=replace(state, should_exit=True))
+        if normalized == "":
+            return FrontendInputResult(state=replace(state, should_exit=True))
+        return FrontendInputResult(state=state)
 
-    if state.pending_presentation_events:
+    if has_pending_presentation(state):
         if normalized == "":
             return FrontendInputResult(state=state, action=UiActionAdvancePresentation())
         return FrontendInputResult(state=set_flash(state, "info", "Bitte zuerst die lokale Auflösung mit Enter weiterführen."))
 
-    if state.client_mode == ClientMode.LOBBY:
-        return _parse_lobby_input(state, normalized)
-    return _parse_game_input(state, normalized)
-
-
-
-def _parse_lobby_input(state: CliState, normalized: str) -> FrontendInputResult:
-    submenu = state.navigation_state.lobby_submenu
-    seat_index = state.navigation_state.selected_seat_index
-
-    if submenu == "main":
-        return _parse_lobby_main(state, normalized)
-    if submenu == "rename":
-        if normalized == "":
-            return FrontendInputResult(state=set_flash(state, "error", "Der Anzeigename darf nicht leer sein."))
-        return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "main")), action=UiActionRename(normalized))
-    if submenu == "seat_edit":
-        if seat_index is None:
-            raise TypeError("seat_edit submenu requires seat_index")
-        return _parse_lobby_seat_edit(state, normalized, seat_index)
-    if submenu == "bot_name":
-        if seat_index is None:
-            raise TypeError("bot_name submenu requires seat_index")
-        return _parse_lobby_bot_name(state, normalized, seat_index)
-    raise ValueError(f"unsupported lobby submenu: {submenu!r}")
-
-
-
-def _parse_game_input(state: CliState, normalized: str) -> FrontendInputResult:
-    if state.client_mode == ClientMode.ENDED:
-        if normalized != "":
+    match state.screen:
+        case LobbyScreen(kind="main"):
+            return _parse_lobby_main(state, normalized)
+        case LobbyScreen(kind="rename"):
+            return _parse_lobby_rename(state, normalized)
+        case LobbyScreen(kind="seat_edit", seat_index=seat_index):
+            return _parse_lobby_seat_edit(state, normalized, seat_index)
+        case LobbyScreen(kind="bot_name", seat_index=seat_index):
+            return _parse_lobby_bot_name(state, normalized, seat_index)
+        case GameScreen(kind="waiting"):
             return FrontendInputResult(state=state)
-        return FrontendInputResult(state=apply_feedback_state(state, replace(state.feedback_state, should_exit=True)))
-
-    if state.pending_action == PendingAction.CHOOSE_CARD:
-        if normalized == "":
-            return FrontendInputResult(state=set_flash(state, "error", "Bitte einen Kartenwert eingeben."))
-        try:
-            card_value = int(normalized)
-        except ValueError:
-            return FrontendInputResult(state=set_flash(state, "error", "Bitte einen gültigen Kartenwert eingeben."))
-        return FrontendInputResult(state=clear_flash(state), action=UiActionChooseCard(card_value))
-
-    if state.pending_action == PendingAction.CHOOSE_ROW:
-        player_state = state.player_state
-        if player_state is None:
-            return FrontendInputResult(state=set_flash(state, "error", "Kein Spielerzustand für Reihenwahl vorhanden."))
-        row_mapping = build_row_display_mapping(player_state.public_state)
-        try:
-            cli_row = int(normalized)
-        except ValueError:
-            return FrontendInputResult(state=set_flash(state, "error", "Bitte eine gültige Reihennummer eingeben."))
-        if cli_row < 1 or cli_row > row_mapping.max_cli_row():
-            return FrontendInputResult(state=set_flash(state, "error", "Bitte eine gültige Reihennummer eingeben."))
-        state_row_index = row_mapping.to_state_index(cli_row)
-        row_id = player_state.public_state.rows[state_row_index].row_id
-        return FrontendInputResult(state=clear_flash(state), action=UiActionChooseRow(row_id))
-
-    if normalized == "":
-        return FrontendInputResult(state=state)
-    return FrontendInputResult(state=set_flash(state, "info", "Bitte auf den nächsten Spielschritt warten."))
-
+        case GameScreen(kind="choose_card"):
+            return _parse_game_choose_card(state, normalized)
+        case GameScreen(kind="choose_row"):
+            return _parse_game_choose_row(state, normalized)
+        case GameScreen(kind="ended"):
+            if normalized == "":
+                return FrontendInputResult(state=replace(state, should_exit=True))
+            return FrontendInputResult(state=state)
+    raise TypeError(f"unsupported screen: {state.screen!r}")
 
 
 def _parse_lobby_main(state: CliState, text: str) -> FrontendInputResult:
     if text == "n":
-        return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "rename")))
+        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="rename"), flash_message=None))
     if text == "g":
         return FrontendInputResult(state=clear_flash(state), action=UiActionStartGame())
     if text.isdigit():
         seat_index = int(text)
-        if not _is_valid_seat_index(state, seat_index):
-            return FrontendInputResult(state=set_flash(state, "error", "Ungültiger Platz."))
-        return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "seat_edit", seat_index)))
-    return FrontendInputResult(state=set_flash(state, "error", "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer."))
+        if state.lobby_view is None or not (0 <= seat_index < state.lobby_view.seat_count):
+            return FrontendInputResult(state=set_flash(replace(state, screen=LobbyScreen(kind="main")), "error", "Ungültiger Platz."))
+        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index), flash_message=None))
+    return FrontendInputResult(state=set_flash(replace(state, screen=LobbyScreen(kind="main")), "error", "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer."))
 
 
+def _parse_lobby_rename(state: CliState, text: str) -> FrontendInputResult:
+    if text == "":
+        return FrontendInputResult(state=set_flash(replace(state, screen=LobbyScreen(kind="rename")), "error", "Der Anzeigename darf nicht leer sein."))
+    return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None), action=UiActionRename(text))
 
-def _parse_lobby_seat_edit(state: CliState, text: str, seat_index: int) -> FrontendInputResult:
+
+def _parse_lobby_seat_edit(state: CliState, text: str, seat_index: int | None) -> FrontendInputResult:
+    if seat_index is None:
+        raise TypeError("seat_edit screen requires seat_index")
     if text == "m":
-        return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "main")), action=UiActionAssignSelfToSeat(seat_index))
+        return FrontendInputResult(state=clear_flash(state), action=UiActionAssignSelfToSeat(seat_index))
     if text == "b":
-        return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "bot_name", seat_index)))
+        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="bot_name", seat_index=seat_index), flash_message=None))
     if text == "c":
-        return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "main")), action=UiActionClearSeat(seat_index))
+        return FrontendInputResult(state=clear_flash(state), action=UiActionClearSeat(seat_index))
     if text == "x":
-        return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "main")))
-    return FrontendInputResult(state=set_flash(state, "error", "Ungültige Eingabe. Erlaubt sind m, b, c oder x."))
+        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None))
+    return FrontendInputResult(state=set_flash(replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index)), "error", "Ungültige Eingabe. Erlaubt sind m, b, c oder x."))
 
 
-
-def _parse_lobby_bot_name(state: CliState, text: str, seat_index: int) -> FrontendInputResult:
+def _parse_lobby_bot_name(state: CliState, text: str, seat_index: int | None) -> FrontendInputResult:
+    if seat_index is None:
+        raise TypeError("bot_name screen requires seat_index")
     if text == "x":
-        return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "seat_edit", seat_index)))
-    bot_name = text or _default_bot_name(state, seat_index)
-    return FrontendInputResult(
-        state=clear_flash(_set_lobby_submenu(state, "main")),
-        action=UiActionCreateBot(seat_index, bot_name),
-    )
+        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index), flash_message=None))
+    display_name = text or f"Bot_{seat_index}"
+    return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None), action=UiActionCreateBot(seat_index, display_name))
 
 
-
-def _is_valid_seat_index(state: CliState, seat_index: int) -> bool:
-    lobby = state.lobby_view
-    if lobby is None:
-        return False
-    return any(seat.seat_index == seat_index for seat in lobby.seats)
-
-
-
-def _default_bot_name(state: CliState, seat_index: int) -> str:
-    lobby = state.lobby_view
-    if lobby is None:
-        return f"Bot {seat_index}"
-    for seat in lobby.seats:
-        if seat.seat_index == seat_index and seat.occupant_display_name:
-            return seat.occupant_display_name
-    return f"Bot {seat_index}"
+def _parse_game_choose_card(state: CliState, text: str) -> FrontendInputResult:
+    try:
+        value = int(text)
+    except ValueError:
+        return FrontendInputResult(state=set_flash(state, "error", "Bitte eine Kartenzahl eingeben."))
+    return FrontendInputResult(state=clear_flash(state), action=UiActionChooseCard(value))
 
 
-
-def _set_lobby_submenu(state: CliState, submenu: str, seat_index: int | None = None) -> CliState:
-    return apply_navigation_state(state, replace(state.navigation_state, lobby_submenu=submenu, selected_seat_index=seat_index))
+def _parse_game_choose_row(state: CliState, text: str) -> FrontendInputResult:
+    screen = state.screen
+    if not isinstance(screen, GameScreen) or screen.player_state is None:
+        raise TypeError("expected choose_row screen with player_state")
+    try:
+        cli_row = int(text)
+    except ValueError:
+        return FrontendInputResult(state=set_flash(state, "error", "Bitte eine Reihennummer eingeben."))
+    mapping = build_row_display_mapping(screen.player_state.public_state)
+    if cli_row < 1 or cli_row > mapping.max_cli_row():
+        return FrontendInputResult(state=set_flash(state, "error", "Ungültige Reihennummer."))
+    row_id = screen.player_state.public_state.rows[mapping.to_state_index(cli_row)].row_id
+    return FrontendInputResult(state=clear_flash(state), action=UiActionChooseRow(row_id))

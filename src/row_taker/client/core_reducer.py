@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from row_taker.cli.local_resolution import apply_local_row_choice, start_local_resolution
+from row_taker.cli.row_display import build_row_display_mapping
+from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, UiMessage, has_pending_presentation
 from row_taker.client.actions import (
     UiAction,
     UiActionAdvancePresentation,
@@ -14,9 +17,7 @@ from row_taker.client.actions import (
     UiActionRename,
     UiActionStartGame,
 )
-from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction
 from row_taker.client.presentation_events import PresentationEvent
-from row_taker.client.trick_presentation_resolver import apply_trick_row_choice, start_trick_presentation
 from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
 from row_taker.protocol.messages import (
     AssignSeatToClient,
@@ -44,29 +45,19 @@ from row_taker.protocol.messages import (
 
 
 @dataclass(frozen=True, slots=True)
-class CoreActionResult:
-    state: ClientCoreState
+class ActionResult:
+    state: CliState
     outbound_message: ClientToServerMessage | None = None
     local_message: str | None = None
 
 
-
-def append_presentation_events(
-    state: ClientCoreState,
-    events: tuple[PresentationEvent, ...],
-) -> ClientCoreState:
+def append_presentation_events(state: CliState, events: tuple[PresentationEvent, ...]) -> CliState:
     if not events:
         return state
     return replace(state, pending_presentation_events=state.pending_presentation_events + events)
 
 
-
-def reset_presentation_queue(state: ClientCoreState) -> ClientCoreState:
-    return replace(state, presentation_events=(), pending_presentation_events=())
-
-
-
-def advance_presentation_queue(state: ClientCoreState) -> ClientCoreState:
+def advance_presentation_queue(state: CliState) -> CliState:
     if not state.pending_presentation_events:
         return state
     next_event = state.pending_presentation_events[0]
@@ -77,144 +68,157 @@ def advance_presentation_queue(state: ClientCoreState) -> ClientCoreState:
     )
 
 
-
-def reduce_server_message(state: ClientCoreState, message: ServerToClientMessage) -> ClientCoreState:
+def reduce_server_message(state: CliState, message: ServerToClientMessage) -> CliState:
     match message:
         case IdentityAssigned(client_id=client_id):
             return replace(state, own_client_id=client_id)
         case LobbyStateUpdated(lobby=lobby):
-            return replace(state, lobby_view=lobby, client_mode=ClientMode.LOBBY, pending_action=PendingAction.LOBBY_COMMAND)
-        case LobbyActionRejected():
-            return state
+            return replace(state, lobby_view=lobby)
+        case LobbyActionRejected(message=text):
+            return replace(state, flash_message=UiMessage(level="error", text=text))
         case GameStarting(lobby=lobby):
             return replace(
                 state,
                 lobby_view=lobby,
                 public_state=None,
-                player_state=None,
+                screen=GameScreen(kind="waiting"),
+                flash_message=UiMessage(level="info", text="Spielstart..."),
                 revealed_trick=None,
-                trick_presentation_state=None,
+                local_resolution=None,
                 presentation_events=(),
                 pending_presentation_events=(),
-                client_mode=ClientMode.GAME,
-                pending_action=PendingAction.NONE,
             )
         case StateUpdated(state=public_state):
-            next_trick_presentation_state = state.trick_presentation_state
-            if next_trick_presentation_state is not None and next_trick_presentation_state.pending_row_choice is None:
-                next_trick_presentation_state = None
+            next_screen = state.screen
+            if isinstance(next_screen, GameScreen) and next_screen.kind == "choose_row":
+                next_screen = GameScreen(kind="waiting")
+            next_local_resolution = state.local_resolution
+            if next_local_resolution is not None and next_local_resolution.pending_row_choice is None:
+                next_local_resolution = None
             return replace(
                 state,
                 public_state=public_state,
+                screen=next_screen,
                 revealed_trick=None,
-                trick_presentation_state=next_trick_presentation_state,
-                client_mode=ClientMode.GAME,
-                pending_action=PendingAction.NONE,
+                local_resolution=next_local_resolution,
             )
         case CardsRevealed() as revealed:
-            trick_presentation_state = None
+            local_resolution = None
             queued_events: tuple[PresentationEvent, ...] = ()
             if state.public_state is not None:
-                trick_presentation_state = start_trick_presentation(state.public_state, revealed)
-                queued_events = trick_presentation_state.events
-            next_state = replace(
-                state,
-                revealed_trick=revealed,
-                trick_presentation_state=trick_presentation_state,
-            )
+                local_resolution = start_local_resolution(state.public_state, revealed)
+                queued_events = local_resolution.events
+            next_state = replace(state, revealed_trick=revealed, local_resolution=local_resolution, flash_message=None)
             return append_presentation_events(next_state, queued_events)
         case RowChoiceCommitted(row_id=row_id):
-            trick_presentation_state = state.trick_presentation_state
+            local_resolution = state.local_resolution
             newly_queued_events: tuple[PresentationEvent, ...] = ()
-            if trick_presentation_state is not None and trick_presentation_state.pending_row_choice is not None:
-                previous_count = len(trick_presentation_state.events)
-                trick_presentation_state = apply_trick_row_choice(trick_presentation_state, row_id)
-                newly_queued_events = trick_presentation_state.events[previous_count:]
-            next_state = replace(
-                state,
-                trick_presentation_state=trick_presentation_state,
-                pending_action=PendingAction.NONE,
-            )
+            if local_resolution is not None and local_resolution.pending_row_choice is not None:
+                previous_count = len(local_resolution.events)
+                local_resolution = apply_local_row_choice(local_resolution, row_id)
+                newly_queued_events = local_resolution.events[previous_count:]
+            next_state = replace(state, screen=GameScreen(kind="waiting"), local_resolution=local_resolution, flash_message=None)
             return append_presentation_events(next_state, newly_queued_events)
         case ChooseCardRequested(player_id=player_id, state=player_state):
             return replace(
                 state,
                 own_player_id=player_id,
-                player_state=player_state,
+                screen=GameScreen(kind="choose_card", player_state=player_state),
+                flash_message=None,
                 revealed_trick=None,
-                trick_presentation_state=None,
+                local_resolution=None,
                 presentation_events=(),
                 pending_presentation_events=(),
-                client_mode=ClientMode.GAME,
-                pending_action=PendingAction.CHOOSE_CARD,
             )
         case ChooseRowRequested(player_id=player_id, state=player_state):
             return replace(
                 state,
                 own_player_id=player_id,
-                player_state=player_state,
-                client_mode=ClientMode.GAME,
-                pending_action=PendingAction.CHOOSE_ROW,
+                screen=GameScreen(kind="choose_row", player_state=player_state),
+                flash_message=None,
             )
         case SessionEnded(message=text):
             return replace(
                 state,
                 session_error=text,
-                client_mode=ClientMode.ENDED,
-                pending_action=PendingAction.NONE,
+                exit_on_ack=False,
+                suppress_final_result=True,
+                should_exit=True,
+                flash_message=None,
             )
         case ServerError(message=text):
-            return replace(state, session_error=text)
+            return replace(
+                state,
+                session_error=text,
+                exit_on_ack=True,
+                suppress_final_result=True,
+                flash_message=None,
+            )
         case _:
             raise TypeError(f"unsupported server message type: {type(message)!r}")
 
 
-
-def apply_ui_action(state: ClientCoreState, action: UiAction) -> CoreActionResult:
+def apply_ui_action(state: CliState, action: UiAction) -> ActionResult:
     match action:
+        case UiActionLeaveSession():
+            return ActionResult(
+                state=replace(state, should_exit=True, suppress_final_result=True),
+                outbound_message=LeaveSession(),
+            )
         case UiActionAdvancePresentation():
-            return CoreActionResult(state=advance_presentation_queue(state))
+            return ActionResult(state=advance_presentation_queue(state))
         case UiActionRename(name=name):
-            if not name.strip():
-                return CoreActionResult(state=state, local_message="Der Anzeigename darf nicht leer sein.")
-            return CoreActionResult(state=state, outbound_message=SetDisplayName(display_name=name))
+            return ActionResult(
+                state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
+                outbound_message=SetDisplayName(display_name=name),
+            )
         case UiActionAssignSelfToSeat(seat_index=seat_index):
             if state.own_client_id is None:
-                return CoreActionResult(state=state, local_message="Eigene client_id unbekannt.")
-            return CoreActionResult(
-                state=state,
+                return ActionResult(state=state, local_message="Eigene client_id unbekannt.")
+            return ActionResult(
+                state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
                 outbound_message=AssignSeatToClient(seat_index=seat_index, target_client_id=state.own_client_id),
             )
         case UiActionCreateBot(seat_index=seat_index, name=name):
-            return CoreActionResult(
-                state=state,
+            return ActionResult(
+                state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
                 outbound_message=CreateLocalBotOnSeat(seat_index=seat_index, display_name=name),
             )
         case UiActionClearSeat(seat_index=seat_index):
-            return CoreActionResult(state=state, outbound_message=ClearSeat(seat_index=seat_index))
+            return ActionResult(
+                state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
+                outbound_message=ClearSeat(seat_index=seat_index),
+            )
         case UiActionStartGame():
-            return CoreActionResult(state=state, outbound_message=RequestStartGame())
-        case UiActionChooseCard(card_value=card_value):
-            player_state = state.player_state
+            return ActionResult(
+                state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None),
+                outbound_message=RequestStartGame(),
+            )
+        case UiActionChooseCard(card_value=value):
+            screen = state.screen
+            player_state = screen.player_state if isinstance(screen, GameScreen) and screen.kind == "choose_card" else None
             if player_state is None:
-                return CoreActionResult(state=state, local_message="Kein Spielerzustand für Kartenauswahl vorhanden.")
+                return ActionResult(state=state, local_message="Keine Kartenauswahl aktiv.")
             try:
-                validate_submit_card(player_state, card_value)
-            except ValueError as exc:
-                return CoreActionResult(state=state, local_message=str(exc))
-            next_state = replace(state, pending_action=PendingAction.NONE)
-            return CoreActionResult(state=next_state, outbound_message=SubmitCard(card_value=card_value))
+                validate_submit_card(player_state, value)
+            except Exception as exc:
+                return ActionResult(state=state, local_message=str(exc))
+            return ActionResult(
+                state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
+                outbound_message=SubmitCard(card_value=value),
+            )
         case UiActionChooseRow(row_id=row_id):
-            player_state = state.player_state
+            screen = state.screen
+            player_state = screen.player_state if isinstance(screen, GameScreen) and screen.kind == "choose_row" else None
             if player_state is None:
-                return CoreActionResult(state=state, local_message="Kein Spielerzustand für Reihenwahl vorhanden.")
+                return ActionResult(state=state, local_message="Keine Reihenwahl aktiv.")
             try:
                 validate_submit_row_choice(player_state, row_id)
-            except ValueError as exc:
-                return CoreActionResult(state=state, local_message=str(exc))
-            next_state = replace(state, pending_action=PendingAction.NONE)
-            return CoreActionResult(state=next_state, outbound_message=SubmitRowChoice(row_id=row_id))
-        case UiActionLeaveSession():
-            return CoreActionResult(state=state, outbound_message=LeaveSession())
+            except Exception as exc:
+                return ActionResult(state=state, local_message=str(exc))
+            return ActionResult(
+                state=replace(state, screen=GameScreen(kind="waiting"), flash_message=None),
+                outbound_message=SubmitRowChoice(row_id=row_id),
+            )
         case _:
             raise TypeError(f"unsupported ui action type: {type(action)!r}")

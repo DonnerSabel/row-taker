@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from row_taker.engine.game.models import RowID
 
-
-@dataclass(frozen=True, slots=True)
 class UiAction:
     pass
 
@@ -43,7 +40,7 @@ class UiActionChooseCard(UiAction):
 
 @dataclass(frozen=True, slots=True)
 class UiActionChooseRow(UiAction):
-    row_id: RowID
+    row_id: object
 
 
 @dataclass(frozen=True, slots=True)

@@ -651,16 +651,17 @@ This logging infrastructure is not just convenience. It is part of the intended
 diagnostics design for later debugging, including future richer debug messages or
 snapshots.
 
+
 ## 10. Canonical client pipeline
 
 The canonical client pipeline is centered around `GameClientCore`.
 
 Consequences:
-- frontends must feed server messages into `GameClientCore.on_server_message(...)`
-- frontends must feed user actions into `GameClientCore.on_ui_action(...)`
+- frontends feed server messages into `GameClientCore.on_server_message(...)`
+- frontends feed user actions into `GameClientCore.on_ui_action(...)`
 - the core owns inbox, deferring, revision tracking, and the presentation queue
-- `CliApp` is only the CLI host layer around the core
-- `state_machine.py` was removed as a productive abstraction; tests and frontends should use `GameClientCore` + `CliFrontend` directly
+- `CliApp` is the CLI host layer around the core
+- `state_machine.py` is no longer a productive abstraction
 
 ### Core result objects
 
@@ -669,22 +670,9 @@ Consequences:
 - `applied_server_messages`
 - `outbound_messages`
 - `local_messages`
-- `effects`
-
-This is intentional.
-
-The project explicitly prefers a small result/effect API over a purely state-only API,
-because later GUI implementations should not have to infer all transition semantics by
-comparing old and new states manually.
 
 ### Shared core for human clients and bots
-
-Transport/protocol handling and the network-facing client core are shared concerns for
-human clients and bots.
 
 Target model:
 - human client = `GameClientCore` + frontend
 - bot = `GameClientCore` + decision layer
-
-The presentation queue remains in the core even though a bot may choose to ignore its
-visible rendering meaning.
