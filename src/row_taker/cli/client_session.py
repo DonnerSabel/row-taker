@@ -1,28 +1,28 @@
 from __future__ import annotations
 
-from row_taker.cli.console import CliConsole as _CliConsole
+from row_taker.cli.console import CliConsole
 from row_taker.cli.runtime import CliRuntime
-from row_taker.cli.state_models import initial_cli_state as _initial_cli_state
-
-CliConsole = _CliConsole
-initial_cli_state = _initial_cli_state
+from row_taker.cli.state_models import initial_cli_state
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.transport import ClientTransport
 
 
 class ClientSession:
-    """Compatibility wrapper around the CLI runtime.
-
-    The actual client orchestration now lives in CliRuntime + GameClientCore.
-    """
-
-    def __init__(self, transport: ClientTransport, own_client_id: str | None = None, *, interactive: bool = True) -> None:
+    def __init__(
+        self,
+        transport: ClientTransport,
+        own_client_id: str | None = None,
+        *,
+        interactive: bool = True,
+        console_factory: type[CliConsole] = CliConsole,
+        initial_state_factory=initial_cli_state,
+    ) -> None:
         self.runtime = CliRuntime(
             transport=transport,
             own_client_id=own_client_id,
             interactive=interactive,
-            console_factory=CliConsole,
-            initial_state_factory=initial_cli_state,
+            console_factory=console_factory,
+            initial_state_factory=initial_state_factory,
         )
 
     @property

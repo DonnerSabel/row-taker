@@ -5,6 +5,7 @@ import random
 from row_taker.cli.render import determine_prompt, render_resolution_lines
 from row_taker.cli.state_machine import reduce_server_message, reduce_user_input
 from row_taker.cli.state_models import CliState, GameScreen
+from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction
 from row_taker.client.presentation_events import PresentationCardsRevealed, PresentationRowTaken
 from row_taker.engine.game import build_player_state, setup_game
 from row_taker.protocol.messages import (
@@ -59,7 +60,7 @@ def test_cards_revealed_is_stored_for_waiting_screen() -> None:
         ),
     )
 
-    state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
+    state = reduce_server_message(CliState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
 
     assert state.public_state == player_state.public_state
     assert state.revealed_trick == revealed
@@ -100,7 +101,7 @@ def test_cards_revealed_builds_local_presentation_events() -> None:
         ),
     )
 
-    state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
+    state = reduce_server_message(CliState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
 
     assert state.local_resolution is not None
     assert state.pending_presentation_events
@@ -120,7 +121,7 @@ def test_row_choice_committed_advances_local_resolution() -> None:
         ),
     )
 
-    state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
+    state = reduce_server_message(CliState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
     assert state.local_resolution is not None
     assert state.local_resolution.pending_row_choice is not None
 
@@ -144,7 +145,7 @@ def test_cards_revealed_queues_presentation_events_before_display() -> None:
         ),
     )
 
-    state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
+    state = reduce_server_message(CliState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
 
     assert state.presentation_events == ()
     assert state.pending_presentation_events
@@ -152,8 +153,12 @@ def test_cards_revealed_queues_presentation_events_before_display() -> None:
 
 def test_pending_presentation_uses_enter_prompt_until_queue_is_empty() -> None:
     state = CliState(
-        screen=GameScreen(kind="choose_row", player_state=_player_state_for(0)),
-        pending_presentation_events=(PresentationCardsRevealed(plays=()),),
+        core_state=ClientCoreState(
+            player_state=_player_state_for(0),
+            client_mode=ClientMode.GAME,
+            pending_action=PendingAction.CHOOSE_ROW,
+            pending_presentation_events=(PresentationCardsRevealed(plays=()),),
+        )
     )
 
     assert determine_prompt(state) == "Weiter mit Enter > "
@@ -161,8 +166,11 @@ def test_pending_presentation_uses_enter_prompt_until_queue_is_empty() -> None:
 
 def test_enter_advances_pending_presentation_queue() -> None:
     state = CliState(
-        screen=GameScreen(kind="waiting"),
-        pending_presentation_events=(PresentationCardsRevealed(plays=()), PresentationRowTaken("p1", "Alice", 1, (1, 2), 3, 5, (5,))),
+        core_state=ClientCoreState(
+            client_mode=ClientMode.GAME,
+            pending_action=PendingAction.NONE,
+            pending_presentation_events=(PresentationCardsRevealed(plays=()), PresentationRowTaken("p1", "Alice", 1, (1, 2), 3, 5, (5,))),
+        )
     )
 
     result = reduce_user_input(state, "")
@@ -173,8 +181,11 @@ def test_enter_advances_pending_presentation_queue() -> None:
 
 def test_non_enter_during_pending_presentation_shows_hint() -> None:
     state = CliState(
-        screen=GameScreen(kind="waiting"),
-        pending_presentation_events=(PresentationCardsRevealed(plays=()),),
+        core_state=ClientCoreState(
+            client_mode=ClientMode.GAME,
+            pending_action=PendingAction.NONE,
+            pending_presentation_events=(PresentationCardsRevealed(plays=()),),
+        )
     )
 
     result = reduce_user_input(state, "foo")
@@ -186,9 +197,11 @@ def test_non_enter_during_pending_presentation_shows_hint() -> None:
 def test_choose_card_requested_clears_visible_and_pending_presentation() -> None:
     player_state = _player_state_for(0)
     state = CliState(
-        public_state=player_state.public_state,
-        presentation_events=(PresentationCardsRevealed(plays=()),),
-        pending_presentation_events=(PresentationCardsRevealed(plays=()),),
+        core_state=ClientCoreState(
+            public_state=player_state.public_state,
+            presentation_events=(PresentationCardsRevealed(plays=()),),
+            pending_presentation_events=(PresentationCardsRevealed(plays=()),),
+        )
     )
 
     from row_taker.protocol.messages import ChooseCardRequested
@@ -202,10 +215,7 @@ def test_choose_card_requested_clears_visible_and_pending_presentation() -> None
 
 
 def test_render_resolution_lines_renders_from_presentation_events() -> None:
-    state = CliState(
-        own_player_id="p1",
-        presentation_events=(PresentationCardsRevealed(plays=()),),
-    )
+    state = CliState(core_state=ClientCoreState(own_player_id="p1", presentation_events=(PresentationCardsRevealed(plays=()),)))
 
     rendered = render_resolution_lines(state)
     assert rendered is not None

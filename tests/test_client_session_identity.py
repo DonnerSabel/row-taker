@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from row_taker.cli.render import render_screen
 from row_taker.cli.state_machine import reduce_server_message, reduce_user_input
-from row_taker.cli.state_models import CliState, LobbyScreen
+from row_taker.cli.state_models import CliNavigationState, CliState, LobbyScreen
+from row_taker.client.core_state import ClientCoreState
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     IdentityAssigned,
@@ -57,7 +58,6 @@ def _lobby() -> LobbyView:
     )
 
 
-
 def test_reduce_server_message_stores_own_client_id_from_identity_assigned() -> None:
     state = CliState()
 
@@ -67,12 +67,10 @@ def test_reduce_server_message_stores_own_client_id_from_identity_assigned() -> 
     assert new_state.screen == LobbyScreen(kind="main")
 
 
-
 def test_reduce_user_input_assign_seat_uses_explicit_own_client_id() -> None:
     state = CliState(
-        own_client_id="client-1",
-        lobby_view=_lobby(),
-        screen=LobbyScreen(kind="seat_edit", seat_index=0),
+        core_state=ClientCoreState(own_client_id="client-1", lobby_view=_lobby()),
+        navigation_state=CliNavigationState(lobby_submenu="seat_edit", selected_seat_index=0),
     )
 
     result = reduce_user_input(state, "m")
@@ -81,11 +79,10 @@ def test_reduce_user_input_assign_seat_uses_explicit_own_client_id() -> None:
     assert result.outbound_message == AssignSeatToClient(seat_index=0, target_client_id="client-1")
 
 
-
 def test_reduce_user_input_assign_seat_without_identity_sets_local_error() -> None:
     state = CliState(
-        lobby_view=_lobby(),
-        screen=LobbyScreen(kind="seat_edit", seat_index=0),
+        core_state=ClientCoreState(lobby_view=_lobby()),
+        navigation_state=CliNavigationState(lobby_submenu="seat_edit", selected_seat_index=0),
     )
 
     result = reduce_user_input(state, "m")
@@ -95,12 +92,10 @@ def test_reduce_user_input_assign_seat_without_identity_sets_local_error() -> No
     assert "client_id" in (result.state.flash_message.text if result.state.flash_message else "")
 
 
-
 def test_render_lobby_shows_participants_and_marks_own_client() -> None:
     state = CliState(
-        own_client_id="client-1",
-        lobby_view=_lobby(),
-        screen=LobbyScreen(kind="main"),
+        core_state=ClientCoreState(own_client_id="client-1", lobby_view=_lobby()),
+        navigation_state=CliNavigationState(lobby_submenu="main"),
     )
 
     out = render_screen(state)
@@ -110,11 +105,10 @@ def test_render_lobby_shows_participants_and_marks_own_client() -> None:
     assert "Bot_1 (bot, Platz 2)" in out
 
 
-
 def test_reduce_server_message_lobby_update_keeps_active_lobby_mode() -> None:
     state = CliState(
-        own_client_id="client-1",
-        screen=LobbyScreen(kind="seat_edit", seat_index=2),
+        core_state=ClientCoreState(own_client_id="client-1"),
+        navigation_state=CliNavigationState(lobby_submenu="seat_edit", selected_seat_index=2),
     )
 
     new_state = reduce_server_message(state, LobbyStateUpdated(lobby=_lobby()))

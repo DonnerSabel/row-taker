@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from row_taker.cli.row_display import build_row_display_mapping
+from row_taker.client.core_state import ClientMode, PendingAction, initial_client_core_state
 from row_taker.cli.state_models import (
     CliState,
     GameScreen,
@@ -369,5 +370,12 @@ def render_own_hand(player_state: PlayerState) -> str:
 
 
 def render_public_state(public_state: PublicState) -> None:
-    state = CliState(public_state=public_state, screen=GameScreen(kind="waiting"))
+    state = CliState(
+        core_state=replace(
+            initial_client_core_state(),
+            public_state=public_state,
+            client_mode=ClientMode.GAME,
+            pending_action=PendingAction.NONE,
+        )
+    )
     print(render_game_overview(state))
