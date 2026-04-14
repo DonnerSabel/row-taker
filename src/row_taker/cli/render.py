@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from row_taker.cli.row_display import build_row_display_mapping
-from row_taker.cli.screens import GameScreen, LobbyScreen, current_screen
 from row_taker.client.core_state import ClientMode, PendingAction, initial_client_core_state
 from row_taker.client.presentation_events import (
     PresentationCardPlaced,
@@ -73,26 +72,29 @@ def determine_prompt(state: ClientState) -> str | None:
     raise TypeError(f"unsupported pending action: {state.pending_action!r}")
 
 
-
 def render_main_screen(state: ClientState) -> str:
-    match current_screen(state):
-        case LobbyScreen(kind="main"):
+    if state.client_mode == ClientMode.LOBBY:
+        submenu = state.navigation_state.lobby_submenu
+        if submenu == "main":
             return render_lobby_main(state)
-        case LobbyScreen(kind="rename"):
+        if submenu == "rename":
             return render_lobby_rename(state)
-        case LobbyScreen(kind="seat_edit"):
+        if submenu == "seat_edit":
             return render_lobby_seat_edit(state)
-        case LobbyScreen(kind="bot_name"):
+        if submenu == "bot_name":
             return render_lobby_bot_name(state)
-        case GameScreen(kind="waiting"):
-            return render_game_waiting(state)
-        case GameScreen(kind="choose_card"):
-            return render_game_choose_card(state)
-        case GameScreen(kind="choose_row"):
-            return render_game_choose_row(state)
-        case GameScreen(kind="ended"):
-            return render_game_ended(state)
-    raise TypeError(f"unsupported screen: {current_screen(state)!r}")
+        raise TypeError(f"unsupported lobby submenu: {submenu!r}")
+    if state.client_mode == ClientMode.ENDED:
+        return render_game_ended(state)
+    if state.pending_action == PendingAction.CHOOSE_CARD:
+        return render_game_choose_card(state)
+    if state.pending_action == PendingAction.CHOOSE_ROW:
+        return render_game_choose_row(state)
+    if state.pending_action == PendingAction.NONE:
+        return render_game_waiting(state)
+    raise TypeError(
+        f"unsupported render state: mode={state.client_mode!r}, pending_action={state.pending_action!r}"
+    )
 
 
 def render_session_error(message: str) -> str:

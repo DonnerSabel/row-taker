@@ -711,3 +711,10 @@ Consequences:
 - text input should not primarily branch on concrete screen objects
 - prompt selection should not primarily branch on concrete screen objects
 - screen objects are a rendering projection, not the main client control model
+
+
+## Stand nach Umbauzug 2
+
+Die CLI leitet nun nicht nur Eingabe und Prompt, sondern auch das Haupt-Rendering primär aus `ClientState` ab. `cli/screens.py` bleibt als abgeleitete View-Projektion erhalten, ist aber nicht mehr die führende Produktionslogik für das Rendering.
+
+Die Tests sind entlang der Architekturgrenzen getrennt in Core-, Frontend- und Render-Tests.

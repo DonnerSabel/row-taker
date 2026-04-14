@@ -101,3 +101,10 @@ Fuer die CLI sollen fachliche Entscheidungen primaer an diesen Achsen haengen:
 `LobbyScreen` und `GameScreen` sind nur noch abgeleitete View-Objekte. Sie duerfen
 beim Rendern hilfreich sein, sollen aber nicht mehr die fuehrende Wahrheit fuer
 Prompt-Bestimmung oder Texteingabe sein.
+
+
+## Stand nach Umbauzug 2
+
+Die CLI leitet nun nicht nur Eingabe und Prompt, sondern auch das Haupt-Rendering primär aus `ClientState` ab. `cli/screens.py` bleibt als abgeleitete View-Projektion erhalten, ist aber nicht mehr die führende Produktionslogik für das Rendering.
+
+Die Tests sind entlang der Architekturgrenzen getrennt in Core-, Frontend- und Render-Tests.
