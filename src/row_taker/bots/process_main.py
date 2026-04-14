@@ -5,7 +5,7 @@ import logging
 import random
 import sys
 
-from row_taker.clients.random_bot_client import RandomBotClient
+from row_taker.bots.random_bot_client import RandomBotClient
 from row_taker.logging_utils import configure_logging
 from row_taker.protocol.errors import ConnectionClosed, TransportError
 from row_taker.protocol.messages import JoinLobby, SessionEnded
@@ -47,8 +47,8 @@ def main() -> int:
             if isinstance(message, SessionEnded):
                 logger.debug("bot session ended received; exiting process")
                 return 0
-            response = bot.handle_server_message(message)
-            if response is not None:
+            responses = bot.handle_server_message(message)
+            for response in responses:
                 logger.debug("bot sending client message: type=%s", type(response).__name__)
                 transport.send(response)
     except TransportError as exc:
