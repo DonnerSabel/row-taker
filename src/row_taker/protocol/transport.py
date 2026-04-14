@@ -36,15 +36,21 @@ class TcpLineTransport:
         return cls(sock=sock, reader=sock.makefile("rb"), writer=sock.makefile("wb"))
 
     def send_line(self, data: bytes) -> None:
+        writer = self.writer
+        if writer is None:
+            raise ConnectionClosed("transport closed")
         try:
-            self.writer.write(data)
-            self.writer.flush()
+            writer.write(data)
+            writer.flush()
         except OSError as exc:
             raise SendFailed(str(exc)) from exc
 
     def receive_line(self) -> bytes:
+        reader = self.reader
+        if reader is None:
+            raise ConnectionClosed("transport closed")
         try:
-            line = self.reader.readline()
+            line = reader.readline()
         except OSError as exc:
             raise ReceiveFailed(str(exc)) from exc
         if not line:
