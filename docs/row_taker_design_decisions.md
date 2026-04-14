@@ -660,7 +660,7 @@ Consequences:
 - frontends must feed user actions into `GameClientCore.on_ui_action(...)`
 - the core owns inbox, deferring, revision tracking, and the presentation queue
 - `CliApp` is only the CLI host layer around the core
-- the historical `state_machine.py` is not a target abstraction and should disappear
+- `state_machine.py` was removed as a productive abstraction; tests and frontends should use `GameClientCore` + `CliFrontend` directly
 
 ### Core result objects
 

@@ -8,6 +8,11 @@ from row_taker.protocol.transport import ClientTransport
 
 
 class ClientSession:
+    """Temporary compatibility wrapper around CliApp.
+
+    The long-term target architecture is centered on GameClientCore + CliApp.
+    """
+
     def __init__(
         self,
         transport: ClientTransport,
