@@ -65,8 +65,9 @@ def on_server_message(message) -> None:
 update = core.on_server_message(message)
 state = update.state
 
-if isinstance(current_screen(state), GameScreen) and current_screen(state).kind == "choose_card":
-    action = ClientActionChooseCard(choose_bot_card(current_screen(state).player_state))
+if state.client_mode == ClientMode.GAME and state.pending_action == PendingAction.CHOOSE_CARD:
+    assert state.player_state is not None
+    action = ClientActionChooseCard(choose_bot_card(state.player_state))
     reply = core.on_ui_action(action)
     for outbound in reply.outbound_messages:
         transport.send(outbound)
@@ -87,3 +88,16 @@ zuständig.
 
 ### Frontend
 Das Frontend ist fuer Rendering, Eingabe und das Versenden der Outbound-Nachrichten zustaendig.
+
+
+## Frontend state axes
+
+Fuer die CLI sollen fachliche Entscheidungen primaer an diesen Achsen haengen:
+
+- `state.client_mode`
+- `state.pending_action`
+- `state.navigation_state`
+
+`LobbyScreen` und `GameScreen` sind nur noch abgeleitete View-Objekte. Sie duerfen
+beim Rendern hilfreich sein, sollen aber nicht mehr die fuehrende Wahrheit fuer
+Prompt-Bestimmung oder Texteingabe sein.

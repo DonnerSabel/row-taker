@@ -690,3 +690,24 @@ Consequences:
 - the CLI frontend may derive `LobbyScreen` and `GameScreen` from `ClientState`,
   but the core should operate on `ClientState`, `ClientMode`, and
   `PendingAction`
+
+
+---
+
+## 12. CLI state axes and view projection
+
+The CLI uses three leading state axes:
+
+- `client_mode`
+- `pending_action`
+- `navigation_state`
+
+These are the primary source of truth for CLI input handling and prompt selection.
+
+`LobbyScreen` and `GameScreen` may still exist as derived view helpers, but they are
+not supposed to act as the hidden state machine of the client anymore.
+
+Consequences:
+- text input should not primarily branch on concrete screen objects
+- prompt selection should not primarily branch on concrete screen objects
+- screen objects are a rendering projection, not the main client control model

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from row_taker.client.core_state import ClientCoreState
+from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction
 
 import random
 
 from row_taker.cli.frontend import CliFrontend, set_flash
 from row_taker.cli.render import determine_prompt, render_resolution_lines
-from row_taker.cli.screens import GameScreen, current_screen
 from row_taker.client.core_reducer import reduce_server_message as direct_reduce_server_message
 from row_taker.client.game_client_core import GameClientCore
 from row_taker.client.presentation_events import PresentationCardsRevealed, PresentationRowTaken
@@ -117,8 +116,8 @@ def test_choose_card_requested_enters_choose_card_screen() -> None:
     )
 
     assert new_state.own_player_id == player_state.self_player_id
-    assert isinstance(current_screen(new_state), GameScreen)
-    assert current_screen(new_state).kind == "choose_card"
+    assert new_state.client_mode == ClientMode.GAME
+    assert new_state.pending_action == PendingAction.CHOOSE_CARD
 
 
 

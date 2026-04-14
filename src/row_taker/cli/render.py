@@ -48,24 +48,30 @@ def determine_prompt(state: ClientState) -> str | None:
         return "Weiter mit Enter > " if state.exit_on_ack else None
     if has_pending_presentation(state):
         return "Weiter mit Enter > "
-    match current_screen(state):
-        case LobbyScreen(kind="main"):
+    if state.client_mode == ClientMode.LOBBY:
+        submenu = state.navigation_state.lobby_submenu
+        if submenu == "main":
             return "Auswahl > "
-        case LobbyScreen(kind="rename"):
+        if submenu == "rename":
             return "Neuer Anzeigename > "
-        case LobbyScreen(kind="seat_edit", seat_index=seat_index):
+        if submenu == "seat_edit":
+            seat_index = state.navigation_state.selected_seat_index
+            if seat_index is None:
+                raise TypeError("seat_edit submenu requires selected_seat_index")
             return f"Platz {seat_index} > "
-        case LobbyScreen(kind="bot_name"):
+        if submenu == "bot_name":
             return "Bot-Name > "
-        case GameScreen(kind="waiting"):
-            return None
-        case GameScreen(kind="choose_card"):
-            return "Karte > "
-        case GameScreen(kind="choose_row"):
-            return "Reihe > "
-        case GameScreen(kind="ended"):
-            return "Weiter mit Enter > "
-    raise TypeError(f"unsupported screen: {current_screen(state)!r}")
+        raise TypeError(f"unsupported lobby submenu: {submenu!r}")
+    if state.client_mode == ClientMode.ENDED:
+        return "Weiter mit Enter > "
+    if state.pending_action == PendingAction.NONE:
+        return None
+    if state.pending_action == PendingAction.CHOOSE_CARD:
+        return "Karte > "
+    if state.pending_action == PendingAction.CHOOSE_ROW:
+        return "Reihe > "
+    raise TypeError(f"unsupported pending action: {state.pending_action!r}")
+
 
 
 def render_main_screen(state: ClientState) -> str:
@@ -126,14 +132,14 @@ def render_lobby_rename(state: ClientState) -> str:
 
 
 def render_lobby_seat_edit(state: ClientState) -> str:
-    screen = current_screen(state)
-    if not isinstance(screen, LobbyScreen) or screen.kind != "seat_edit" or screen.seat_index is None:
-        raise TypeError("expected seat_edit screen")
+    seat_index = state.navigation_state.selected_seat_index
+    if state.client_mode != ClientMode.LOBBY or state.navigation_state.lobby_submenu != "seat_edit" or seat_index is None:
+        raise TypeError("expected seat_edit submenu")
     return "\n".join(
         [
-            render_lobby_overview_with_highlight(state, screen.seat_index),
+            render_lobby_overview_with_highlight(state, seat_index),
             "",
-            f"Platz {screen.seat_index} bearbeiten",
+            f"Platz {seat_index} bearbeiten",
             "-------------------------",
             "  m = mich setzen",
             "  b = Bot setzen/umbenennen",
@@ -145,15 +151,15 @@ def render_lobby_seat_edit(state: ClientState) -> str:
 
 
 def render_lobby_bot_name(state: ClientState) -> str:
-    screen = current_screen(state)
-    if not isinstance(screen, LobbyScreen) or screen.kind != "bot_name" or screen.seat_index is None:
-        raise TypeError("expected bot_name screen")
-    current_name = _current_bot_name(state, screen.seat_index)
+    seat_index = state.navigation_state.selected_seat_index
+    if state.client_mode != ClientMode.LOBBY or state.navigation_state.lobby_submenu != "bot_name" or seat_index is None:
+        raise TypeError("expected bot_name submenu")
+    current_name = _current_bot_name(state, seat_index)
     return "\n".join(
         [
-            render_lobby_overview_with_highlight(state, screen.seat_index),
+            render_lobby_overview_with_highlight(state, seat_index),
             "",
-            f"Bot für Platz {screen.seat_index}",
+            f"Bot für Platz {seat_index}",
             "-------------------",
             f"Aktueller/Vorgeschlagener Name: {current_name}",
             "Neuen Bot-Namen eingeben.",
@@ -251,13 +257,13 @@ def render_game_waiting(state: ClientState) -> str:
 
 
 def render_game_choose_card(state: ClientState) -> str:
-    screen = current_screen(state)
-    if not isinstance(screen, GameScreen) or screen.kind != "choose_card" or screen.player_state is None:
-        raise TypeError("expected choose_card screen")
+    player_state = state.player_state
+    if state.client_mode != ClientMode.GAME or state.pending_action != PendingAction.CHOOSE_CARD or player_state is None:
+        raise TypeError("expected choose_card state")
     lines = [
         render_game_overview(state),
         "",
-        render_own_hand(screen.player_state),
+        render_own_hand(player_state),
         "",
         "Du bist dran.",
         "Wähle eine Karte aus deiner Hand.",
@@ -267,11 +273,11 @@ def render_game_choose_card(state: ClientState) -> str:
 
 
 def render_game_choose_row(state: ClientState) -> str:
-    screen = current_screen(state)
-    if not isinstance(screen, GameScreen) or screen.kind != "choose_row" or screen.player_state is None:
-        raise TypeError("expected choose_row screen")
-    mapping = build_row_display_mapping(screen.player_state.public_state)
-    pending_card_value = screen.player_state.pending_card_value()
+    player_state = state.player_state
+    if state.client_mode != ClientMode.GAME or state.pending_action != PendingAction.CHOOSE_ROW or player_state is None:
+        raise TypeError("expected choose_row state")
+    mapping = build_row_display_mapping(player_state.public_state)
+    pending_card_value = player_state.pending_card_value()
     pending_card_text = "?" if pending_card_value is None else str(pending_card_value)
     lines = [render_game_overview(state)]
     resolution = render_resolution_lines(state)
@@ -280,7 +286,7 @@ def render_game_choose_row(state: ClientState) -> str:
     lines.extend(
         [
             "",
-            render_own_hand(screen.player_state),
+            render_own_hand(player_state),
             "",
             f"Deine Karte {pending_card_text} ist kleiner als alle Reihen.",
             f"Bitte wähle eine Reihe zwischen 1 und {mapping.max_cli_row()}.",

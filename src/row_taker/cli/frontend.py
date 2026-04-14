@@ -18,11 +18,8 @@ from row_taker.client.core_state import ClientMode, PendingAction
 from row_taker.client.state import (
     ClientState,
     UiMessage,
+    enter_lobby_submenu,
     has_pending_presentation,
-    show_lobby_bot_name,
-    show_lobby_main,
-    show_lobby_rename,
-    show_lobby_seat_edit,
     with_feedback_updates,
 )
 
@@ -106,7 +103,7 @@ def _parse_lobby_input(state: ClientState, text: str) -> FrontendInputResult:
 
 def _parse_lobby_main(state: ClientState, text: str) -> FrontendInputResult:
     if text == "n":
-        next_state = show_lobby_rename(state)
+        next_state = enter_lobby_submenu(state, "rename")
         next_state = with_feedback_updates(next_state, flash_message=None)
         return FrontendInputResult(state=next_state)
     if text == "g":
@@ -114,18 +111,18 @@ def _parse_lobby_main(state: ClientState, text: str) -> FrontendInputResult:
     if text.isdigit():
         seat_index = int(text)
         if state.lobby_view is None or not (0 <= seat_index < state.lobby_view.seat_count):
-            return FrontendInputResult(state=set_flash(show_lobby_main(state), "error", "Ungültiger Platz."))
-        next_state = show_lobby_seat_edit(state, seat_index)
+            return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "main"), "error", "Ungültiger Platz."))
+        next_state = enter_lobby_submenu(state, "seat_edit", seat_index=seat_index)
         next_state = with_feedback_updates(next_state, flash_message=None)
         return FrontendInputResult(state=next_state)
-    return FrontendInputResult(state=set_flash(show_lobby_main(state), "error", "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer."))
+    return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "main"), "error", "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer."))
 
 
 
 def _parse_lobby_rename(state: ClientState, text: str) -> FrontendInputResult:
     if text == "":
-        return FrontendInputResult(state=set_flash(show_lobby_rename(state), "error", "Der Anzeigename darf nicht leer sein."))
-    next_state = show_lobby_main(state)
+        return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "rename"), "error", "Der Anzeigename darf nicht leer sein."))
+    next_state = enter_lobby_submenu(state, "main")
     next_state = with_feedback_updates(next_state, flash_message=None)
     return FrontendInputResult(state=next_state, action=ClientActionRename(text))
 
@@ -137,16 +134,16 @@ def _parse_lobby_seat_edit(state: ClientState, text: str, seat_index: int | None
     if text == "m":
         return FrontendInputResult(state=clear_flash(state), action=ClientActionAssignSelfToSeat(seat_index))
     if text == "b":
-        next_state = show_lobby_bot_name(state, seat_index)
+        next_state = enter_lobby_submenu(state, "bot_name", seat_index=seat_index)
         next_state = with_feedback_updates(next_state, flash_message=None)
         return FrontendInputResult(state=next_state)
     if text == "c":
         return FrontendInputResult(state=clear_flash(state), action=ClientActionClearSeat(seat_index))
     if text == "x":
-        next_state = show_lobby_main(state)
+        next_state = enter_lobby_submenu(state, "main")
         next_state = with_feedback_updates(next_state, flash_message=None)
         return FrontendInputResult(state=next_state)
-    return FrontendInputResult(state=set_flash(show_lobby_seat_edit(state, seat_index), "error", "Ungültige Eingabe. Erlaubt sind m, b, c oder x."))
+    return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "seat_edit", seat_index=seat_index), "error", "Ungültige Eingabe. Erlaubt sind m, b, c oder x."))
 
 
 
@@ -154,11 +151,11 @@ def _parse_lobby_bot_name(state: ClientState, text: str, seat_index: int | None)
     if seat_index is None:
         raise TypeError("bot_name screen requires seat_index")
     if text == "x":
-        next_state = show_lobby_seat_edit(state, seat_index)
+        next_state = enter_lobby_submenu(state, "seat_edit", seat_index=seat_index)
         next_state = with_feedback_updates(next_state, flash_message=None)
         return FrontendInputResult(state=next_state)
     display_name = text or f"Bot_{seat_index}"
-    next_state = show_lobby_main(state)
+    next_state = enter_lobby_submenu(state, "main")
     next_state = with_feedback_updates(next_state, flash_message=None)
     return FrontendInputResult(state=next_state, action=ClientActionCreateBot(seat_index, display_name))
 

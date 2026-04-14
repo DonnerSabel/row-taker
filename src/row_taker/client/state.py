@@ -142,7 +142,7 @@ def with_feedback_updates(state: ClientState, **changes: object) -> ClientState:
 
 
 
-def show_lobby_main(state: ClientState) -> ClientState:
+def enter_lobby_submenu(state: ClientState, submenu: LobbySubmenu, *, seat_index: int | None = None) -> ClientState:
     return replace(
         state,
         core_state=replace(
@@ -152,105 +152,33 @@ def show_lobby_main(state: ClientState) -> ClientState:
         ),
         navigation_state=replace(
             state.navigation_state,
-            lobby_submenu="main",
-            selected_seat_index=None,
-        ),
-    )
-
-
-
-def show_lobby_rename(state: ClientState) -> ClientState:
-    return replace(
-        state,
-        core_state=replace(
-            state.core_state,
-            client_mode=ClientMode.LOBBY,
-            pending_action=PendingAction.LOBBY_COMMAND,
-        ),
-        navigation_state=replace(
-            state.navigation_state,
-            lobby_submenu="rename",
-            selected_seat_index=None,
-        ),
-    )
-
-
-
-def show_lobby_seat_edit(state: ClientState, seat_index: int) -> ClientState:
-    return replace(
-        state,
-        core_state=replace(
-            state.core_state,
-            client_mode=ClientMode.LOBBY,
-            pending_action=PendingAction.LOBBY_COMMAND,
-        ),
-        navigation_state=replace(
-            state.navigation_state,
-            lobby_submenu="seat_edit",
+            lobby_submenu=submenu,
             selected_seat_index=seat_index,
         ),
     )
 
 
 
-def show_lobby_bot_name(state: ClientState, seat_index: int) -> ClientState:
-    return replace(
-        state,
-        core_state=replace(
-            state.core_state,
-            client_mode=ClientMode.LOBBY,
-            pending_action=PendingAction.LOBBY_COMMAND,
-        ),
-        navigation_state=replace(
-            state.navigation_state,
-            lobby_submenu="bot_name",
-            selected_seat_index=seat_index,
-        ),
-    )
-
-
-
-def show_game_waiting(state: ClientState, player_state: PlayerState | None = None) -> ClientState:
+def enter_game_mode(
+    state: ClientState,
+    *,
+    pending_action: PendingAction,
+    player_state: PlayerState | None = None,
+) -> ClientState:
     next_player_state = state.player_state if player_state is None else player_state
     return replace(
         state,
         core_state=replace(
             state.core_state,
             client_mode=ClientMode.GAME,
-            pending_action=PendingAction.NONE,
+            pending_action=pending_action,
             player_state=next_player_state,
         ),
     )
 
 
 
-def show_choose_card(state: ClientState, player_state: PlayerState) -> ClientState:
-    return replace(
-        state,
-        core_state=replace(
-            state.core_state,
-            client_mode=ClientMode.GAME,
-            pending_action=PendingAction.CHOOSE_CARD,
-            player_state=player_state,
-        ),
-    )
-
-
-
-def show_choose_row(state: ClientState, player_state: PlayerState) -> ClientState:
-    return replace(
-        state,
-        core_state=replace(
-            state.core_state,
-            client_mode=ClientMode.GAME,
-            pending_action=PendingAction.CHOOSE_ROW,
-            player_state=player_state,
-        ),
-    )
-
-
-
-def show_game_ended(state: ClientState, player_state: PlayerState | None = None) -> ClientState:
+def enter_ended_mode(state: ClientState, player_state: PlayerState | None = None) -> ClientState:
     next_player_state = state.player_state if player_state is None else player_state
     return replace(
         state,
@@ -261,3 +189,43 @@ def show_game_ended(state: ClientState, player_state: PlayerState | None = None)
             player_state=next_player_state,
         ),
     )
+
+
+
+def show_lobby_main(state: ClientState) -> ClientState:
+    return enter_lobby_submenu(state, "main")
+
+
+
+def show_lobby_rename(state: ClientState) -> ClientState:
+    return enter_lobby_submenu(state, "rename")
+
+
+
+def show_lobby_seat_edit(state: ClientState, seat_index: int) -> ClientState:
+    return enter_lobby_submenu(state, "seat_edit", seat_index=seat_index)
+
+
+
+def show_lobby_bot_name(state: ClientState, seat_index: int) -> ClientState:
+    return enter_lobby_submenu(state, "bot_name", seat_index=seat_index)
+
+
+
+def show_game_waiting(state: ClientState, player_state: PlayerState | None = None) -> ClientState:
+    return enter_game_mode(state, pending_action=PendingAction.NONE, player_state=player_state)
+
+
+
+def show_choose_card(state: ClientState, player_state: PlayerState) -> ClientState:
+    return enter_game_mode(state, pending_action=PendingAction.CHOOSE_CARD, player_state=player_state)
+
+
+
+def show_choose_row(state: ClientState, player_state: PlayerState) -> ClientState:
+    return enter_game_mode(state, pending_action=PendingAction.CHOOSE_ROW, player_state=player_state)
+
+
+
+def show_game_ended(state: ClientState, player_state: PlayerState | None = None) -> ClientState:
+    return enter_ended_mode(state, player_state=player_state)
