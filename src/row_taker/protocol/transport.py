@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import socket
 from dataclasses import dataclass
 from typing import BinaryIO
@@ -12,6 +13,8 @@ from row_taker.protocol.framing import (
     encode_server_message,
 )
 from row_taker.protocol.messages import ClientToServerMessage, ServerToClientMessage
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -49,7 +52,46 @@ class TcpLineTransport:
         return line
 
     def close(self) -> None:
-        try:
+        logger.debug("transport close start")
+
+        sock = self.sock
+        reader = self.reader
+        writer = self.writer
+
+        # Break references first so a second cleanup path cannot race the same objects.
+        self.sock = None  # type: ignore[assignment]
+        self.reader = None  # type: ignore[assignment]
+        self.writer = None  # type: ignore[assignment]
+
+        if sock is not None:
+            try:
+                logger.debug("transport socket shutdown start")
+                sock.shutdown(socket.SHUT_RDWR)
+                logger.debug("transport socket shutdown done")
+            except OSError as exc:
+                logger.debug("transport socket shutdown ignored: %s", exc)
+            try:
+                logger.debug("transport socket close start")
+                sock.close()
+                logger.debug("transport socket close done")
+            except OSError as exc:
+                logger.debug("transport socket close ignored: %s", exc)
+
+        if reader is not None:
+            try:
+                logger.debug("transport reader close start")
+                reader.close()
+                logger.debug("transport reader close done")
+            except OSError as exc:
+                logger.debug("transport reader close ignored: %s", exc)
+
+        if writer is not None:
+            try:
+                logger.debug("transport writer close start")
+                writer.close()
+                logger.debug("transport writer close done")
+            except OSError as exc:
+                logger.debug("transport writer close ignored: %s", exc)
             self.writer.close()
         finally:
             try:
