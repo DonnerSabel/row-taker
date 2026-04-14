@@ -7,7 +7,6 @@ from row_taker.cli.state_models import (
     CliFeedbackState,
     CliNavigationState,
     CliState,
-    LobbyScreen,
     UiMessage,
     apply_feedback_state,
     apply_navigation_state,
@@ -24,7 +23,7 @@ from row_taker.client.actions import (
     UiActionRename,
     UiActionStartGame,
 )
-from row_taker.client.core_state import ClientMode
+from row_taker.client.core_state import ClientMode, PendingAction
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,13 +43,9 @@ class CliFrontend:
 
 def sync_frontend_to_core(state: CliState) -> CliState:
     core = state.core_state
-    navigation = state.navigation_state
 
     if core.client_mode == ClientMode.LOBBY:
         return state
-
-    if core.client_mode == ClientMode.ENDED:
-        return apply_navigation_state(state, CliNavigationState())
 
     return apply_navigation_state(state, CliNavigationState())
 
@@ -115,24 +110,31 @@ def parse_text_to_action(state: CliState, text: str) -> FrontendInputResult:
             return FrontendInputResult(state=state, action=UiActionAdvancePresentation())
         return FrontendInputResult(state=set_flash(state, "info", "Bitte zuerst die lokale Auflösung mit Enter weiterführen."))
 
-    screen = state.screen
-    match screen:
-        case LobbyScreen(kind="main"):
-            return _parse_lobby_main(state, normalized)
-        case LobbyScreen(kind="rename"):
-            if normalized == "":
-                return FrontendInputResult(state=set_flash(state, "error", "Der Anzeigename darf nicht leer sein."))
-            return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "main")), action=UiActionRename(normalized))
-        case LobbyScreen(kind="seat_edit", seat_index=seat_index):
-            if seat_index is None:
-                raise TypeError("seat_edit screen requires seat_index")
-            return _parse_lobby_seat_edit(state, normalized, seat_index)
-        case LobbyScreen(kind="bot_name", seat_index=seat_index):
-            if seat_index is None:
-                raise TypeError("bot_name screen requires seat_index")
-            return _parse_lobby_bot_name(state, normalized, seat_index)
-        case _:
-            return _parse_game_input(state, normalized)
+    if state.client_mode == ClientMode.LOBBY:
+        return _parse_lobby_input(state, normalized)
+    return _parse_game_input(state, normalized)
+
+
+
+def _parse_lobby_input(state: CliState, normalized: str) -> FrontendInputResult:
+    submenu = state.navigation_state.lobby_submenu
+    seat_index = state.navigation_state.selected_seat_index
+
+    if submenu == "main":
+        return _parse_lobby_main(state, normalized)
+    if submenu == "rename":
+        if normalized == "":
+            return FrontendInputResult(state=set_flash(state, "error", "Der Anzeigename darf nicht leer sein."))
+        return FrontendInputResult(state=clear_flash(_set_lobby_submenu(state, "main")), action=UiActionRename(normalized))
+    if submenu == "seat_edit":
+        if seat_index is None:
+            raise TypeError("seat_edit submenu requires seat_index")
+        return _parse_lobby_seat_edit(state, normalized, seat_index)
+    if submenu == "bot_name":
+        if seat_index is None:
+            raise TypeError("bot_name submenu requires seat_index")
+        return _parse_lobby_bot_name(state, normalized, seat_index)
+    raise ValueError(f"unsupported lobby submenu: {submenu!r}")
 
 
 
@@ -142,7 +144,7 @@ def _parse_game_input(state: CliState, normalized: str) -> FrontendInputResult:
             return FrontendInputResult(state=state)
         return FrontendInputResult(state=apply_feedback_state(state, replace(state.feedback_state, should_exit=True)))
 
-    if state.pending_action.name == "CHOOSE_CARD":
+    if state.pending_action == PendingAction.CHOOSE_CARD:
         if normalized == "":
             return FrontendInputResult(state=set_flash(state, "error", "Bitte einen Kartenwert eingeben."))
         try:
@@ -151,7 +153,7 @@ def _parse_game_input(state: CliState, normalized: str) -> FrontendInputResult:
             return FrontendInputResult(state=set_flash(state, "error", "Bitte einen gültigen Kartenwert eingeben."))
         return FrontendInputResult(state=clear_flash(state), action=UiActionChooseCard(card_value))
 
-    if state.pending_action.name == "CHOOSE_ROW":
+    if state.pending_action == PendingAction.CHOOSE_ROW:
         player_state = state.player_state
         if player_state is None:
             return FrontendInputResult(state=set_flash(state, "error", "Kein Spielerzustand für Reihenwahl vorhanden."))
