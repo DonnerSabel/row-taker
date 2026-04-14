@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from row_taker.cli.local_resolution import apply_local_row_choice, start_local_resolution
+from row_taker.client.trick_presentation_resolver import apply_trick_row_choice, start_trick_presentation
 from row_taker.client.actions import (
     ClientAction,
     ClientActionAdvancePresentation,
@@ -20,13 +20,8 @@ from row_taker.client.presentation_events import PresentationEvent
 from row_taker.client.state import (
     ClientState,
     UiMessage,
-    show_choose_card,
-    show_choose_row,
-    show_game_waiting,
-    show_lobby_bot_name,
-    show_lobby_main,
-    show_lobby_rename,
-    show_lobby_seat_edit,
+    enter_game_mode,
+    enter_lobby_submenu,
     with_core_updates,
     with_feedback_updates,
 )
@@ -95,7 +90,7 @@ def reduce_server_message(state: ClientState, message: ServerToClientMessage) ->
         case LobbyActionRejected(message=text):
             return with_feedback_updates(state, flash_message=UiMessage(level="error", text=text))
         case GameStarting(lobby=lobby):
-            next_state = show_game_waiting(state)
+            next_state = enter_game_mode(state, pending_action=PendingAction.NONE)
             next_state = with_core_updates(
                 next_state,
                 lobby_view=lobby,
@@ -110,8 +105,8 @@ def reduce_server_message(state: ClientState, message: ServerToClientMessage) ->
         case StateUpdated(state=public_state):
             next_state = state
             if next_state.pending_action == PendingAction.CHOOSE_ROW:
-                next_state = show_game_waiting(next_state)
-            next_local_resolution = next_state.local_resolution
+                next_state = enter_game_mode(next_state, pending_action=PendingAction.NONE)
+            next_local_resolution = next_state.trick_presentation_state
             if next_local_resolution is not None and next_local_resolution.pending_row_choice is None:
                 next_local_resolution = None
             return with_core_updates(
@@ -124,7 +119,7 @@ def reduce_server_message(state: ClientState, message: ServerToClientMessage) ->
             local_resolution = None
             queued_events: tuple[PresentationEvent, ...] = ()
             if state.public_state is not None:
-                local_resolution = start_local_resolution(state.public_state, revealed)
+                local_resolution = start_trick_presentation(state.public_state, revealed)
                 queued_events = local_resolution.events
             next_state = with_core_updates(
                 state,
@@ -134,18 +129,18 @@ def reduce_server_message(state: ClientState, message: ServerToClientMessage) ->
             next_state = with_feedback_updates(next_state, flash_message=None)
             return append_presentation_events(next_state, queued_events)
         case RowChoiceCommitted(row_id=row_id):
-            local_resolution = state.local_resolution
+            local_resolution = state.trick_presentation_state
             newly_queued_events: tuple[PresentationEvent, ...] = ()
             if local_resolution is not None and local_resolution.pending_row_choice is not None:
                 previous_count = len(local_resolution.events)
-                local_resolution = apply_local_row_choice(local_resolution, row_id)
+                local_resolution = apply_trick_row_choice(local_resolution, row_id)
                 newly_queued_events = local_resolution.events[previous_count:]
-            next_state = show_game_waiting(state)
+            next_state = enter_game_mode(state, pending_action=PendingAction.NONE)
             next_state = with_core_updates(next_state, trick_presentation_state=local_resolution)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return append_presentation_events(next_state, newly_queued_events)
         case ChooseCardRequested(player_id=player_id, state=player_state):
-            next_state = show_choose_card(state, player_state)
+            next_state = enter_game_mode(state, pending_action=PendingAction.CHOOSE_CARD, player_state=player_state)
             next_state = with_core_updates(
                 next_state,
                 own_player_id=player_id,
@@ -160,7 +155,7 @@ def reduce_server_message(state: ClientState, message: ServerToClientMessage) ->
             )
             return with_feedback_updates(next_state, flash_message=None)
         case ChooseRowRequested(player_id=player_id, state=player_state):
-            next_state = show_choose_row(state, player_state)
+            next_state = enter_game_mode(state, pending_action=PendingAction.CHOOSE_ROW, player_state=player_state)
             next_state = with_core_updates(
                 next_state,
                 own_player_id=player_id,
@@ -202,7 +197,7 @@ def apply_ui_action(state: ClientState, action: ClientAction) -> ActionResult:
         case ClientActionAdvancePresentation():
             return ActionResult(state=advance_presentation_queue(state))
         case ClientActionRename(name=name):
-            next_state = show_lobby_main(state)
+            next_state = enter_lobby_submenu(state, "main")
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
@@ -211,28 +206,28 @@ def apply_ui_action(state: ClientState, action: ClientAction) -> ActionResult:
         case ClientActionAssignSelfToSeat(seat_index=seat_index):
             if state.own_client_id is None:
                 return ActionResult(state=state, local_message="Eigene client_id unbekannt.")
-            next_state = show_lobby_main(state)
+            next_state = enter_lobby_submenu(state, "main")
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=AssignSeatToClient(seat_index=seat_index, target_client_id=state.own_client_id),
             )
         case ClientActionCreateBot(seat_index=seat_index, name=name):
-            next_state = show_lobby_main(state)
+            next_state = enter_lobby_submenu(state, "main")
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=CreateLocalBotOnSeat(seat_index=seat_index, display_name=name),
             )
         case ClientActionClearSeat(seat_index=seat_index):
-            next_state = show_lobby_main(state)
+            next_state = enter_lobby_submenu(state, "main")
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
                 outbound_message=ClearSeat(seat_index=seat_index),
             )
         case ClientActionStartGame():
-            next_state = show_lobby_main(state)
+            next_state = enter_lobby_submenu(state, "main")
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
@@ -246,7 +241,7 @@ def apply_ui_action(state: ClientState, action: ClientAction) -> ActionResult:
                 validate_submit_card(player_state, value)
             except Exception as exc:
                 return ActionResult(state=state, local_message=str(exc))
-            next_state = show_game_waiting(state, player_state)
+            next_state = enter_game_mode(state, pending_action=PendingAction.NONE, player_state=player_state)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,
@@ -260,7 +255,7 @@ def apply_ui_action(state: ClientState, action: ClientAction) -> ActionResult:
                 validate_submit_row_choice(player_state, row_id)
             except Exception as exc:
                 return ActionResult(state=state, local_message=str(exc))
-            next_state = show_game_waiting(state, player_state)
+            next_state = enter_game_mode(state, pending_action=PendingAction.NONE, player_state=player_state)
             next_state = with_feedback_updates(next_state, flash_message=None)
             return ActionResult(
                 state=next_state,

@@ -5,6 +5,7 @@ from typing import Literal
 
 from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction, initial_client_core_state
 from row_taker.client.presentation_events import PresentationEvent
+from row_taker.client.trick_presentation_resolver import TrickPresentationState
 from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.protocol.messages import CardsRevealed, LobbyView
 
@@ -67,7 +68,7 @@ class ClientState:
         return self.core_state.revealed_trick
 
     @property
-    def local_resolution(self):
+    def trick_presentation_state(self) -> TrickPresentationState | None:
         return self.core_state.trick_presentation_state
 
     @property
@@ -111,38 +112,36 @@ class ClientState:
         return self.core_state.pending_action
 
 
-
 def initial_client_state(own_client_id: str | None = None) -> ClientState:
     return ClientState(core_state=initial_client_core_state(own_client_id=own_client_id))
-
 
 
 def has_pending_presentation(state: ClientState) -> bool:
     return bool(state.core_state.pending_presentation_events)
 
 
-
 def has_visible_presentation(state: ClientState) -> bool:
     return bool(state.core_state.presentation_events)
-
 
 
 def with_core_updates(state: ClientState, **changes: object) -> ClientState:
     return replace(state, core_state=replace(state.core_state, **changes))
 
 
-
 def with_navigation_updates(state: ClientState, **changes: object) -> ClientState:
     return replace(state, navigation_state=replace(state.navigation_state, **changes))
-
 
 
 def with_feedback_updates(state: ClientState, **changes: object) -> ClientState:
     return replace(state, feedback_state=replace(state.feedback_state, **changes))
 
 
-
-def enter_lobby_submenu(state: ClientState, submenu: LobbySubmenu, *, seat_index: int | None = None) -> ClientState:
+def enter_lobby_submenu(
+    state: ClientState,
+    submenu: LobbySubmenu,
+    *,
+    selected_seat_index: int | None = None,
+) -> ClientState:
     return replace(
         state,
         core_state=replace(
@@ -153,10 +152,9 @@ def enter_lobby_submenu(state: ClientState, submenu: LobbySubmenu, *, seat_index
         navigation_state=replace(
             state.navigation_state,
             lobby_submenu=submenu,
-            selected_seat_index=seat_index,
+            selected_seat_index=selected_seat_index,
         ),
     )
-
 
 
 def enter_game_mode(
@@ -177,7 +175,6 @@ def enter_game_mode(
     )
 
 
-
 def enter_ended_mode(state: ClientState, player_state: PlayerState | None = None) -> ClientState:
     next_player_state = state.player_state if player_state is None else player_state
     return replace(
@@ -189,43 +186,3 @@ def enter_ended_mode(state: ClientState, player_state: PlayerState | None = None
             player_state=next_player_state,
         ),
     )
-
-
-
-def show_lobby_main(state: ClientState) -> ClientState:
-    return enter_lobby_submenu(state, "main")
-
-
-
-def show_lobby_rename(state: ClientState) -> ClientState:
-    return enter_lobby_submenu(state, "rename")
-
-
-
-def show_lobby_seat_edit(state: ClientState, seat_index: int) -> ClientState:
-    return enter_lobby_submenu(state, "seat_edit", seat_index=seat_index)
-
-
-
-def show_lobby_bot_name(state: ClientState, seat_index: int) -> ClientState:
-    return enter_lobby_submenu(state, "bot_name", seat_index=seat_index)
-
-
-
-def show_game_waiting(state: ClientState, player_state: PlayerState | None = None) -> ClientState:
-    return enter_game_mode(state, pending_action=PendingAction.NONE, player_state=player_state)
-
-
-
-def show_choose_card(state: ClientState, player_state: PlayerState) -> ClientState:
-    return enter_game_mode(state, pending_action=PendingAction.CHOOSE_CARD, player_state=player_state)
-
-
-
-def show_choose_row(state: ClientState, player_state: PlayerState) -> ClientState:
-    return enter_game_mode(state, pending_action=PendingAction.CHOOSE_ROW, player_state=player_state)
-
-
-
-def show_game_ended(state: ClientState, player_state: PlayerState | None = None) -> ClientState:
-    return enter_ended_mode(state, player_state=player_state)

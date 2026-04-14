@@ -82,8 +82,8 @@ class _QueuedTransport:
 def test_client_session_applies_game_messages_one_by_one_around_presentation_queue() -> None:
     import random
 
-    from row_taker.client.core_state import ClientCoreState
-    from row_taker.client.state import ClientState, show_game_waiting
+    from row_taker.client.core_state import ClientCoreState, PendingAction
+    from row_taker.client.state import ClientState, enter_game_mode
     from row_taker.engine.game import build_player_state, setup_game
     from row_taker.protocol.messages import CardsRevealed, PlayedCardView, StateUpdated
 
@@ -93,7 +93,7 @@ def test_client_session_applies_game_messages_one_by_one_around_presentation_que
 
     def _initial_state(_own_client_id=None) -> ClientState:
         state = ClientState(core_state=ClientCoreState(public_state=public_state))
-        return show_game_waiting(state)
+        return enter_game_mode(state, pending_action=PendingAction.NONE)
 
     messages = [
         StateUpdated(state=public_state),
