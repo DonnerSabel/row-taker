@@ -58,7 +58,8 @@ class TcpLineTransport:
         reader = self.reader
         writer = self.writer
 
-        # Break references first so a second cleanup path cannot race the same objects.
+        # Break references first so concurrent cleanup paths cannot race the
+        # same objects.
         self.sock = None  # type: ignore[assignment]
         self.reader = None  # type: ignore[assignment]
         self.writer = None  # type: ignore[assignment]
@@ -70,6 +71,7 @@ class TcpLineTransport:
                 logger.debug("transport socket shutdown done")
             except OSError as exc:
                 logger.debug("transport socket shutdown ignored: %s", exc)
+
             try:
                 logger.debug("transport socket close start")
                 sock.close()
@@ -92,12 +94,6 @@ class TcpLineTransport:
                 logger.debug("transport writer close done")
             except OSError as exc:
                 logger.debug("transport writer close ignored: %s", exc)
-            self.writer.close()
-        finally:
-            try:
-                self.reader.close()
-            finally:
-                self.sock.close()
 
 
 @dataclass(slots=True)
