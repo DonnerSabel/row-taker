@@ -106,39 +106,39 @@ def reduce_server_message(state: ClientState, message: ServerToClientMessage) ->
             next_state = state
             if next_state.pending_action == PendingAction.CHOOSE_ROW:
                 next_state = enter_game_mode(next_state, pending_action=PendingAction.NONE)
-            next_local_resolution = next_state.trick_presentation_state
-            if next_local_resolution is not None and next_local_resolution.pending_row_choice is None:
-                next_local_resolution = None
+            next_presentation_state = next_state.trick_presentation_state
+            if next_presentation_state is not None and next_presentation_state.pending_row_choice is None:
+                next_presentation_state = None
             return with_core_updates(
                 next_state,
                 public_state=public_state,
                 revealed_trick=None,
-                trick_presentation_state=next_local_resolution,
+                trick_presentation_state=next_presentation_state,
             )
         case CardsRevealed() as revealed:
-            local_resolution = None
+            presentation_state = None
             queued_events: tuple[PresentationEvent, ...] = ()
             if state.public_state is not None:
-                local_resolution = start_trick_presentation(state.public_state, revealed)
-                queued_events = local_resolution.events
+                presentation_state = start_trick_presentation(state.public_state, revealed)
+                queued_events = presentation_state.events
             next_state = with_core_updates(
                 state,
                 revealed_trick=revealed,
-                trick_presentation_state=local_resolution,
+                trick_presentation_state=presentation_state,
             )
             next_state = with_feedback_updates(next_state, flash_message=None)
             return append_presentation_events(next_state, queued_events)
         case RowChoiceCommitted(row_id=row_id):
-            local_resolution = state.trick_presentation_state
-            newly_queued_events: tuple[PresentationEvent, ...] = ()
-            if local_resolution is not None and local_resolution.pending_row_choice is not None:
-                previous_count = len(local_resolution.events)
-                local_resolution = apply_trick_row_choice(local_resolution, row_id)
-                newly_queued_events = local_resolution.events[previous_count:]
+            presentation_state = state.trick_presentation_state
+            new_events: tuple[PresentationEvent, ...] = ()
+            if presentation_state is not None and presentation_state.pending_row_choice is not None:
+                previous_count = len(presentation_state.events)
+                presentation_state = apply_trick_row_choice(presentation_state, row_id)
+                new_events = presentation_state.events[previous_count:]
             next_state = enter_game_mode(state, pending_action=PendingAction.NONE)
-            next_state = with_core_updates(next_state, trick_presentation_state=local_resolution)
+            next_state = with_core_updates(next_state, trick_presentation_state=presentation_state)
             next_state = with_feedback_updates(next_state, flash_message=None)
-            return append_presentation_events(next_state, newly_queued_events)
+            return append_presentation_events(next_state, new_events)
         case ChooseCardRequested(player_id=player_id, state=player_state):
             next_state = enter_game_mode(state, pending_action=PendingAction.CHOOSE_CARD, player_state=player_state)
             next_state = with_core_updates(

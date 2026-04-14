@@ -60,7 +60,7 @@ def test_session_ended_exits_immediately() -> None:
     assert state.session_error == "Spiel abgebrochen"
 
 
-def test_cards_revealed_builds_local_presentation_events() -> None:
+def test_cards_revealed_builds_trick_presentation_events() -> None:
     player_state = player_state_for(0)
     revealed = CardsRevealed(
         plays=(
@@ -84,7 +84,7 @@ def test_cards_revealed_builds_local_presentation_events() -> None:
     assert isinstance(state.pending_presentation_events[0], PresentationCardsRevealed)
 
 
-def test_row_choice_committed_advances_local_resolution() -> None:
+def test_row_choice_committed_advances_trick_presentation_state() -> None:
     player_state = player_state_for(0)
     lowest = min(row.cards[-1].value for row in player_state.public_state.rows)
     revealed = CardsRevealed(
