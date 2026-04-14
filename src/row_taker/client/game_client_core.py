@@ -21,12 +21,8 @@ class CoreUpdate:
 class GameClientCore:
     """GUI-neutral client core.
 
-    This class owns:
-    - server inbox
-    - defer logic while presentation is pending
-    - revision bookkeeping
-    - UI action application
-    - continuing ready server-flow after local actions
+    Owns inbox, revision tracking, defer logic and UI-action application.
+    Frontends should only feed messages/actions into this class and render its state.
     """
 
     def __init__(self, state: ClientCoreState | None = None) -> None:
@@ -37,14 +33,26 @@ class GameClientCore:
     def server_inbox(self) -> tuple[ServerToClientMessage, ...]:
         return tuple(self._server_inbox)
 
-    def receive_server_message(self, message: ServerToClientMessage) -> CoreUpdate:
+    def on_server_message(self, message: ServerToClientMessage) -> CoreUpdate:
         self._server_inbox.append(message)
         revision = get_game_message_revision(message)
         if revision is not None:
             self.state = replace(self.state, received_game_revision=revision)
         return self._drain_server_inbox()
 
-    def apply_action(self, action: UiAction) -> CoreUpdate:
+    def on_ui_action(self, action: UiAction) -> CoreUpdate:
+        action_update = self._apply_ui_action(action)
+        flow_update = self._drain_server_inbox()
+        return self._merge_updates(action_update, flow_update)
+
+    def on_transport_closed(self, message: str) -> CoreUpdate:
+        self.state = replace(self.state, session_error=message)
+        return CoreUpdate(state=self.state)
+
+    def has_pending_presentation(self) -> bool:
+        return bool(self.state.pending_presentation_events)
+
+    def _apply_ui_action(self, action: UiAction) -> CoreUpdate:
         result = apply_ui_action(self.state, action)
         self.state = result.state
         return CoreUpdate(
@@ -52,15 +60,6 @@ class GameClientCore:
             outbound_messages=(result.outbound_message,) if result.outbound_message is not None else (),
             local_messages=(result.local_message,) if result.local_message is not None else (),
         )
-
-    def continue_ready_flow(self) -> CoreUpdate:
-        return self._drain_server_inbox()
-
-    def has_pending_presentation(self) -> bool:
-        return bool(self.state.pending_presentation_events)
-
-    def has_pending_server_messages(self) -> bool:
-        return bool(self._server_inbox)
 
     def _drain_server_inbox(self) -> CoreUpdate:
         applied_messages: list[ServerToClientMessage] = []
@@ -91,3 +90,13 @@ class GameClientCore:
         if not self.state.pending_presentation_events:
             return False
         return not isinstance(message, (SessionEnded, ServerError))
+
+    @staticmethod
+    def _merge_updates(first: CoreUpdate, second: CoreUpdate) -> CoreUpdate:
+        return CoreUpdate(
+            state=second.state,
+            applied_server_messages=first.applied_server_messages + second.applied_server_messages,
+            outbound_messages=first.outbound_messages + second.outbound_messages,
+            local_messages=first.local_messages + second.local_messages,
+            deferred=first.deferred or second.deferred,
+        )

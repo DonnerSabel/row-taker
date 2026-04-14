@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import suppress
-from dataclasses import replace
 
 from row_taker.cli.console import CliConsole, InputAborted
 from row_taker.cli.frontend import CliFrontend, mark_server_error, mark_session_ended, set_flash
@@ -20,7 +19,7 @@ logger = logging.getLogger("row_taker.cli.runtime")
 
 
 class CliRuntime:
-    """Thin CLI host around GameClientCore."""
+    """CLI host around the GUI-neutral GameClientCore."""
 
     def __init__(
         self,
@@ -43,9 +42,7 @@ class CliRuntime:
         core = GameClientCore(state.core_state)
         console = self.console_factory()
 
-        server_task: asyncio.Task[ServerToClientMessage] | None = asyncio.create_task(
-            asyncio.to_thread(self.transport.receive)
-        )
+        server_task: asyncio.Task[ServerToClientMessage] | None = self._spawn_server_task()
         input_task: asyncio.Task[str] | None = None
         input_prompt: str | None = None
         abort_requested = False
@@ -55,7 +52,7 @@ class CliRuntime:
 
             while not state.should_exit and not abort_requested:
                 if not self.interactive and core.has_pending_presentation():
-                    state, _ = await self._apply_action(console, core, state, UiActionAdvancePresentation())
+                    state, _ = await self._process_action(console, core, state, UiActionAdvancePresentation())
                     continue
 
                 current_prompt = build_view(state).prompt if self.interactive else None
@@ -98,6 +95,9 @@ class CliRuntime:
         finally:
             await self._cleanup(console, server_task, input_task)
 
+    def _spawn_server_task(self) -> asyncio.Task[ServerToClientMessage]:
+        return asyncio.create_task(asyncio.to_thread(self.transport.receive))
+
     async def _handle_server_task(
         self,
         core: GameClientCore,
@@ -110,18 +110,16 @@ class CliRuntime:
         except ConnectionClosed:
             logger.debug("transport receive ended with ConnectionClosed")
             if not state.should_exit and state.session_error is None:
-                core.state = replace(core.state, session_error="Die Verbindung zum Server wurde beendet.")
-                state = self._sync_state_from_core(state, core)
+                update = core.on_transport_closed("Die Verbindung zum Server wurde beendet.")
+                state = await self._apply_core_update(console, core, state, update)
                 state = mark_server_error(state)
                 await self._render(console, state)
-                return state, None
             return state, None
 
         logger.debug("server message received: type=%s", type(message).__name__)
-        update = core.receive_server_message(message)
+        update = core.on_server_message(message)
         state = await self._apply_core_update(console, core, state, update)
-
-        return state, asyncio.create_task(asyncio.to_thread(self.transport.receive))
+        return state, self._spawn_server_task()
 
     async def _handle_input_task(
         self,
@@ -150,7 +148,7 @@ class CliRuntime:
             await self._render(console, state)
             return state, abort_requested
 
-        state, outbound_messages = await self._apply_action(console, core, state, parsed.action)
+        state, outbound_messages = await self._process_action(console, core, state, parsed.action)
 
         for outbound_message in outbound_messages:
             logger.debug("sending outbound client message: type=%s", type(outbound_message).__name__)
@@ -158,31 +156,16 @@ class CliRuntime:
 
         return state, abort_requested
 
-    async def _apply_action(
+    async def _process_action(
         self,
         console: CliConsole,
         core: GameClientCore,
         state: CliState,
         action: object,
     ) -> tuple[CliState, tuple[object, ...]]:
-        update = core.apply_action(action)
-        state = self._sync_state_from_core(state, core)
-
-        if update.local_messages:
-            state = set_flash(state, "error", update.local_messages[-1])
-        else:
-            state = self.frontend.clear_flash(state)
-
-        await self._render(console, state)
-        state = await self._continue_core_flow(console, core, state)
+        update = core.on_ui_action(action)
+        state = await self._apply_core_update(console, core, state, update)
         return state, update.outbound_messages
-
-    async def _continue_core_flow(self, console: CliConsole, core: GameClientCore, state: CliState) -> CliState:
-        while True:
-            update = core.continue_ready_flow()
-            if not update.applied_server_messages:
-                return self._sync_state_from_core(state, core)
-            state = await self._apply_core_update(console, core, state, update)
 
     async def _apply_core_update(
         self,
@@ -191,8 +174,16 @@ class CliRuntime:
         state: CliState,
         update: CoreUpdate,
     ) -> CliState:
+        state = self._sync_state_from_core(state, core)
+
+        if update.local_messages:
+            state = set_flash(state, "error", update.local_messages[-1])
+        elif update.applied_server_messages or update.outbound_messages:
+            state = self.frontend.clear_flash(state)
+
         if not update.applied_server_messages:
-            return self._sync_state_from_core(state, core)
+            await self._render(console, state)
+            return state
 
         for message in update.applied_server_messages:
             logger.debug(
