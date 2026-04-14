@@ -10,6 +10,7 @@ from row_taker.protocol.messages import (
     ChooseRowRequested,
     ClientToServerMessage,
     ServerToClientMessage,
+    SessionEnded,
     SubmitCard,
     SubmitRowChoice,
 )
@@ -34,5 +35,8 @@ class RandomBotClient:
 
             row_id = self.rng.choice(list(selectable_row_ids(state)))
             return SubmitRowChoice(row_id=row_id)
+
+        if isinstance(message, SessionEnded):
+            return None
 
         return None

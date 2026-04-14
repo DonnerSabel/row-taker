@@ -180,7 +180,7 @@ def run_network_server(
         network_server = NetworkServer(server=local_server)
         while True:
             if network_server.should_shutdown():
-                logger.info("no participants connected anymore; server shutting down")
+                logger.info("session ended and no participants connected anymore; server shutting down")
                 break
             try:
                 conn, addr = listener.accept()

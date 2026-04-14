@@ -86,6 +86,7 @@ class LocalServer:
     _connection_endpoints: dict[str, str | None] = field(default_factory=dict)
     _next_game_revision: int = 1
     _match_abort_in_progress: bool = False
+    _session_ended: bool = False
 
     def __post_init__(self) -> None:
         self.lobby_state = LobbyState(seat_count=self.seat_count)
@@ -452,7 +453,9 @@ class LocalServer:
             )
 
         self._match_abort_in_progress = True
+        self._session_ended = True
         logger.debug("match abort flagged in progress: departing_client_id=%s", departing_client_id)
+        logger.debug("session ended flagged: reason=%s departing_client_id=%s", reason.value, departing_client_id)
         logger.debug("removing departing participant during abort: client_id=%s", departing_client_id)
         self._remove_participant(departing_client_id)
         self._connection_endpoints.pop(departing_client_id, None)
@@ -470,7 +473,8 @@ class LocalServer:
     @property
     def should_shutdown(self) -> bool:
         return (
-            self.active_match is None
+            self._session_ended
+            and self.active_match is None
             and not self._start_in_progress
             and not self.registry.records
             and not self._pending_bot_starts
@@ -547,6 +551,7 @@ class LocalServer:
         if handle is not None:
             logger.debug("closing running bot process: client_id=%s", client_id)
             handle.close()
+            logger.debug("closed running bot process: client_id=%s returncode=%s", client_id, handle.poll())
 
     def _assert_known_client(self, client_id: str) -> None:
         if not self.registry.has(client_id):
