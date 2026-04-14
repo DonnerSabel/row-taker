@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import argparse
+
 from row_taker.cli.client_session import ClientSession, print_final_result
 from row_taker.cli.terminal import clear_screen
+from row_taker.logging_utils import configure_logging
 from row_taker.protocol.messages import JoinLobby
 from row_taker.protocol.transport import ClientTransport
 
@@ -29,13 +32,22 @@ def _prompt_port(default: int = 8765) -> int:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Run a row-taker CLI client")
+    parser.add_argument("--host")
+    parser.add_argument("--port", type=int)
+    parser.add_argument("--name")
+    parser.add_argument("--log-level")
+    args, _unknown = parser.parse_known_args()
+
+    configure_logging(args.log_level)
+
     clear_screen()
     print("Row-Taker – CLI")
     print()
 
-    host = _prompt_host()
-    port = _prompt_port()
-    display_name = _prompt_name()
+    host = args.host or _prompt_host()
+    port = args.port if args.port is not None else _prompt_port()
+    display_name = args.name or _prompt_name()
 
     transport = ClientTransport.connect(host, port)
     transport.send(JoinLobby(display_name=display_name))

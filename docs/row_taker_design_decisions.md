@@ -560,3 +560,46 @@ When changing the project later, these questions should be asked first:
 
 If the answer to one of these questions is no, the change is likely moving in the
 wrong direction.
+
+
+## Presentation-Schicht als GUI-Andockfläche
+
+Zwischen lokaler Spielauflösung und konkreter Oberfläche liegt eine eigene, GUI-neutrale Presentation-Schicht.
+
+Leitidee
+
+- Die Engine und die client-seitige Auflösung kennen nur fachliche Daten.
+- Die Presentation-Schicht übersetzt diese fachlichen Daten in strukturierte Presentation-Events.
+- CLI und GUI rendern dieselben Presentation-Events jeweils auf ihre eigene Weise.
+- Auf dieser Ebene gibt es **keine** GUI-Objekte und keine pygame-Abhängigkeiten.
+
+Typische Event-Typen
+
+- `PresentationCardsRevealed`
+- `PresentationCardPlaced`
+- `PresentationRowChoiceRequired`
+- `PresentationRowChosen`
+- `PresentationRowTaken`
+- `PresentationOverflowResolved`
+- `PresentationTrickFinished`
+
+Wichtige Regel
+
+`card_value` ist die fachliche Karten-ID. Die GUI hält ihr eigenes Mapping von `card_value` auf ihr konkretes GUI-Kartenobjekt.
+
+Beispielidee in Pseudocode
+
+```python
+cards_by_value: dict[int, GuiCard]
+
+for event in presentation_events:
+    match event:
+        case PresentationCardsRevealed(plays=plays):
+            for play in plays:
+                cards_by_value[play.card_value].flip_face_up()
+        case PresentationCardPlaced(card_value=value, row_id=row_id):
+            gui_card = cards_by_value[value]
+            table.animate_card_to_row(gui_card, row_id)
+        case PresentationRowChoiceRequired(player_id=player_id):
+            overlays.show_row_choice(player_id)
+```

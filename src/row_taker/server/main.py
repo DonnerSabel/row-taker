@@ -4,6 +4,7 @@ import argparse
 import socket
 from collections.abc import Iterable
 
+from row_taker.logging_utils import configure_logging
 from row_taker.server.network_server import run_network_server
 
 
@@ -78,7 +79,10 @@ def main() -> int:
     parser.add_argument("--host")
     parser.add_argument("--port", type=int)
     parser.add_argument("--seat-count", type=int)
+    parser.add_argument("--log-level")
     args = parser.parse_args()
+
+    configure_logging(args.log_level)
 
     host = args.host or _prompt_choice(
         _discover_local_ipv4_addresses(),

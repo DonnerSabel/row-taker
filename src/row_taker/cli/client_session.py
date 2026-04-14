@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass, replace
@@ -18,6 +19,8 @@ from row_taker.engine.game.state import PublicState
 from row_taker.protocol.errors import ConnectionClosed
 from row_taker.protocol.messages import ServerToClientMessage, get_game_message_revision
 from row_taker.protocol.transport import ClientTransport
+
+logger = logging.getLogger("row_taker.cli.client_session")
 
 
 @dataclass(slots=True)
@@ -59,7 +62,11 @@ class ClientSession:
                     input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
                     break
 
-                if not self.interactive and state.pending_resolution_lines:
+                if not self.interactive and state.pending_presentation_events:
+                    logger.debug(
+                        "auto-advancing pending presentation event: pending=%s",
+                        len(state.pending_presentation_events),
+                    )
                     state = advance_presentation_queue(state)
                     await self._refresh_screen(console, state)
                     continue
@@ -86,6 +93,7 @@ class ClientSession:
                     try:
                         message = server_task.result()
                     except ConnectionClosed:
+                        logger.debug("transport receive ended with ConnectionClosed")
                         if not state.should_exit and state.session_error is None:
                             state = replace(
                                 state,
@@ -96,10 +104,12 @@ class ClientSession:
                             server_task = None
                             continue
                         break
+                    logger.debug("server message received: type=%s", type(message).__name__)
                     server_inbox.append(message)
                     revision = get_game_message_revision(message)
                     if revision is not None:
                         state = replace(state, received_game_revision=revision)
+                        logger.debug("server message enqueued: type=%s revision=%s inbox_size=%s", type(message).__name__, revision, len(server_inbox))
                     server_task = asyncio.create_task(asyncio.to_thread(self.transport.receive))
 
                 if input_task is not None and input_task in done:
@@ -119,6 +129,7 @@ class ClientSession:
                         state = result.state
                         self.own_client_id = state.own_client_id
                         if result.outbound_message is not None:
+                            logger.debug("sending outbound client message: type=%s", type(result.outbound_message).__name__)
                             with suppress(Exception):
                                 await asyncio.to_thread(self.transport.send, result.outbound_message)
                         if state.should_exit and state.suppress_final_result:
@@ -151,13 +162,21 @@ class ClientSession:
             return state, False
         next_message = server_inbox[0]
         if self._should_defer_server_message_application(state, next_message):
+            logger.debug(
+                "deferring server message application: type=%s pending_presentation=%s inbox_size=%s",
+                type(next_message).__name__,
+                len(state.pending_presentation_events),
+                len(server_inbox),
+            )
             return state, False
 
         message = server_inbox.popleft()
+        logger.debug("applying server message: type=%s", type(message).__name__)
         state = reduce_server_message(state, message)
         revision = get_game_message_revision(message)
         if revision is not None:
             state = replace(state, applied_game_revision=revision)
+            logger.debug("server message applied: type=%s revision=%s", type(message).__name__, revision)
         self.own_client_id = state.own_client_id
         return state, True
 
@@ -166,7 +185,7 @@ class ClientSession:
         state: CliState,
         message: ServerToClientMessage,
     ) -> bool:
-        if not state.pending_resolution_lines:
+        if not state.pending_presentation_events:
             return False
         return not state.should_exit and not self._is_immediate_server_message(message)
 

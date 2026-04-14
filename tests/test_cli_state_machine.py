@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import random
 
+from row_taker.cli.render import determine_prompt, render_resolution_lines
 from row_taker.cli.state_machine import reduce_server_message, reduce_user_input
 from row_taker.cli.state_models import CliState, GameScreen
+from row_taker.client.presentation_events import PresentationCardsRevealed, PresentationRowTaken
 from row_taker.engine.game import build_player_state, setup_game
 from row_taker.protocol.messages import (
     CardsRevealed,
     LeaveSession,
     PlayedCardView,
-    SessionEnded,
     RowChoiceCommitted,
     SessionEndReason,
+    SessionEnded,
     StateUpdated,
 )
 
@@ -81,7 +83,7 @@ def test_session_ended_exits_immediately() -> None:
     assert state.session_error == "Spiel abgebrochen"
 
 
-def test_cards_revealed_builds_local_resolution_lines() -> None:
+def test_cards_revealed_builds_local_presentation_events() -> None:
     player_state = _player_state_for(0)
     revealed = CardsRevealed(
         plays=(
@@ -101,7 +103,8 @@ def test_cards_revealed_builds_local_resolution_lines() -> None:
     state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
 
     assert state.local_resolution is not None
-    assert state.pending_resolution_lines
+    assert state.pending_presentation_events
+    assert isinstance(state.pending_presentation_events[0], PresentationCardsRevealed)
 
 
 def test_row_choice_committed_advances_local_resolution() -> None:
@@ -126,10 +129,10 @@ def test_row_choice_committed_advances_local_resolution() -> None:
 
     assert state.local_resolution is not None
     assert state.local_resolution.pending_row_choice is None
-    assert any('startet mit' in line for line in state.pending_resolution_lines)
+    assert any(isinstance(event, PresentationRowTaken) for event in state.pending_presentation_events)
 
 
-def test_cards_revealed_queues_resolution_lines_before_display() -> None:
+def test_cards_revealed_queues_presentation_events_before_display() -> None:
     player_state = _player_state_for(0)
     revealed = CardsRevealed(
         plays=(
@@ -143,35 +146,35 @@ def test_cards_revealed_queues_resolution_lines_before_display() -> None:
 
     state = reduce_server_message(CliState(public_state=player_state.public_state), revealed)
 
-    assert state.resolution_lines == ()
-    assert state.pending_resolution_lines
+    assert state.presentation_events == ()
+    assert state.pending_presentation_events
 
 
-def test_pending_resolution_uses_enter_prompt_until_queue_is_empty() -> None:
+def test_pending_presentation_uses_enter_prompt_until_queue_is_empty() -> None:
     state = CliState(
         screen=GameScreen(kind="choose_row", player_state=_player_state_for(0)),
-        pending_resolution_lines=("- Alice legt 1 an Reihe 1.",),
+        pending_presentation_events=(PresentationCardsRevealed(plays=()),),
     )
 
     assert determine_prompt(state) == "Weiter mit Enter > "
 
 
-def test_enter_advances_pending_resolution_queue() -> None:
+def test_enter_advances_pending_presentation_queue() -> None:
     state = CliState(
         screen=GameScreen(kind="waiting"),
-        pending_resolution_lines=("- Alice legt 1 an Reihe 1.", "- Bob legt 2 an Reihe 2."),
+        pending_presentation_events=(PresentationCardsRevealed(plays=()), PresentationRowTaken("p1", "Alice", 1, (1, 2), 3, 5, (5,))),
     )
 
     result = reduce_user_input(state, "")
 
-    assert result.state.resolution_lines == ("- Alice legt 1 an Reihe 1.",)
-    assert result.state.pending_resolution_lines == ("- Bob legt 2 an Reihe 2.",)
+    assert len(result.state.presentation_events) == 1
+    assert len(result.state.pending_presentation_events) == 1
 
 
-def test_non_enter_during_pending_resolution_shows_hint() -> None:
+def test_non_enter_during_pending_presentation_shows_hint() -> None:
     state = CliState(
         screen=GameScreen(kind="waiting"),
-        pending_resolution_lines=("- Alice legt 1 an Reihe 1.",),
+        pending_presentation_events=(PresentationCardsRevealed(plays=()),),
     )
 
     result = reduce_user_input(state, "foo")
@@ -180,13 +183,12 @@ def test_non_enter_during_pending_resolution_shows_hint() -> None:
     assert "Enter" in result.state.flash_message.text
 
 
-
-def test_choose_card_requested_clears_visible_and_pending_resolution_lines() -> None:
+def test_choose_card_requested_clears_visible_and_pending_presentation() -> None:
     player_state = _player_state_for(0)
     state = CliState(
         public_state=player_state.public_state,
-        resolution_lines=("- Alice legt 1 an Reihe 1.",),
-        pending_resolution_lines=("- Bob legt 2 an Reihe 2.",),
+        presentation_events=(PresentationCardsRevealed(plays=()),),
+        pending_presentation_events=(PresentationCardsRevealed(plays=()),),
     )
 
     from row_taker.protocol.messages import ChooseCardRequested
@@ -195,5 +197,16 @@ def test_choose_card_requested_clears_visible_and_pending_resolution_lines() -> 
         ChooseCardRequested(player_id=player_state.self_player_id, state=player_state),
     )
 
-    assert new_state.resolution_lines == ()
-    assert new_state.pending_resolution_lines == ()
+    assert new_state.presentation_events == ()
+    assert new_state.pending_presentation_events == ()
+
+
+def test_render_resolution_lines_renders_from_presentation_events() -> None:
+    state = CliState(
+        own_player_id="p1",
+        presentation_events=(PresentationCardsRevealed(plays=()),),
+    )
+
+    rendered = render_resolution_lines(state)
+    assert rendered is not None
+    assert "Lokale Auflösung" in rendered

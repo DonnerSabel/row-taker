@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.cli.local_resolution import LocalResolutionState
+from row_taker.client.presentation_events import PresentationEvent
+from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.protocol.messages import CardsRevealed, LobbyView
 
 
@@ -39,8 +40,8 @@ class CliState:
     flash_message: UiMessage | None = None
     revealed_trick: CardsRevealed | None = None
     local_resolution: LocalResolutionState | None = None
-    resolution_lines: tuple[str, ...] = ()
-    pending_resolution_lines: tuple[str, ...] = ()
+    presentation_events: tuple[PresentationEvent, ...] = ()
+    pending_presentation_events: tuple[PresentationEvent, ...] = ()
     received_game_revision: int | None = None
     applied_game_revision: int | None = None
     session_error: str | None = None
@@ -64,8 +65,9 @@ def initial_cli_state(own_client_id: str | None = None) -> CliState:
 
 
 def has_pending_presentation(state: CliState) -> bool:
-    return bool(state.pending_resolution_lines)
+    return bool(state.pending_presentation_events)
 
 
-def has_visible_resolution(state: CliState) -> bool:
-    return bool(state.resolution_lines)
+
+def has_visible_presentation(state: CliState) -> bool:
+    return bool(state.presentation_events)

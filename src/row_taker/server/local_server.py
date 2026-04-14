@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import logging
 import random
 from dataclasses import dataclass, field, replace
-from datetime import datetime
 
 from row_taker.engine.game import setup_game
 from row_taker.engine.game.models import PlayerID
@@ -62,6 +62,9 @@ class PendingBotStart:
     seat_index: int
     display_name: str
     handle: BotProcessHandle
+
+
+logger = logging.getLogger("row_taker.server.local")
 
 
 @dataclass(slots=True)
@@ -352,8 +355,10 @@ class LocalServer:
         stamped_message = self._stamp_game_message_revision(message)
         if isinstance(stamped_message, ChooseCardRequested | ChooseRowRequested):
             target_client_id = self.player_to_client_id[stamped_message.player_id]
+            logger.debug("route match message: type=%s revision=%s target_client_id=%s", type(stamped_message).__name__, getattr(stamped_message, "revision", None), target_client_id)
             self.outbox.append(OutgoingEnvelope(message=stamped_message, target_client_id=target_client_id))
             return
+        logger.debug("route broadcast match message: type=%s revision=%s", type(stamped_message).__name__, getattr(stamped_message, "revision", None))
         self.outbox.append(OutgoingEnvelope(message=stamped_message, target_client_id=None))
 
     def _stamp_game_message_revision(self, message: GameServerMessage) -> GameServerMessage:
@@ -431,7 +436,9 @@ class LocalServer:
         self._log(
             f"active match aborted: client_id={departing_client_id} name={departing_display_name!r} reason={reason.value} remaining_clients={remaining_client_ids!r}"
         )
+        logger.debug("abort enqueue start: departing_client_id=%s remaining_clients=%s outbox_before=%s", departing_client_id, remaining_client_ids, len(self.outbox))
         for client_id in remaining_client_ids:
+            logger.debug("enqueue SessionEnded: target_client_id=%s reason=%s", client_id, reason.value)
             self.outbox.append(
                 OutgoingEnvelope(
                     SessionEnded(
@@ -445,9 +452,12 @@ class LocalServer:
             )
 
         self._match_abort_in_progress = True
+        logger.debug("match abort flagged in progress: departing_client_id=%s", departing_client_id)
+        logger.debug("removing departing participant during abort: client_id=%s", departing_client_id)
         self._remove_participant(departing_client_id)
         self._connection_endpoints.pop(departing_client_id, None)
 
+        logger.debug("clearing active match after abort: player_to_client=%s client_to_player=%s", self.player_to_client_id, self.client_to_player_id)
         self.active_match = None
         self.player_to_client_id.clear()
         self.client_to_player_id.clear()
@@ -527,6 +537,7 @@ class LocalServer:
                 return client_id
 
     def _remove_participant(self, client_id: str) -> None:
+        logger.debug("remove participant: client_id=%s kind=%s", client_id, self.registry.get_participant(client_id).kind if self.registry.has(client_id) else None)
         self._close_running_bot(client_id)
         self.registry.remove_participant(client_id)
         self.lobby_state = remove_client(self.lobby_state, client_id)
@@ -534,6 +545,7 @@ class LocalServer:
     def _close_running_bot(self, client_id: str) -> None:
         handle = self._running_bot_processes_by_client_id.pop(client_id, None)
         if handle is not None:
+            logger.debug("closing running bot process: client_id=%s", client_id)
             handle.close()
 
     def _assert_known_client(self, client_id: str) -> None:
@@ -555,5 +567,4 @@ class LocalServer:
         return f"Spiel abgebrochen: Verbindung zu {departing_display_name}{endpoint_suffix} verloren."
 
     def _log(self, message: str) -> None:
-        timestamp = datetime.now().isoformat(sep=" ", timespec="seconds")
-        print(f"{timestamp} [server] {message}", flush=True)
+        logger.info(message)

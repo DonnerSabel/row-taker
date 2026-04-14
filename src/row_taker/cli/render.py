@@ -10,12 +10,18 @@ from row_taker.cli.state_models import (
     UiMessage,
     has_pending_presentation,
 )
-from row_taker.engine.game.state import PlayerState, PublicState
-from row_taker.protocol.messages import (
-    LobbyParticipantView,
-    LobbySeatView,
-    CardsRevealed,
+from row_taker.client.presentation_events import (
+    PresentationCardPlaced,
+    PresentationCardsRevealed,
+    PresentationEvent,
+    PresentationOverflowResolved,
+    PresentationRowChoiceRequired,
+    PresentationRowChosen,
+    PresentationRowTaken,
+    PresentationTrickFinished,
 )
+from row_taker.engine.game.state import PlayerState, PublicState
+from row_taker.protocol.messages import LobbyParticipantView, LobbySeatView
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,7 +100,6 @@ def render_session_error(message: str) -> str:
 def render_flash_message(message: UiMessage) -> str:
     title = "Fehler" if message.level == "error" else "Hinweis"
     return "\n".join([f"{title}: {message.text}"])
-
 
 
 def render_lobby_main(state: CliState) -> str:
@@ -242,9 +247,6 @@ def _current_bot_name(state: CliState, seat_index: int) -> str:
 
 def render_game_waiting(state: CliState) -> str:
     lines = [render_game_overview(state)]
-    revealed = render_revealed_trick(state.revealed_trick, own_player_id=state.own_player_id)
-    if revealed is not None:
-        lines.extend(["", revealed])
     resolution = render_resolution_lines(state)
     if resolution is not None:
         lines.extend(["", resolution])
@@ -276,9 +278,6 @@ def render_game_choose_row(state: CliState) -> str:
     pending_card_value = screen.player_state.pending_card_value()
     pending_card_text = "?" if pending_card_value is None else str(pending_card_value)
     lines = [render_game_overview(state)]
-    revealed = render_revealed_trick(state.revealed_trick, own_player_id=state.own_player_id)
-    if revealed is not None:
-        lines.extend(["", revealed])
     resolution = render_resolution_lines(state)
     if resolution is not None:
         lines.extend(["", resolution])
@@ -323,25 +322,43 @@ def render_game_overview(state: CliState) -> str:
     return "\n".join(lines)
 
 
-def render_revealed_trick(revealed: CardsRevealed | None, *, own_player_id) -> str | None:
-    if revealed is None:
-        return None
-    lines = ["Gespielte Karten:"]
-    for card in revealed.plays:
-        marker = " <- du" if card.player_id == own_player_id else ""
-        lines.append(f"  {card.card_value:>3}  {card.player_name}{marker}")
-    return "\n".join(lines)
-
-
-
 def render_resolution_lines(state: CliState) -> str | None:
-    if not state.resolution_lines and not state.pending_resolution_lines:
+    if not state.presentation_events and not state.pending_presentation_events:
         return None
     lines = ["Lokale Auflösung:"]
-    lines.extend(f"  {line}" for line in state.resolution_lines)
-    if state.pending_resolution_lines:
-        lines.append(f"  ... {len(state.pending_resolution_lines)} weiterer Schritt(e) in der Warteschlange")
+    for event in state.presentation_events:
+        lines.extend(f"  {line}" for line in render_presentation_event(event, own_player_id=state.own_player_id))
+    if state.pending_presentation_events:
+        lines.append(f"  ... {len(state.pending_presentation_events)} weiterer Schritt(e) in der Warteschlange")
     return "\n".join(lines)
+
+
+def render_presentation_event(event: PresentationEvent, *, own_player_id: str | None) -> tuple[str, ...]:
+    match event:
+        case PresentationCardsRevealed(plays=plays):
+            lines = ["Gespielte Karten:"]
+            for card in plays:
+                marker = " <- du" if card.player_id == own_player_id else ""
+                lines.append(f"  {card.card_value:>3}  {card.player_name}{marker}")
+            return tuple(lines)
+        case PresentationCardPlaced(player_name=name, card_value=value, row_id=row_id, row_cards_after=row_cards_after):
+            return (f"- {name} legt {value} an Reihe {row_id}; danach: {' '.join(str(v) for v in row_cards_after)}",)
+        case PresentationRowChoiceRequired(player_name=name, card_value=value):
+            return (f"- {name} muss mit {value} eine Reihe wählen.",)
+        case PresentationRowChosen(player_name=name, row_id=row_id, card_value=value):
+            return (f"- {name} wählt Reihe {row_id} für {value}.",)
+        case PresentationRowTaken(player_name=name, row_id=row_id, taken_cards=taken_cards, bullheads=bullheads, replacement_card_value=value, row_cards_after=row_cards_after):
+            cards = ' '.join(str(v) for v in taken_cards)
+            after = ' '.join(str(v) for v in row_cards_after)
+            return (f"- {name} nimmt Reihe {row_id} ({cards}) für {bullheads} Hornochsen und startet mit {value}; danach: {after}",)
+        case PresentationOverflowResolved(player_name=name, row_id=row_id, card_value=value, taken_cards=taken_cards, bullheads=bullheads, row_cards_after=row_cards_after):
+            cards = ' '.join(str(v) for v in taken_cards)
+            after = ' '.join(str(v) for v in row_cards_after)
+            return (f"- {name} löst Overflow in Reihe {row_id} mit {value} aus, nimmt ({cards}) für {bullheads} Hornochsen; danach: {after}",)
+        case PresentationTrickFinished():
+            return ("- Stich fertig.",)
+    return (f"- {type(event).__name__}",)
+
 
 def render_own_hand(player_state: PlayerState) -> str:
     cards = " ".join(f"|{card.value} {card.bullheads * '🐮'}|" for card in player_state.hand)
@@ -349,8 +366,6 @@ def render_own_hand(player_state: PlayerState) -> str:
         f"{player_state.self_player_name()}: Deine Handkarten:",
         f"  {cards}" if cards else "  -",
     ])
-
-
 
 
 def render_public_state(public_state: PublicState) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from row_taker.engine.game import (
@@ -32,12 +33,16 @@ from row_taker.protocol.messages import (
 )
 
 
+logger = logging.getLogger("row_taker.hub.match_hub")
+
+
 @dataclass(slots=True)
 class MatchHub:
     state: GameState
     outbox: list[GameServerMessage] = field(default_factory=list)
 
     def start_match(self) -> None:
+        logger.debug("match start: phase=%s players=%s", self.state.phase_info.phase, [player.name for player in self.state.players])
         self.outbox.append(StateUpdated(state=self.build_public_state()))
         self._request_choose_cards_for_current_trick()
 
@@ -74,15 +79,18 @@ class MatchHub:
             )
 
     def _handle_submit_card(self, player_id: PlayerID, message: SubmitCard) -> None:
+        logger.debug("submit card: player_id=%s card_value=%s", player_id, message.card_value)
         submit_play_card(self.state, player_id, message.card_value)
         if not all_cards_selected(self.state):
             return
 
         revealed_plays = begin_trick_resolution(self.state)
+        logger.debug("cards revealed: plays=%s", [(play.player_id, play.card.value) for play in revealed_plays])
         self.outbox.append(self._build_cards_revealed(revealed_plays))
         self._advance_resolution_until_blocked()
 
     def _handle_submit_row_choice(self, player_id: PlayerID, message: SubmitRowChoice) -> None:
+        logger.debug("submit row choice: player_id=%s row_id=%s", player_id, message.row_id)
         submit_choose_row(self.state, player_id, message.row_id)
         self.outbox.append(RowChoiceCommitted(row_id=message.row_id))
         self._advance_resolution_until_blocked()
@@ -93,6 +101,7 @@ class MatchHub:
                 active_player_id = self.state.phase_info.active_player_id
                 if active_player_id is None:
                     raise ValueError("missing active_player_id for choose-row phase")
+                logger.debug("resolution blocked on row choice: player_id=%s", active_player_id)
                 self.outbox.append(
                     ChooseRowRequested(
                         player_id=active_player_id,
@@ -114,6 +123,7 @@ class MatchHub:
 
     def _finish_current_trick(self) -> None:
         result = finish_trick(self.state)
+        logger.debug("finish trick: game_finished=%s", result.game_finished)
         self.outbox.append(StateUpdated(state=self.build_public_state()))
         if not result.game_finished:
             self._request_choose_cards_for_current_trick()

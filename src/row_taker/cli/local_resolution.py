@@ -2,13 +2,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from row_taker.cli.row_display import format_resolution_steps_for_cli
+from row_taker.client.presentation_builder import (
+    build_presentation_card_placed,
+    build_presentation_cards_revealed,
+    build_presentation_overflow_resolved,
+    build_presentation_row_choice_required,
+    build_presentation_row_chosen,
+    build_presentation_row_taken,
+    build_presentation_trick_finished,
+)
+from row_taker.client.presentation_events import PresentationEvent
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import PublicPlayerInfo, Row
-from row_taker.engine.game.phases import StepAction
 from row_taker.engine.game.public_state_ops import apply_resolution_step
 from row_taker.engine.game.rules import place_card, take_row, target_row_index
 from row_taker.engine.game.state import PublicState, TrickResolutionStep
+from row_taker.engine.game.phases import StepAction
 from row_taker.protocol.messages import CardsRevealed, PlayedCardView
 
 
@@ -18,7 +27,7 @@ class LocalResolutionState:
     remaining_plays: tuple[PlayedCardView, ...]
     pending_row_choice: PlayedCardView | None
     steps: tuple[TrickResolutionStep, ...]
-    lines: tuple[str, ...]
+    events: tuple[PresentationEvent, ...]
 
 
 def start_local_resolution(public_state: PublicState, revealed: CardsRevealed) -> LocalResolutionState:
@@ -28,7 +37,7 @@ def start_local_resolution(public_state: PublicState, revealed: CardsRevealed) -
         remaining_plays=ordered,
         pending_row_choice=None,
         steps=(),
-        lines=(),
+        events=(build_presentation_cards_revealed(revealed.plays),),
     )
     return _advance_until_blocked(initial)
 
@@ -56,14 +65,31 @@ def apply_local_row_choice(state: LocalResolutionState, row_id) -> LocalResoluti
         new_row_cards=tuple(rows[chosen_index].cards),
     )
     next_shadow_state = apply_resolution_step(current_state, step)
-    step_line = format_resolution_steps_for_cli(current_state, [step])[0]
+    player_names = _player_names_for_state(current_state)
 
     resumed = LocalResolutionState(
         shadow_state=next_shadow_state,
         remaining_plays=state.remaining_plays,
         pending_row_choice=None,
         steps=state.steps + (step,),
-        lines=state.lines + (step_line,),
+        events=state.events
+        + (
+            build_presentation_row_chosen(
+                player_id=play.player_id,
+                player_names=player_names,
+                row_id=row_id,
+                card_value=play.card_value,
+            ),
+            build_presentation_row_taken(
+                player_id=play.player_id,
+                player_names=player_names,
+                row_id=row_id,
+                taken_cards=tuple(card.value for card in previous_cards),
+                bullheads=bullheads,
+                replacement_card_value=play.card_value,
+                row_cards_after=tuple(card.value for card in rows[chosen_index].cards),
+            ),
+        ),
     )
     return _advance_until_blocked(resumed)
 
@@ -74,6 +100,7 @@ def _advance_until_blocked(state: LocalResolutionState) -> LocalResolutionState:
         play = current.remaining_plays[0]
         card = Card(play.card_value)
         row_index = target_row_index(current.shadow_state.rows, card)
+        player_names = _player_names_for_state(current.shadow_state)
 
         if row_index is None:
             return LocalResolutionState(
@@ -81,7 +108,14 @@ def _advance_until_blocked(state: LocalResolutionState) -> LocalResolutionState:
                 remaining_plays=current.remaining_plays[1:],
                 pending_row_choice=play,
                 steps=current.steps,
-                lines=current.lines + (f"- {play.player_name} muss mit {card.value} eine Reihe wählen.",),
+                events=current.events
+                + (
+                    build_presentation_row_choice_required(
+                        player_id=play.player_id,
+                        player_names=player_names,
+                        card_value=card.value,
+                    ),
+                ),
             )
 
         row = current.shadow_state.rows[row_index]
@@ -99,13 +133,38 @@ def _advance_until_blocked(state: LocalResolutionState) -> LocalResolutionState:
             new_row_cards=next_row_cards,
         )
         next_shadow_state = apply_resolution_step(current.shadow_state, step)
-        step_line = format_resolution_steps_for_cli(current.shadow_state, [step])[0]
+        if taken is None:
+            next_event: PresentationEvent = build_presentation_card_placed(
+                player_id=play.player_id,
+                player_names=player_names,
+                card_value=card.value,
+                row_id=row.row_id,
+                row_cards_after=tuple(item.value for item in next_row_cards),
+            )
+        else:
+            next_event = build_presentation_overflow_resolved(
+                player_id=play.player_id,
+                player_names=player_names,
+                row_id=row.row_id,
+                card_value=card.value,
+                taken_cards=tuple(item.value for item in previous_cards),
+                bullheads=bullheads,
+                row_cards_after=tuple(item.value for item in next_row_cards),
+            )
         current = LocalResolutionState(
             shadow_state=next_shadow_state,
             remaining_plays=current.remaining_plays[1:],
             pending_row_choice=None,
             steps=current.steps + (step,),
-            lines=current.lines + (step_line,),
+            events=current.events + (next_event,),
+        )
+    if current.pending_row_choice is None and not current.remaining_plays:
+        return LocalResolutionState(
+            shadow_state=current.shadow_state,
+            remaining_plays=current.remaining_plays,
+            pending_row_choice=None,
+            steps=current.steps,
+            events=current.events + (build_presentation_trick_finished(),),
         )
     return current
 
@@ -127,3 +186,7 @@ def _clone_public_state(public_state: PublicState) -> PublicState:
         trick_no=public_state.trick_no,
         phase_info=public_state.phase_info,
     )
+
+
+def _player_names_for_state(public_state: PublicState) -> dict[str, str]:
+    return {player.player_id: player.name for player in public_state.players}

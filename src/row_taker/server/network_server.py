@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import logging
 import random
 import socket
 import threading
 from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import datetime
 
 from row_taker.protocol.errors import ConnectionClosed, ProtocolError, TransportError
 from row_taker.protocol.messages import (
@@ -38,6 +38,9 @@ class _Connection:
             self.transport.close()
 
 
+logger = logging.getLogger("row_taker.server.network")
+
+
 @dataclass(slots=True)
 class NetworkServer:
     server: LocalServer
@@ -53,7 +56,7 @@ class NetworkServer:
             self._connections[client_id] = _Connection(client_id=client_id, transport=transport)
             self._ever_had_connection = True
             self.server.register_connection(client_id, endpoint_display=endpoint_display)
-            _log(f"connection accepted: client_id={client_id} endpoint={endpoint_display or '-'}")
+            logger.info(f"connection accepted: client_id={client_id} endpoint={endpoint_display or '-'}")
             return client_id
 
     def remove_connection(self, client_id: str) -> None:
@@ -61,7 +64,7 @@ class NetworkServer:
             connection = self._connections.pop(client_id, None)
             if connection is not None:
                 connection.close()
-            _log(f"connection closed: client_id={client_id}")
+            logger.info(f"connection closed: client_id={client_id}")
             self.server.disconnect_client(client_id)
             self._dispatch_locked(self.server.drain_outbox())
 
@@ -75,7 +78,7 @@ class NetworkServer:
             if adopted_client_id is not None and adopted_client_id != client_id:
                 self._rename_connection_locked(client_id, adopted_client_id)
                 client_id = adopted_client_id
-                _log(f"connection adopted requested client id: client_id={client_id}")
+                logger.info(f"connection adopted requested client id: client_id={client_id}")
             if isinstance(message, JoinLobby):
                 connection = self._connections.get(client_id)
                 if connection is not None:
@@ -109,7 +112,7 @@ class NetworkServer:
                     connection.send(envelope)
                 except TransportError as exc:
                     failed_client_ids.add(connection.client_id)
-                    _log(
+                    logger.info(
                         f"send failed: client_id={connection.client_id} error={type(exc).__name__}: {exc}"
                     )
         if failed_client_ids:
@@ -137,14 +140,14 @@ def _serve_connection(conn: socket.socket, network_server: NetworkServer, endpoi
             try:
                 message = transport.receive()
             except ConnectionClosed:
-                _log(f"client disconnected while receiving: client_id={client_id}")
+                logger.info(f"client disconnected while receiving: client_id={client_id}")
                 break
             except (ProtocolError, TransportError) as exc:
-                _log(f"client transport error: client_id={client_id} error={type(exc).__name__}: {exc}")
+                logger.info(f"client transport error: client_id={client_id} error={type(exc).__name__}: {exc}")
                 break
             client_id = network_server.handle_client_message(client_id, message)
             if isinstance(message, LeaveSession):
-                _log(f"client requested leave: client_id={client_id}")
+                logger.info(f"client requested leave: client_id={client_id}")
                 break
     finally:
         network_server.remove_connection(client_id)
@@ -158,13 +161,13 @@ def run_network_server(
     with socket.create_server((host, port), reuse_port=False) as listener:
         listener.settimeout(0.5)
         actual_host, actual_port = listener.getsockname()[:2]
-        _log(f"server started on {actual_host}:{actual_port}")
+        logger.info(f"server started on {actual_host}:{actual_port}")
         server_handle = ServerHandle(host=actual_host, port=actual_port)
         local_server = LocalServer(rng=rng, seat_count=seat_count, server_handle=server_handle)
         network_server = NetworkServer(server=local_server)
         while True:
             if network_server.should_shutdown():
-                _log("no participants connected anymore; server shutting down")
+                logger.info("no participants connected anymore; server shutting down")
                 break
             try:
                 conn, addr = listener.accept()
@@ -178,6 +181,3 @@ def run_network_server(
             thread.start()
 
 
-def _log(message: str) -> None:
-    timestamp = datetime.now().isoformat(sep=" ", timespec="seconds")
-    print(f"{timestamp} [server] {message}", flush=True)
