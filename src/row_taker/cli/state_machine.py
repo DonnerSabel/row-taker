@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 
 from row_taker.cli.frontend import CliFrontend, mark_server_error, mark_session_ended, set_flash
 from row_taker.cli.state_models import CliState, apply_client_core_state
