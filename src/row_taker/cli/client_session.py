@@ -8,6 +8,11 @@ from row_taker.protocol.transport import ClientTransport
 
 
 class ClientSession:
+    """Compatibility wrapper around the CLI runtime.
+
+    The actual client orchestration now lives in CliRuntime + GameClientCore.
+    """
+
     def __init__(self, transport: ClientTransport, own_client_id: str | None = None, *, interactive: bool = True) -> None:
         self.runtime = CliRuntime(
             transport=transport,
@@ -27,7 +32,6 @@ class ClientSession:
 
     async def run_async(self) -> PublicState | None:
         return await self.runtime.run_async()
-
 
 
 def print_final_result(public_state: PublicState | None) -> None:

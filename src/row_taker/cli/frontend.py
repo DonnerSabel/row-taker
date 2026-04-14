@@ -39,6 +39,9 @@ class CliFrontend:
     def handle_text_input(self, state: CliState, text: str) -> FrontendInputResult:
         return parse_text_to_action(state, text)
 
+    def clear_flash(self, state: CliState) -> CliState:
+        return clear_flash(state)
+
 
 
 def sync_frontend_to_core(state: CliState) -> CliState:

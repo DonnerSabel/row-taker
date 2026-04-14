@@ -10,7 +10,7 @@ from row_taker.cli.frontend import CliFrontend, mark_server_error, mark_session_
 from row_taker.cli.render import build_view
 from row_taker.cli.state_models import CliState, apply_client_core_state, initial_cli_state
 from row_taker.client.actions import UiActionAdvancePresentation
-from row_taker.client.game_client_core import GameClientCore
+from row_taker.client.game_client_core import CoreUpdate, GameClientCore
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.errors import ConnectionClosed
 from row_taker.protocol.messages import ServerError, ServerToClientMessage, SessionEnded
@@ -20,6 +20,8 @@ logger = logging.getLogger("row_taker.cli.runtime")
 
 
 class CliRuntime:
+    """Thin CLI host around GameClientCore."""
+
     def __init__(
         self,
         transport: ClientTransport,
@@ -40,22 +42,20 @@ class CliRuntime:
         state = self.initial_state_factory(self.own_client_id)
         core = GameClientCore(state.core_state)
         console = self.console_factory()
-        server_task: asyncio.Task[ServerToClientMessage] | None = asyncio.create_task(asyncio.to_thread(self.transport.receive))
+
+        server_task: asyncio.Task[ServerToClientMessage] | None = asyncio.create_task(
+            asyncio.to_thread(self.transport.receive)
+        )
         input_task: asyncio.Task[str] | None = None
         input_prompt: str | None = None
         abort_requested = False
 
         try:
+            await self._render(console, state)
+
             while not state.should_exit and not abort_requested:
-                state = await self._drain_core(console, core, state)
-                if state.should_exit:
-                    input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
-                    break
-
-                await self._refresh_screen(console, state)
-
                 if not self.interactive and core.has_pending_presentation():
-                    state = await self._apply_core_action(console, core, state, UiActionAdvancePresentation())
+                    state, _ = await self._apply_action(console, core, state, UiActionAdvancePresentation())
                     continue
 
                 current_prompt = build_view(state).prompt if self.interactive else None
@@ -69,6 +69,7 @@ class CliRuntime:
                     wait_tasks.add(server_task)
                 if input_task is not None:
                     wait_tasks.add(input_task)
+
                 if not wait_tasks:
                     break
 
@@ -90,25 +91,12 @@ class CliRuntime:
                 state.suppress_final_result,
                 state.session_error,
             )
+
             if state.suppress_final_result or state.session_error is not None:
                 return None
             return state.public_state
         finally:
             await self._cleanup(console, server_task, input_task)
-
-    async def _drain_core(self, console: CliConsole, core: GameClientCore, state: CliState) -> CliState:
-        drain = core.drain_ready_server_messages()
-        for message in drain.applied_messages:
-            logger.debug(
-                "applying server message: type=%s inbox_remaining=%s pending_presentation=%s",
-                type(message).__name__,
-                len(core.server_inbox),
-                len(core.state.pending_presentation_events),
-            )
-            state = self._sync_state_from_core(state, core)
-            state = self._apply_cli_side_effects(state, message)
-            await self._refresh_screen(console, state)
-        return state
 
     async def _handle_server_task(
         self,
@@ -125,23 +113,14 @@ class CliRuntime:
                 core.state = replace(core.state, session_error="Die Verbindung zum Server wurde beendet.")
                 state = self._sync_state_from_core(state, core)
                 state = mark_server_error(state)
-                await self._refresh_screen(console, state)
+                await self._render(console, state)
                 return state, None
             return state, None
 
         logger.debug("server message received: type=%s", type(message).__name__)
-        logger.debug("server message queued from transport: type=%s", type(message).__name__)
-        core.enqueue_server_message(message)
-        revision = core.state.received_game_revision
-        if revision is not None:
-            logger.debug(
-                "server message enqueued: type=%s revision=%s inbox_size=%s applied_revision=%s",
-                type(message).__name__,
-                revision,
-                len(core.server_inbox),
-                core.state.applied_game_revision,
-            )
-        state = await self._drain_core(console, core, state)
+        update = core.receive_server_message(message)
+        state = await self._apply_core_update(console, core, state, update)
+
         return state, asyncio.create_task(asyncio.to_thread(self.transport.receive))
 
     async def _handle_input_task(
@@ -152,6 +131,7 @@ class CliRuntime:
         input_task: asyncio.Task[str],
     ) -> tuple[CliState, bool]:
         abort_requested = False
+
         try:
             line = input_task.result()
         except asyncio.CancelledError:
@@ -165,63 +145,104 @@ class CliRuntime:
 
         parsed = self.frontend.handle_text_input(state, line)
         state = parsed.state
+
         if parsed.action is None:
-            await self._refresh_screen(console, state)
+            await self._render(console, state)
             return state, abort_requested
 
-        state = await self._apply_core_action(console, core, state, parsed.action)
+        state, outbound_messages = await self._apply_action(console, core, state, parsed.action)
+
+        for outbound_message in outbound_messages:
+            logger.debug("sending outbound client message: type=%s", type(outbound_message).__name__)
+            await asyncio.to_thread(self.transport.send, outbound_message)
+
         return state, abort_requested
 
-    async def _apply_core_action(self, console: CliConsole, core: GameClientCore, state: CliState, action) -> CliState:
-        result = core.apply_action(action)
+    async def _apply_action(
+        self,
+        console: CliConsole,
+        core: GameClientCore,
+        state: CliState,
+        action: object,
+    ) -> tuple[CliState, tuple[object, ...]]:
+        update = core.apply_action(action)
         state = self._sync_state_from_core(state, core)
-        if result.local_message is not None:
-            state = set_flash(state, "error", result.local_message)
-            await self._refresh_screen(console, state)
-            return state
-        if result.outbound_message is not None:
-            logger.debug("sending outbound client message: type=%s", type(result.outbound_message).__name__)
-            with suppress(Exception):
-                await asyncio.to_thread(self.transport.send, result.outbound_message)
-        await self._refresh_screen(console, state)
+
+        if update.local_messages:
+            state = set_flash(state, "error", update.local_messages[-1])
+        else:
+            state = self.frontend.clear_flash(state)
+
+        await self._render(console, state)
+        state = await self._continue_core_flow(console, core, state)
+        return state, update.outbound_messages
+
+    async def _continue_core_flow(self, console: CliConsole, core: GameClientCore, state: CliState) -> CliState:
+        while True:
+            update = core.continue_ready_flow()
+            if not update.applied_server_messages:
+                return self._sync_state_from_core(state, core)
+            state = await self._apply_core_update(console, core, state, update)
+
+    async def _apply_core_update(
+        self,
+        console: CliConsole,
+        core: GameClientCore,
+        state: CliState,
+        update: CoreUpdate,
+    ) -> CliState:
+        if not update.applied_server_messages:
+            return self._sync_state_from_core(state, core)
+
+        for message in update.applied_server_messages:
+            logger.debug(
+                "applying server message: type=%s inbox_remaining=%s pending_presentation=%s",
+                type(message).__name__,
+                len(core.server_inbox),
+                len(core.state.pending_presentation_events),
+            )
+            state = self._sync_state_from_core(state, core)
+            state = self._apply_cli_side_effects(state, message)
+            await self._render(console, state)
+
         return state
+
+    async def _render(self, console: CliConsole, state: CliState) -> None:
+        view = build_view(state)
+        await console.render(view.body, view.prompt)
 
     def _sync_state_from_core(self, state: CliState, core: GameClientCore) -> CliState:
         state = apply_client_core_state(state, core.state)
-        state = self.frontend.sync_to_core(state)
-        self.own_client_id = state.own_client_id
-        return state
+        return self.frontend.sync_to_core(state)
 
     def _apply_cli_side_effects(self, state: CliState, message: ServerToClientMessage) -> CliState:
-        if isinstance(message, SessionEnded):
-            return mark_session_ended(state)
-        if isinstance(message, ServerError):
-            return mark_server_error(state)
-        return state
-
-    async def _refresh_screen(self, console: CliConsole, state: CliState) -> None:
-        view = build_view(state)
-        prompt = view.prompt if self.interactive else None
-        await console.render(view.body, prompt)
+        match message:
+            case SessionEnded():
+                return mark_session_ended(state)
+            case ServerError():
+                return mark_server_error(state)
+            case _:
+                return state
 
     async def _replace_input_task(
         self,
         input_task: asyncio.Task[str] | None,
         prompt: str,
         console: CliConsole,
-    ) -> tuple[asyncio.Task[str] | None, str | None]:
-        await self._cancel_input_task(input_task, None)
-        return asyncio.create_task(console.read_line()), prompt
+    ) -> tuple[asyncio.Task[str], str]:
+        input_task, _ = await self._cancel_input_task(input_task, None)
+        return asyncio.create_task(console.read_line(prompt)), prompt
 
     async def _cancel_input_task(
         self,
         input_task: asyncio.Task[str] | None,
-        input_prompt: str | None,
+        _input_prompt: str | None,
     ) -> tuple[asyncio.Task[str] | None, str | None]:
-        if input_task is not None:
-            input_task.cancel()
-            with suppress(asyncio.CancelledError, InputAborted, KeyboardInterrupt):
-                await input_task
+        if input_task is None:
+            return None, None
+        input_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await input_task
         return None, None
 
     async def _cleanup(
@@ -235,27 +256,28 @@ class CliRuntime:
             server_task is not None,
             input_task is not None,
         )
+
         logger.debug("transport close requested")
-        with suppress(Exception):
-            await asyncio.to_thread(self.transport.close)
+        await asyncio.to_thread(self.transport.close)
+
         if server_task is not None:
             logger.debug("server receive task cancel requested")
             server_task.cancel()
             logger.debug("awaiting server receive task shutdown")
-            with suppress(asyncio.CancelledError, ConnectionClosed):
+            with suppress(asyncio.CancelledError):
                 await server_task
             logger.debug("server receive task shutdown complete")
-        else:
-            logger.debug("server receive task shutdown skipped")
+
         if input_task is not None:
+            logger.debug("client input task cancel requested")
             input_task.cancel()
-            with suppress(asyncio.CancelledError, InputAborted, KeyboardInterrupt):
+            with suppress(asyncio.CancelledError):
                 await input_task
             logger.debug("client input task shutdown complete")
         else:
             logger.debug("client input task shutdown skipped")
+
         logger.debug("console close start")
-        with suppress(Exception):
-            await console.close()
+        await console.close()
         logger.debug("console close complete")
         logger.debug("client session cleanup finished")
