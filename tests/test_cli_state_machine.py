@@ -219,6 +219,22 @@ def test_cards_revealed_queues_presentation_events_before_display() -> None:
     assert state.pending_presentation_events
 
 
+def test_choose_row_input_maps_cli_row_to_row_choice_action() -> None:
+    player_state = _player_state_for(0)
+    state = CliState(
+        core_state=ClientCoreState(
+            player_state=player_state,
+            client_mode=ClientMode.GAME,
+            pending_action=PendingAction.CHOOSE_ROW,
+        )
+    )
+
+    parsed = _FRONTEND.handle_text_input(state, "1")
+
+    assert parsed.action is not None
+    assert parsed.state.flash_message is None
+
+
 def test_pending_presentation_uses_enter_prompt_until_queue_is_empty() -> None:
     state = CliState(
         core_state=ClientCoreState(

@@ -160,10 +160,16 @@ def _parse_game_input(state: CliState, normalized: str) -> FrontendInputResult:
         player_state = state.player_state
         if player_state is None:
             return FrontendInputResult(state=set_flash(state, "error", "Kein Spielerzustand für Reihenwahl vorhanden."))
-        row_mapping = build_row_display_mapping(player_state.public_state.rows)
-        if normalized not in row_mapping:
+        row_mapping = build_row_display_mapping(player_state.public_state)
+        try:
+            cli_row = int(normalized)
+        except ValueError:
             return FrontendInputResult(state=set_flash(state, "error", "Bitte eine gültige Reihennummer eingeben."))
-        return FrontendInputResult(state=clear_flash(state), action=UiActionChooseRow(row_mapping[normalized]))
+        if cli_row < 1 or cli_row > row_mapping.max_cli_row():
+            return FrontendInputResult(state=set_flash(state, "error", "Bitte eine gültige Reihennummer eingeben."))
+        state_row_index = row_mapping.to_state_index(cli_row)
+        row_id = player_state.public_state.rows[state_row_index].row_id
+        return FrontendInputResult(state=clear_flash(state), action=UiActionChooseRow(row_id))
 
     if normalized == "":
         return FrontendInputResult(state=state)
