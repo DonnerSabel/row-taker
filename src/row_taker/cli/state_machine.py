@@ -5,7 +5,8 @@ import logging
 from row_taker.cli.frontend import CliFrontend, mark_server_error, mark_session_ended, set_flash
 from row_taker.cli.state_models import CliState, apply_client_core_state
 from row_taker.client.game_client_core import GameClientCore
-from row_taker.protocol.messages import LobbyActionRejected, ServerError, ServerToClientMessage, SessionEnded
+from row_taker.cli.local_resolution import apply_local_row_choice, start_local_resolution
+from row_taker.protocol.messages import CardsRevealed, ChooseCardRequested, LobbyActionRejected, RowChoiceCommitted, ServerError, ServerToClientMessage, SessionEnded
 
 logger = logging.getLogger("row_taker.cli.state_machine")
 
@@ -43,28 +44,70 @@ def advance_presentation_queue(state: CliState) -> CliState:
 
 
 def reduce_server_message(state: CliState, message: ServerToClientMessage) -> CliState:
-    core = GameClientCore(state.core_state)
-    update = core.receive_server_message(message)
+    match message:
+        case CardsRevealed() as revealed:
+            if state.public_state is None:
+                return state
+            local_resolution = start_local_resolution(state.public_state, revealed)
+            state = replace(
+                state,
+                revealed_trick=revealed,
+                local_resolution=local_resolution,
+                pending_presentation_events=state.pending_presentation_events + local_resolution.events,
+            )
+            return _FRONTEND.sync_to_core(state)
 
-    state = apply_client_core_state(state, update.state)
-    state = _FRONTEND.sync_to_core(state)
+        case RowChoiceCommitted(row_id=row_id):
+            if state.local_resolution is None or state.local_resolution.pending_row_choice is None:
+                return state
+            previous_count = len(state.local_resolution.events)
+            local_resolution = apply_local_row_choice(state.local_resolution, row_id)
+            new_events = local_resolution.events[previous_count:]
+            state = replace(
+                state,
+                local_resolution=local_resolution,
+                pending_presentation_events=state.pending_presentation_events + new_events,
+            )
+            return _FRONTEND.sync_to_core(state)
 
-    for applied in update.applied_server_messages:
-        match applied:
-            case LobbyActionRejected(message=text):
-                state = set_flash(state, "error", text)
-            case SessionEnded():
-                logger.debug("session ended applied: message=%r", state.session_error)
-                state = mark_session_ended(state)
-            case ServerError():
-                state = mark_server_error(state)
-            case _:
-                pass
+        case ChooseCardRequested():
+            core = GameClientCore(state.core_state)
+            update = core.receive_server_message(message)
+            state = apply_client_core_state(state, update.state)
+            state = replace(
+                state,
+                revealed_trick=None,
+                local_resolution=None,
+                presentation_events=(),
+                pending_presentation_events=(),
+            )
+            return _FRONTEND.sync_to_core(state)
 
-    return state
+        case _:
+            core = GameClientCore(state.core_state)
+            update = core.receive_server_message(message)
+
+            state = apply_client_core_state(state, update.state)
+            state = _FRONTEND.sync_to_core(state)
+
+            for applied in update.applied_server_messages:
+                match applied:
+                    case LobbyActionRejected(message=text):
+                        state = set_flash(state, "error", text)
+                    case SessionEnded():
+                        logger.debug("session ended applied: message=%r", state.session_error)
+                        state = mark_session_ended(state)
+                    case ServerError():
+                        state = mark_server_error(state)
+                    case _:
+                        pass
+
+            return state
 
 
 def reduce_user_input(state: CliState, text: str) -> UserInputResult:
+    previous_screen = getattr(state, "screen", None)
+
     parsed = _FRONTEND.handle_text_input(state, text)
     state = parsed.state
 
@@ -78,6 +121,8 @@ def reduce_user_input(state: CliState, text: str) -> UserInputResult:
     state = _FRONTEND.sync_to_core(state)
 
     if update.local_messages:
+        if previous_screen is not None:
+            state = replace(state, screen=previous_screen)
         return UserInputResult(state=set_flash(state, "error", update.local_messages[-1]))
 
     while True:

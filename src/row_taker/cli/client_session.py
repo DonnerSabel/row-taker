@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from row_taker.cli.console import CliConsole
+from row_taker.cli.console import CliConsole as _CliConsole
 from row_taker.cli.runtime import CliRuntime
-from row_taker.cli.state_models import initial_cli_state
+from row_taker.cli.state_models import initial_cli_state as _initial_cli_state
+
+CliConsole = _CliConsole
+initial_cli_state = _initial_cli_state
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.transport import ClientTransport
 

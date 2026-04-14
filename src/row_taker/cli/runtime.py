@@ -231,7 +231,7 @@ class CliRuntime:
         console: CliConsole,
     ) -> tuple[asyncio.Task[str], str]:
         input_task, _ = await self._cancel_input_task(input_task, None)
-        return asyncio.create_task(console.read_line(prompt)), prompt
+        return asyncio.create_task(console.read_line()), prompt
 
     async def _cancel_input_task(
         self,
@@ -264,7 +264,7 @@ class CliRuntime:
             logger.debug("server receive task cancel requested")
             server_task.cancel()
             logger.debug("awaiting server receive task shutdown")
-            with suppress(asyncio.CancelledError):
+            with suppress(asyncio.CancelledError, ConnectionClosed):
                 await server_task
             logger.debug("server receive task shutdown complete")
 
