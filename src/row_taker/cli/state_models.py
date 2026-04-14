@@ -157,6 +157,50 @@ def apply_feedback_state(state: CliState, feedback: CliFeedbackState) -> CliStat
     return replace(state, feedback_state=feedback)
 
 
+def with_core_updates(state: CliState, **changes: object) -> CliState:
+    return replace(state, core_state=replace(state.core_state, **changes))
+
+
+def with_navigation_updates(state: CliState, **changes: object) -> CliState:
+    return replace(state, navigation_state=replace(state.navigation_state, **changes))
+
+
+def with_feedback_updates(state: CliState, **changes: object) -> CliState:
+    return replace(state, feedback_state=replace(state.feedback_state, **changes))
+
+
+def with_screen(state: CliState, screen: Screen) -> CliState:
+    if isinstance(screen, LobbyScreen):
+        return replace(
+            state,
+            core_state=replace(
+                state.core_state,
+                client_mode=ClientMode.LOBBY,
+                pending_action=PendingAction.LOBBY_COMMAND,
+            ),
+            navigation_state=replace(
+                state.navigation_state,
+                lobby_submenu=screen.kind,
+                selected_seat_index=screen.seat_index,
+            ),
+        )
+    pending_action = PendingAction.NONE
+    if screen.kind == "choose_card":
+        pending_action = PendingAction.CHOOSE_CARD
+    elif screen.kind == "choose_row":
+        pending_action = PendingAction.CHOOSE_ROW
+    client_mode = ClientMode.ENDED if screen.kind == "ended" else ClientMode.GAME
+    return replace(
+        state,
+        core_state=replace(
+            state.core_state,
+            client_mode=client_mode,
+            pending_action=pending_action,
+            player_state=screen.player_state,
+        ),
+    )
+
+
 def _screen_from_state(state: CliState) -> Screen:
     core = state.core_state
     nav = state.navigation_state

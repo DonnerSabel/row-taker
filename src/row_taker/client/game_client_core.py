@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import replace
 
-from row_taker.cli.state_models import CliState, initial_cli_state
+from row_taker.cli.state_models import CliState, initial_cli_state, with_core_updates, with_feedback_updates
 from row_taker.client.actions import UiAction
 from row_taker.client.core_reducer import apply_ui_action, reduce_server_message
 from row_taker.client.update import CoreUpdate
@@ -23,7 +22,7 @@ class GameClientCore:
         self._server_inbox.append(message)
         revision = get_game_message_revision(message)
         if revision is not None:
-            self.state = replace(self.state, received_game_revision=revision)
+            self.state = with_core_updates(self.state, received_game_revision=revision)
         return self._drain_server_inbox()
 
     def on_ui_action(self, action: UiAction) -> CoreUpdate:
@@ -43,7 +42,8 @@ class GameClientCore:
         )
 
     def on_transport_closed(self, message: str) -> CoreUpdate:
-        self.state = replace(self.state, session_error=message, exit_on_ack=False)
+        self.state = with_core_updates(self.state, session_error=message)
+        self.state = with_feedback_updates(self.state, exit_on_ack=False)
         return CoreUpdate(state=self.state)
 
     def has_pending_presentation(self) -> bool:
@@ -59,7 +59,7 @@ class GameClientCore:
             self.state = reduce_server_message(self.state, message)
             revision = get_game_message_revision(message)
             if revision is not None:
-                self.state = replace(self.state, applied_game_revision=revision)
+                self.state = with_core_updates(self.state, applied_game_revision=revision)
             applied.append(message)
         return CoreUpdate(state=self.state, applied_server_messages=tuple(applied))
 

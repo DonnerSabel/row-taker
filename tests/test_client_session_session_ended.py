@@ -85,11 +85,12 @@ def test_client_session_applies_game_messages_one_by_one_around_presentation_que
     player_state = build_player_state(game, game.players[0].player_id)
     public_state = player_state.public_state
 
-    from row_taker.cli.state_models import CliState
+    from row_taker.cli.state_models import CliState, with_screen
     from row_taker.client.core_state import ClientCoreState
 
     def _initial_state(_own_client_id=None) -> CliState:
-        return CliState(core_state=ClientCoreState(public_state=public_state))
+        state = CliState(core_state=ClientCoreState(public_state=public_state))
+        return with_screen(state, __import__("row_taker.cli.state_models", fromlist=["GameScreen"]).GameScreen(kind="waiting"))
 
     messages = [
         StateUpdated(state=public_state),

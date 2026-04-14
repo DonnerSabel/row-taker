@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from row_taker.cli.row_display import build_row_display_mapping
-from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, UiMessage, has_pending_presentation
+from row_taker.cli.state_models import (
+    CliState,
+    GameScreen,
+    LobbyScreen,
+    UiMessage,
+    has_pending_presentation,
+    with_feedback_updates,
+    with_screen,
+)
 from row_taker.client.actions import (
     UiActionAdvancePresentation,
     UiActionAssignSelfToSeat,
@@ -35,24 +43,27 @@ class CliFrontend:
 
 
 def set_flash(state: CliState, level: str, text: str) -> CliState:
-    return replace(state, flash_message=UiMessage(level=level, text=text))
+    return with_feedback_updates(state, flash_message=UiMessage(level=level, text=text))
 
 
 def clear_flash(state: CliState) -> CliState:
-    return replace(state, flash_message=None)
+    return with_feedback_updates(state, flash_message=None)
 
 
 def parse_text_to_action(state: CliState, text: str) -> FrontendInputResult:
     normalized = text.strip()
 
     if normalized == "X":
-        return FrontendInputResult(state=replace(state, should_exit=True, suppress_final_result=True), action=UiActionLeaveSession())
+        return FrontendInputResult(
+            state=with_feedback_updates(state, should_exit=True, suppress_final_result=True),
+            action=UiActionLeaveSession(),
+        )
 
     if state.session_error is not None:
         if not state.exit_on_ack:
-            return FrontendInputResult(state=replace(state, should_exit=True))
+            return FrontendInputResult(state=with_feedback_updates(state, should_exit=True))
         if normalized == "":
-            return FrontendInputResult(state=replace(state, should_exit=True))
+            return FrontendInputResult(state=with_feedback_updates(state, should_exit=True))
         return FrontendInputResult(state=state)
 
     if has_pending_presentation(state):
@@ -77,28 +88,34 @@ def parse_text_to_action(state: CliState, text: str) -> FrontendInputResult:
             return _parse_game_choose_row(state, normalized)
         case GameScreen(kind="ended"):
             if normalized == "":
-                return FrontendInputResult(state=replace(state, should_exit=True))
+                return FrontendInputResult(state=with_feedback_updates(state, should_exit=True))
             return FrontendInputResult(state=state)
     raise TypeError(f"unsupported screen: {state.screen!r}")
 
 
 def _parse_lobby_main(state: CliState, text: str) -> FrontendInputResult:
     if text == "n":
-        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="rename"), flash_message=None))
+        next_state = with_screen(state, LobbyScreen(kind="rename"))
+        next_state = with_feedback_updates(next_state, flash_message=None)
+        return FrontendInputResult(state=next_state)
     if text == "g":
         return FrontendInputResult(state=clear_flash(state), action=UiActionStartGame())
     if text.isdigit():
         seat_index = int(text)
         if state.lobby_view is None or not (0 <= seat_index < state.lobby_view.seat_count):
-            return FrontendInputResult(state=set_flash(replace(state, screen=LobbyScreen(kind="main")), "error", "Ungültiger Platz."))
-        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index), flash_message=None))
-    return FrontendInputResult(state=set_flash(replace(state, screen=LobbyScreen(kind="main")), "error", "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer."))
+            return FrontendInputResult(state=set_flash(with_screen(state, LobbyScreen(kind="main")), "error", "Ungültiger Platz."))
+        next_state = with_screen(state, LobbyScreen(kind="seat_edit", seat_index=seat_index))
+        next_state = with_feedback_updates(next_state, flash_message=None)
+        return FrontendInputResult(state=next_state)
+    return FrontendInputResult(state=set_flash(with_screen(state, LobbyScreen(kind="main")), "error", "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer."))
 
 
 def _parse_lobby_rename(state: CliState, text: str) -> FrontendInputResult:
     if text == "":
-        return FrontendInputResult(state=set_flash(replace(state, screen=LobbyScreen(kind="rename")), "error", "Der Anzeigename darf nicht leer sein."))
-    return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None), action=UiActionRename(text))
+        return FrontendInputResult(state=set_flash(with_screen(state, LobbyScreen(kind="rename")), "error", "Der Anzeigename darf nicht leer sein."))
+    next_state = with_screen(state, LobbyScreen(kind="main"))
+    next_state = with_feedback_updates(next_state, flash_message=None)
+    return FrontendInputResult(state=next_state, action=UiActionRename(text))
 
 
 def _parse_lobby_seat_edit(state: CliState, text: str, seat_index: int | None) -> FrontendInputResult:
@@ -107,21 +124,29 @@ def _parse_lobby_seat_edit(state: CliState, text: str, seat_index: int | None) -
     if text == "m":
         return FrontendInputResult(state=clear_flash(state), action=UiActionAssignSelfToSeat(seat_index))
     if text == "b":
-        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="bot_name", seat_index=seat_index), flash_message=None))
+        next_state = with_screen(state, LobbyScreen(kind="bot_name", seat_index=seat_index))
+        next_state = with_feedback_updates(next_state, flash_message=None)
+        return FrontendInputResult(state=next_state)
     if text == "c":
         return FrontendInputResult(state=clear_flash(state), action=UiActionClearSeat(seat_index))
     if text == "x":
-        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None))
-    return FrontendInputResult(state=set_flash(replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index)), "error", "Ungültige Eingabe. Erlaubt sind m, b, c oder x."))
+        next_state = with_screen(state, LobbyScreen(kind="main"))
+        next_state = with_feedback_updates(next_state, flash_message=None)
+        return FrontendInputResult(state=next_state)
+    return FrontendInputResult(state=set_flash(with_screen(state, LobbyScreen(kind="seat_edit", seat_index=seat_index)), "error", "Ungültige Eingabe. Erlaubt sind m, b, c oder x."))
 
 
 def _parse_lobby_bot_name(state: CliState, text: str, seat_index: int | None) -> FrontendInputResult:
     if seat_index is None:
         raise TypeError("bot_name screen requires seat_index")
     if text == "x":
-        return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="seat_edit", seat_index=seat_index), flash_message=None))
+        next_state = with_screen(state, LobbyScreen(kind="seat_edit", seat_index=seat_index))
+        next_state = with_feedback_updates(next_state, flash_message=None)
+        return FrontendInputResult(state=next_state)
     display_name = text or f"Bot_{seat_index}"
-    return FrontendInputResult(state=replace(state, screen=LobbyScreen(kind="main"), flash_message=None), action=UiActionCreateBot(seat_index, display_name))
+    next_state = with_screen(state, LobbyScreen(kind="main"))
+    next_state = with_feedback_updates(next_state, flash_message=None)
+    return FrontendInputResult(state=next_state, action=UiActionCreateBot(seat_index, display_name))
 
 
 def _parse_game_choose_card(state: CliState, text: str) -> FrontendInputResult:
