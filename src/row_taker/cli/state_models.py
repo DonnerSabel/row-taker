@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from row_taker.cli.local_resolution import LocalResolutionState
@@ -29,11 +29,17 @@ class GameScreen:
 
 
 Screen = LobbyScreen | GameScreen
+LobbySubmenu = Literal["main", "rename", "seat_edit", "bot_name"]
 
 
 @dataclass(frozen=True, slots=True)
-class CliFrontendState:
-    screen: Screen = field(default_factory=lambda: LobbyScreen(kind="main"))
+class CliNavigationState:
+    lobby_submenu: LobbySubmenu = "main"
+    selected_seat_index: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CliFeedbackState:
     flash_message: UiMessage | None = None
     exit_on_ack: bool = False
     suppress_final_result: bool = False
@@ -43,13 +49,15 @@ class CliFrontendState:
 @dataclass(frozen=True, slots=True, init=False)
 class CliState:
     core_state: ClientCoreState
-    frontend_state: CliFrontendState
+    navigation_state: CliNavigationState
+    feedback_state: CliFeedbackState
 
     def __init__(
         self,
         *,
         core_state: ClientCoreState | None = None,
-        frontend_state: CliFrontendState | None = None,
+        navigation_state: CliNavigationState | None = None,
+        feedback_state: CliFeedbackState | None = None,
         own_client_id: str | None = None,
         own_player_id: str | None = None,
         lobby_view: LobbyView | None = None,
@@ -87,16 +95,18 @@ class CliState:
                 client_mode=client_mode,
                 pending_action=pending_action,
             )
-        if frontend_state is None:
-            frontend_state = CliFrontendState(
-                screen=LobbyScreen(kind="main") if screen is None else screen,
+        if navigation_state is None:
+            navigation_state = _navigation_from_screen(screen)
+        if feedback_state is None:
+            feedback_state = CliFeedbackState(
                 flash_message=flash_message,
                 exit_on_ack=exit_on_ack,
                 suppress_final_result=suppress_final_result,
                 should_exit=should_exit,
             )
         object.__setattr__(self, "core_state", core_state)
-        object.__setattr__(self, "frontend_state", frontend_state)
+        object.__setattr__(self, "navigation_state", navigation_state)
+        object.__setattr__(self, "feedback_state", feedback_state)
 
     @property
     def own_client_id(self) -> str | None:
@@ -120,11 +130,11 @@ class CliState:
 
     @property
     def screen(self) -> Screen:
-        return self.frontend_state.screen
+        return _screen_from_state(self)
 
     @property
     def flash_message(self) -> UiMessage | None:
-        return self.frontend_state.flash_message
+        return self.feedback_state.flash_message
 
     @property
     def revealed_trick(self) -> CardsRevealed | None:
@@ -156,15 +166,15 @@ class CliState:
 
     @property
     def exit_on_ack(self) -> bool:
-        return self.frontend_state.exit_on_ack
+        return self.feedback_state.exit_on_ack
 
     @property
     def suppress_final_result(self) -> bool:
-        return self.frontend_state.suppress_final_result
+        return self.feedback_state.suppress_final_result
 
     @property
     def should_exit(self) -> bool:
-        return self.frontend_state.should_exit
+        return self.feedback_state.should_exit
 
     @property
     def client_mode(self) -> ClientMode:
@@ -185,8 +195,11 @@ GameStateEnded = GameScreen
 
 
 def initial_cli_state(own_client_id: str | None = None) -> CliState:
-    core = initial_client_core_state(own_client_id=own_client_id)
-    return CliState(core_state=core, frontend_state=CliFrontendState())
+    return CliState(
+        core_state=initial_client_core_state(own_client_id=own_client_id),
+        navigation_state=CliNavigationState(),
+        feedback_state=CliFeedbackState(),
+    )
 
 
 
@@ -210,5 +223,34 @@ def apply_client_core_state(state: CliState, core: ClientCoreState) -> CliState:
 
 
 
-def apply_frontend_state(state: CliState, frontend: CliFrontendState) -> CliState:
-    return replace(state, frontend_state=frontend)
+def apply_navigation_state(state: CliState, navigation: CliNavigationState) -> CliState:
+    return replace(state, navigation_state=navigation)
+
+
+
+def apply_feedback_state(state: CliState, feedback: CliFeedbackState) -> CliState:
+    return replace(state, feedback_state=feedback)
+
+
+
+def _navigation_from_screen(screen: Screen | None) -> CliNavigationState:
+    if screen is None:
+        return CliNavigationState()
+    if isinstance(screen, LobbyScreen):
+        return CliNavigationState(lobby_submenu=screen.kind, selected_seat_index=screen.seat_index)
+    return CliNavigationState()
+
+
+
+def _screen_from_state(state: CliState) -> Screen:
+    core = state.core_state
+    nav = state.navigation_state
+    if core.client_mode == ClientMode.LOBBY:
+        return LobbyScreen(kind=nav.lobby_submenu, seat_index=nav.selected_seat_index)
+    if core.client_mode == ClientMode.ENDED:
+        return GameScreen(kind="ended", player_state=core.player_state)
+    if core.pending_action == PendingAction.CHOOSE_CARD:
+        return GameScreen(kind="choose_card", player_state=core.player_state)
+    if core.pending_action == PendingAction.CHOOSE_ROW:
+        return GameScreen(kind="choose_row", player_state=core.player_state)
+    return GameScreen(kind="waiting", player_state=core.player_state)
