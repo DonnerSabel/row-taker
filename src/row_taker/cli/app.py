@@ -9,17 +9,18 @@ from row_taker.cli.frontend import CliFrontend, mark_server_error, mark_session_
 from row_taker.cli.render import build_view
 from row_taker.cli.state_models import CliState, apply_client_core_state, initial_cli_state
 from row_taker.client.actions import UiActionAdvancePresentation
-from row_taker.client.game_client_core import CoreUpdate, GameClientCore
+from row_taker.client.game_client_core import GameClientCore
+from row_taker.client.update import CoreUpdate
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.errors import ConnectionClosed
-from row_taker.protocol.messages import ServerError, ServerToClientMessage, SessionEnded
+from row_taker.protocol.messages import ServerToClientMessage
 from row_taker.protocol.transport import ClientTransport
 
-logger = logging.getLogger("row_taker.cli.runtime")
+logger = logging.getLogger("row_taker.cli.app")
 
 
-class CliRuntime:
-    """CLI host around the GUI-neutral GameClientCore."""
+class CliApp:
+    """Thin CLI host around the canonical GameClientCore."""
 
     def __init__(
         self,
@@ -207,6 +208,7 @@ class CliRuntime:
         return self.frontend.sync_to_core(state)
 
     def _apply_cli_side_effects(self, state: CliState, message: ServerToClientMessage) -> CliState:
+        from row_taker.protocol.messages import ServerError, SessionEnded
         match message:
             case SessionEnded():
                 return mark_session_ended(state)

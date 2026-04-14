@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from row_taker.cli.app import CliApp
 from row_taker.cli.console import CliConsole
-from row_taker.cli.runtime import CliRuntime
 from row_taker.cli.state_models import initial_cli_state
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.transport import ClientTransport
@@ -17,7 +17,7 @@ class ClientSession:
         console_factory: type[CliConsole] = CliConsole,
         initial_state_factory=initial_cli_state,
     ) -> None:
-        self.runtime = CliRuntime(
+        self.app = CliApp(
             transport=transport,
             own_client_id=own_client_id,
             interactive=interactive,
@@ -27,14 +27,14 @@ class ClientSession:
 
     @property
     def transport(self) -> ClientTransport:
-        return self.runtime.transport
+        return self.app.transport
 
     @property
     def own_client_id(self) -> str | None:
-        return self.runtime.own_client_id
+        return self.app.own_client_id
 
     async def run_async(self) -> PublicState | None:
-        return await self.runtime.run_async()
+        return await self.app.run_async()
 
 
 def print_final_result(public_state: PublicState | None) -> None:
