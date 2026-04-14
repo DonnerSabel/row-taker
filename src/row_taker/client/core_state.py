@@ -5,7 +5,7 @@ from enum import StrEnum
 
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.client.trick_presentation_resolver import TrickPresentationState
-from row_taker.engine.game.state import PublicState
+from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.protocol.messages import CardsRevealed, LobbyView
 
 
@@ -28,13 +28,14 @@ class ClientCoreState:
     own_player_id: str | None = None
     lobby_view: LobbyView | None = None
     public_state: PublicState | None = None
+    player_state: PlayerState | None = None
+    session_error: str | None = None
     revealed_trick: CardsRevealed | None = None
     trick_presentation_state: TrickPresentationState | None = None
     presentation_events: tuple[PresentationEvent, ...] = ()
     pending_presentation_events: tuple[PresentationEvent, ...] = ()
     received_game_revision: int | None = None
     applied_game_revision: int | None = None
-    session_error: str | None = None
     client_mode: ClientMode = ClientMode.LOBBY
     pending_action: PendingAction = PendingAction.LOBBY_COMMAND
 
