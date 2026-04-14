@@ -8,10 +8,10 @@ Ziel ist eine vollständige, lauffähige Implementierung der **Mechanik** mit kl
 
 - **Engine** – fachliche Zustände und Regeln
 - **Hub** – Message-Orchestrierung eines laufenden Spiels
-- **Clients** – CLI, Bots und später weitere Frontends
+- **Clients** – CLI, Bots und weitere Frontends
 
-Die aktuelle Referenzoberfläche ist die **CLI**. Netzwerktransport ist architektonisch vorbereitet,
-aber noch nicht das aktuelle Arbeitsthema.
+Die aktuelle Referenzoberfläche ist die **CLI**. Das Netzwerkspiel ist inzwischen aktiver Projektbestandteil:
+Server, CLI-Clients und Bots laufen als getrennte Prozesse und verwenden dasselbe minimale Spielprotokoll.
 
 ## Quickstart
 
@@ -55,11 +55,11 @@ In VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → den Interprete
 
 ## Projektprinzipien
 
-- **Engine ist fachlich zentral**: `GameState`, `PublicState`, `PlayerState` und `DeltaPublicState` leben in der Engine.
+- **Engine ist fachlich zentral**: `GameState`, `PublicState` und `PlayerState` leben in der Engine; die Trickauflösung läuft lokal als Resolver / Stepper.
 - **Hub ist bewusst schlank**: Der Hub orchestriert Messages und hält keinen zweiten Regelkern.
-- **Clients tragen keine Spiellogik**: CLI und Bots verwenden Engine-Funktionen statt eigener Regelrekonstruktion.
-- **Darstellung bleibt außerhalb der Engine**: Sortierte Reihenanzeige, Texte, Farben oder GUI-Hit-Tests sind Client-Themen.
-- **Tests sichern Regeln und Zuschnitt**: Kernlogik und Message-Fluss sind unit-getestet.
+- **Clients tragen keine eigene Spiellogik**: CLI und Bots verwenden Engine- und Presentation-Strukturen statt lokaler Sonderregeln.
+- **Darstellung bleibt außerhalb der Engine**: Sortierte Reihenanzeige, Texte, Farben, GUI-Hit-Tests und Animationen sind Client-Themen.
+- **Tests sichern Regeln und Zuschnitt**: Kernlogik, Nachrichtenfluss und Shutdown-Verhalten sind unit-getestet.
 
 ## Repo-Struktur
 
@@ -72,13 +72,37 @@ In VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → den Interprete
 
 ## Zentrale Datenstrukturen
 
-- `GameState` – autoritativer interner Spielzustand des Hubs
-- `PublicState` – öffentlicher Zustand, den der Hub an alle Clients verteilen darf
+- `GameState` – vollständiger fachlicher Spielzustand in der Engine
+- `PublicState` – öffentlicher Zustand des Spiels
 - `PlayerState` – spielerspezifischer Sichtzustand für genau einen Client
-- `DeltaPublicState` – ein einzelner öffentlicher Zustandsübergang während der Trickauflösung
+- `PresentationEvent` – clientseitige Darstellungsereignisse als GUI-neutrale Andockfläche
 
-Ein Trick ergibt damit eine Folge von `DeltaPublicState`-Objekten. Clients können denselben Übergang mit der Engine nachvollziehen.
+Die Trickauflösung wird lokal aus den Synchronisationspunkten des Protokolls rekonstruiert. Clients arbeiten dafür mit Resolver-/Stepper-Schritten und leiten daraus `PresentationEvent`-Folgen ab.
 
 ## Lizenz
 
 MIT – siehe `LICENSE`.
+
+## Logging und Debugging
+
+Server, CLI-Clients und Bots unterstützen Logging über Python `logging`.
+
+Beispiele:
+
+```bash
+python -m row_taker.server --log-level DEBUG --log-file logs/server.log
+python -m row_taker.cli --log-level DEBUG --log-file logs/cli-client1.log
+python -m row_taker.cli --log-level DEBUG --log-file logs/cli-client2.log
+```
+
+Wenn der Server mit `--log-file` läuft, erhalten lokal gestartete Bots automatisch abgeleitete Logdateien, zum Beispiel:
+
+- `logs/server.log`
+- `logs/server-bot-1.log`
+
+Typische zusammengehörige Dateien bei einer Fehlersuche sind:
+
+- `server.log`
+- `cli-client1.log`
+- `cli-client2.log`
+- `server-bot-1.log`

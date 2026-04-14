@@ -193,6 +193,7 @@ def run_network_server(
             if network_server.should_shutdown():
                 logger.info("session ended and no participants connected anymore; server shutting down")
                 break
+        logger.info("network server main loop finished")
             try:
                 conn, addr = listener.accept()
             except TimeoutError:

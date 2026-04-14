@@ -603,3 +603,50 @@ for event in presentation_events:
         case PresentationRowChoiceRequired(player_id=player_id):
             overlays.show_row_choice(player_id)
 ```
+
+### Session end and shutdown
+
+A session-ending event is represented explicitly by `SessionEnded`.
+
+Consequences:
+- when one participant ends the session, the server informs all remaining clients
+- all remaining clients terminate their local session flow on `SessionEnded`
+- this includes local bot processes as well as human clients
+- the server then shuts down automatically once the session has ended and no
+  connected participants or running bot processes remain
+
+This is intentionally modelled as a session-ended policy, not as a special rule
+based on the presence or absence of human participants.
+
+## 9. Presentation layer on the client
+
+Clients use a GUI-neutral presentation layer as the direct bridge between local
+rule reconstruction and visible rendering.
+
+Consequences:
+- local resolver / stepper output is translated into `PresentationEvent` objects
+- CLI and GUI both consume this layer
+- this layer must not contain GUI-specific objects
+- cards are referenced by their fachliche identity, typically `card_value`
+- a GUI owns and manages its own visual card objects
+
+A short formulation is:
+
+**Engine produces semantics. Presentation describes visible meaning. GUI owns visuals.**
+
+## 10. Logging and diagnostics
+
+The project uses structured Python logging instead of temporary ad-hoc `print`
+debugging.
+
+Consequences:
+- server, CLI clients, and bot processes should all be loggable independently
+- log verbosity is controlled via log levels such as `INFO` and `DEBUG`
+- file logging is a first-class debugging workflow, especially for multi-process
+  runs
+- local bot processes inherit the server log level and derive their own log file
+  path from the server log path when one is configured
+
+This logging infrastructure is not just convenience. It is part of the intended
+diagnostics design for later debugging, including future richer debug messages or
+snapshots.

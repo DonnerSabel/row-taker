@@ -122,6 +122,9 @@ Jeder Client muss sauber trennen zwischen:
 3. **darstellen / animieren**
 
 Diese Trennung ist zentral für robuste GUI-Arbeit.
+Sie ist inzwischen nicht mehr nur Zielbild, sondern bereits im aktuellen Clientzuschnitt angelegt:
+Nachrichten werden geordnet empfangen, kontrolliert angewendet und anschließend über eine clientseitige
+Presentation-Schicht sichtbar gemacht.
 
 ---
 
@@ -189,3 +192,44 @@ Bei späteren Umbauten sollte immer zuerst gefragt werden:
 
 Wenn hier ein Nein auftaucht, läuft die Architektur sehr wahrscheinlich in die falsche
 Richtung.
+
+## Presentation-Schicht
+
+Clients leiten aus lokalen Resolver-/Stepper-Schritten eine GUI-neutrale Folge
+von `PresentationEvent`-Objekten ab.
+
+Diese Schicht ist die Andockfläche für CLI und GUI.
+
+Wichtig:
+
+- sie enthält keine GUI-Objekte
+- `card_value` bleibt die fachliche Karten-ID
+- eine GUI verwaltet ihre eigenen Objekte selbst, typischerweise über ein Mapping
+  wie `card_value -> GuiCard`
+- die CLI rendert dieselbe Schicht nur in Textform
+
+## SessionEnded und Server-Shutdown
+
+Wenn ein Teilnehmer die Sitzung beendet, verschickt der Server eine
+`SessionEnded`-Nachricht an alle übrigen Clients.
+
+Folgen:
+
+- alle übrigen Clients beenden sich daraufhin lokal
+- dazu gehören ausdrücklich auch Bots
+- der Server markiert die Sitzung als beendet
+- nachdem danach keine Teilnehmerverbindungen und keine laufenden Bot-Prozesse
+  mehr übrig sind, fährt der Server automatisch herunter
+
+Die Shutdown-Policy hängt damit am fachlichen Zustand **SessionEnded** und nicht
+an einer Sonderregel wie „keine Humans mehr da“.
+
+## Logging
+
+Server, CLI und Bot-Prozesse verwenden Python-Logging mit konfigurierbarem
+Log-Level und optionalen Logdateien.
+
+Der Server akzeptiert `--log-level` und `--log-file`.
+CLI-Clients akzeptieren ebenfalls `--log-level` und `--log-file`.
+Lokal gestartete Bots übernehmen den Log-Level des Servers und erhalten bei
+gesetztem Server-Logpfad automatisch eine abgeleitete Bot-Logdatei.
