@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pygame
+
 from row_taker.client.presentation_events import (
     PresentationCardsRevealed,
     PresentationEvent,
@@ -11,32 +13,101 @@ from row_taker.client.presentation_events import (
 )
 from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
+from row_taker.gui_demo.connect_screen import ConnectFormState, ConnectScreenTargets
 from row_taker.gui_demo.interactions import InteractionMap
 from row_taker.gui_demo.layout import DemoLayout
 from row_taker.gui_demo.primitives import (
     ACCENT,
+    PANEL_BORDER,
+    PANEL_FILL,
     TEXT_MUTED,
     WINDOW_BACKGROUND,
     PrimitiveDrawer,
 )
 
 
-def render_app(
+def render_connect_screen(
+    screen: pygame.Surface,
+    *,
+    drawer: PrimitiveDrawer,
+    layout: DemoLayout,
+    connect_form: ConnectFormState,
+    connect_targets: ConnectScreenTargets,
+) -> None:
+    screen.fill(WINDOW_BACKGROUND)
+
+    header_content = drawer.draw_panel(screen, layout.header_rect)
+    drawer.draw_text(screen, "Row-Taker GUI Demo", (header_content.left, header_content.top), role="title")
+    drawer.draw_text(
+        screen,
+        "Einfach verbinden und dann direkt spielen.",
+        (header_content.left, header_content.top + 34),
+        role="small",
+        color=TEXT_MUTED,
+    )
+
+    pygame.draw.rect(screen, PANEL_FILL, connect_targets.panel_rect)
+    pygame.draw.rect(screen, PANEL_BORDER, connect_targets.panel_rect, width=1)
+
+    title_pos = (connect_targets.panel_rect.left + 24, connect_targets.panel_rect.top + 18)
+    drawer.draw_text(screen, "Connect", title_pos, role="title")
+
+    for target in connect_targets.field_targets:
+        active = connect_form.active_field == target.field_name
+        value = getattr(connect_form, target.field_name)
+        label_pos = (target.rect.left, target.rect.top - 18)
+        drawer.draw_text(screen, target.label, label_pos, role="small", color=TEXT_MUTED)
+        drawer.draw_badge(screen, target.rect, text=value or " ", active=active)
+
+    for target in connect_targets.button_targets:
+        drawer.draw_badge(screen, target.rect, text=target.label, active=(target.button_id == "connect"))
+
+    status_rect = pygame.Rect(
+        connect_targets.panel_rect.left + 24,
+        connect_targets.panel_rect.bottom - 114,
+        connect_targets.panel_rect.width - 48,
+        20,
+    )
+    drawer.draw_text(screen, connect_form.status_message, (status_rect.left, status_rect.top), role="small", color=TEXT_MUTED)
+
+    if connect_form.error_message is not None:
+        error_rect = pygame.Rect(
+            connect_targets.panel_rect.left + 24,
+            connect_targets.panel_rect.bottom - 88,
+            connect_targets.panel_rect.width - 48,
+            44,
+        )
+        drawer.draw_wrapped_lines(screen, [connect_form.error_message], error_rect, role="small", color=ACCENT)
+
+    footer_content = drawer.draw_panel(screen, layout.footer_rect)
+    drawer.draw_wrapped_lines(
+        screen,
+        [
+            "Tab nächstes Feld",
+            "Enter connect",
+            "ESC quit",
+        ],
+        footer_content,
+        role="small",
+        color=TEXT_MUTED,
+    )
+
+
+def render_session(
     screen,
     *,
     drawer: PrimitiveDrawer,
     layout: DemoLayout,
     client_state: ClientState,
     frame_count: int,
-    active_demo_scene: str | None,
     interaction_map: InteractionMap,
     last_action_summary: str,
 ) -> None:
     screen.fill(WINDOW_BACKGROUND)
-    _render_header(screen, drawer, layout, client_state, active_demo_scene)
+    _render_header(screen, drawer, layout, client_state)
     _render_main_area(screen, drawer, layout, client_state, interaction_map)
     _render_sidebar(screen, drawer, layout, client_state, frame_count, last_action_summary, interaction_map)
-    _render_footer(screen, drawer, layout, active_demo_scene)
+    _render_footer(screen, drawer, layout)
 
 
 def _render_header(
@@ -44,12 +115,11 @@ def _render_header(
     drawer: PrimitiveDrawer,
     layout: DemoLayout,
     client_state: ClientState,
-    active_demo_scene: str | None,
 ) -> None:
     content_rect = drawer.draw_panel(screen, layout.header_rect)
     drawer.draw_text(screen, "Row-Taker GUI Demo", (content_rect.left, content_rect.top), role="title")
     subtitle = (
-        "Patch 3: clicks now map to ClientAction objects and local GUI state. "
+        "Einfaches pygame-Frontend auf dem gemeinsamen ClientState. "
         f"Mode={client_state.client_mode.value}, pending_action={client_state.pending_action.value}"
     )
     drawer.draw_text(
@@ -59,14 +129,6 @@ def _render_header(
         role="small",
         color=TEXT_MUTED,
     )
-
-    if active_demo_scene is not None:
-        badge_rect = layout.header_rect.copy()
-        badge_rect.width = 160
-        badge_rect.height = 30
-        badge_rect.top = content_rect.top
-        badge_rect.right = layout.header_rect.right - 12
-        drawer.draw_badge(screen, badge_rect, text=f"demo:{active_demo_scene}", active=True)
 
 
 def _render_main_area(
@@ -84,14 +146,7 @@ def _render_main_area(
         return
 
     content_rect = drawer.draw_panel(screen, layout.main_rect, title="Current view")
-    drawer.draw_wrapped_lines(
-        screen,
-        [
-            "No lobby or game data is available yet.",
-            "This should only happen outside the built-in demo scenes.",
-        ],
-        content_rect,
-    )
+    drawer.draw_wrapped_lines(screen, ["Noch keine Lobby- oder Spielansicht verfügbar."], content_rect)
 
 
 def _render_lobby_panels(
@@ -178,14 +233,11 @@ def _render_rows_and_players(
     info_bottom = drawer.draw_wrapped_lines(screen, info_lines, info_rect, role="small", color=TEXT_MUTED)
 
     y = info_bottom + 10
-
     row_target_by_id = {target.row_id: target for target in interaction_map.row_targets}
     row_area_height = 132
     row_width = max(120, (rect.width - 18) // max(1, len(public_state.rows)))
+
     for index, row in enumerate(public_state.rows):
-        row_rect = row_target_by_id.get(row.row_id, None)
-        if row_rect is None:
-            row_rect = type("RectHolder", (), {"rect": None})()
         target_rect = row_target_by_id[row.row_id].rect if row.row_id in row_target_by_id else None
         fallback_rect = rect.copy()
         fallback_rect.left = rect.left + index * row_width
@@ -226,7 +278,7 @@ def _render_hand(
     info_lines = [
         f"player: {player_state.self_player_name()}",
         f"pending_action: {client_state.pending_action.value}",
-        "click a card to produce ClientActionChooseCard",
+        "click a card to send the choice",
     ]
     if player_state.phase_info.phase == Phase.CHOOSE_ROW and player_state.pending_card_value() is not None:
         info_lines.append(f"pending_card: {player_state.pending_card_value()}")
@@ -352,13 +404,16 @@ def _format_presentation_event(event: PresentationEvent) -> str:
     return event.__class__.__name__
 
 
-def _render_footer(screen, drawer: PrimitiveDrawer, layout: DemoLayout, active_demo_scene: str | None) -> None:
+def _render_footer(screen, drawer: PrimitiveDrawer, layout: DemoLayout) -> None:
     content_rect = drawer.draw_panel(screen, layout.footer_rect)
-    footer_lines = [
-        "ESC quit",
-        "1 lobby   2 choose-card   3 choose-row   4 presentation",
-        "Patch 3 goal: clickable surfaces produce ClientAction objects.",
-    ]
-    if active_demo_scene is None:
-        footer_lines[1] = "Scene hotkeys disabled because the app is running with an external ClientState."
-    drawer.draw_wrapped_lines(screen, footer_lines, content_rect, role="small", color=TEXT_MUTED)
+    drawer.draw_wrapped_lines(
+        screen,
+        [
+            "ESC quit",
+            "Space continue presentation",
+            "Mouse for seats, buttons, cards and rows",
+        ],
+        content_rect,
+        role="small",
+        color=TEXT_MUTED,
+    )

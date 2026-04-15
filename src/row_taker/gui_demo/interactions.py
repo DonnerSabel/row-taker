@@ -6,7 +6,6 @@ import pygame
 
 from row_taker.client.state import ClientState
 from row_taker.gui_demo.layout import DemoLayout
-from row_taker.protocol.messages import LobbySeatView
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +47,7 @@ class InteractionMap:
     continue_target: ContinueTarget | None = None
 
 
-def build_interaction_map(layout: DemoLayout, state: ClientState) -> InteractionMap:
+def build_session_interaction_map(layout: DemoLayout, state: ClientState) -> InteractionMap:
     if state.client_mode.value == "lobby":
         return InteractionMap(
             seat_targets=_build_lobby_seat_targets(layout, state),
@@ -73,10 +72,10 @@ def _build_lobby_seat_targets(layout: DemoLayout, state: ClientState) -> tuple[S
     seat_height = 38
     seat_gap = 10
 
-    for index, seat in enumerate(lobby_view.seats):
+    for seat in lobby_view.seats:
         seat_rect = pygame.Rect(
             top_rect.left,
-            seat_top + index * (seat_height + seat_gap),
+            seat_top + seat.seat_index * (seat_height + seat_gap),
             max(200, top_rect.width - 220),
             seat_height,
         )
@@ -128,7 +127,7 @@ def _build_card_targets(layout: DemoLayout, state: ClientState) -> tuple[CardTar
     info_lines = [
         f"player: {player_state.self_player_name()}",
         f"pending_action: {state.pending_action.value}",
-        "click a card to produce ClientActionChooseCard",
+        "click a card to send the choice",
     ]
     if player_state.phase_info.phase.value == "choose_row" and player_state.pending_card_value() is not None:
         info_lines.append(f"pending_card: {player_state.pending_card_value()}")
