@@ -137,3 +137,15 @@ def test_lobby_state_is_metadata_free() -> None:
         game_started=False,
     )
     assert not hasattr(lobby_state, "clients")
+
+
+
+def test_lobby_view_roundtrip_preserves_participant_kind_types() -> None:
+    decoded = server_message_from_dict(server_message_to_dict(LobbyStateUpdated(lobby=_lobby_view())))
+
+    assert isinstance(decoded, LobbyStateUpdated)
+    assert decoded.lobby.participants[0].participant_kind is ParticipantKind.HUMAN
+    assert decoded.lobby.participants[1].participant_kind is ParticipantKind.BOT
+    assert decoded.lobby.seats[0].occupant_kind is ParticipantKind.HUMAN
+    assert decoded.lobby.seats[1].occupant_kind is None
+    assert decoded.lobby.seats[2].occupant_kind is ParticipantKind.BOT
