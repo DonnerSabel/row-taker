@@ -5,7 +5,7 @@ from row_taker.engine.game.state import GameState, PlayerState, PublicState
 
 
 def build_public_state(game_state: GameState) -> PublicState:
-    public_players = [
+    public_players = tuple(
         PublicPlayerInfo(
             player_id=player.player_id,
             name=player.name,
@@ -13,9 +13,9 @@ def build_public_state(game_state: GameState) -> PublicState:
             hand_count=len(player.hand),
         )
         for player in game_state.players
-    ]
+    )
 
-    visible_rows = [Row(row_id=row.row_id, cards=list(row.cards)) for row in game_state.rows]
+    visible_rows = tuple(Row(row_id=row.row_id, cards=tuple(row.cards)) for row in game_state.rows)
 
     return PublicState(
         config=game_state.config,
@@ -33,5 +33,5 @@ def build_player_state(game_state: GameState, self_player_id: PlayerID) -> Playe
     return PlayerState(
         public_state=build_public_state(game_state),
         self_player_id=self_player_id,
-        hand=list(self_player.hand),
+        hand=tuple(self_player.hand),
     )

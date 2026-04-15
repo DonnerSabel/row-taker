@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from .cards import Card
-from .models import Player, PlayerID, PublicPlayerInfo, Row, RowID
+from .models import EngineRow, Player, PlayerID, PublicPlayerInfo, Row, RowID
 from .phases import Phase, PhaseInfo, StepAction
 
 
@@ -15,7 +15,7 @@ def get_player_index(players: Sequence[Player | PublicPlayerInfo], player_id: Pl
     raise ValueError(f"unknown player_id: {player_id!r}")
 
 
-def get_row_index(rows: Sequence[Row], row_id: RowID) -> int:
+def get_row_index(rows: Sequence[EngineRow | Row], row_id: RowID) -> int:
     for index, row in enumerate(rows):
         if row.row_id == row_id:
             return index
@@ -76,7 +76,7 @@ class TrickResolutionSummary:
 class GameState:
     config: RulesConfig
     players: list[Player]
-    rows: list[Row]
+    rows: list[EngineRow]
     deck: list[Card]
 
     round_no: int = 1
@@ -118,11 +118,15 @@ class GameState:
 @dataclass(frozen=True, slots=True)
 class PublicState:
     config: RulesConfig
-    players: list[PublicPlayerInfo]
-    rows: list[Row]
+    players: tuple[PublicPlayerInfo, ...]
+    rows: tuple[Row, ...]
     round_no: int
     trick_no: int
     phase_info: PhaseInfo
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "players", tuple(self.players))
+        object.__setattr__(self, "rows", tuple(self.rows))
 
     def validate_row_id(self, row_id: RowID) -> None:
         get_row_index(self.rows, row_id)
@@ -135,7 +139,10 @@ class PublicState:
 class PlayerState:
     public_state: PublicState
     self_player_id: PlayerID
-    hand: list[Card]
+    hand: tuple[Card, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "hand", tuple(self.hand))
 
     def validate_phase(self, expected_phase: Phase) -> None:
         if self.phase_info.phase != expected_phase:
@@ -190,11 +197,11 @@ class PlayerState:
         return self.public_state.config
 
     @property
-    def players(self) -> list[PublicPlayerInfo]:
+    def players(self) -> tuple[PublicPlayerInfo, ...]:
         return self.public_state.players
 
     @property
-    def rows(self) -> list[Row]:
+    def rows(self) -> tuple[Row, ...]:
         return self.public_state.rows
 
     @property

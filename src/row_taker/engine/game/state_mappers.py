@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import PlayerID, PublicPlayerInfo, Row, RowID
+from row_taker.engine.game.models import EngineRow, Player, PlayerID, PublicPlayerInfo, Row, RowID
 from row_taker.engine.game.phases import Phase, PhaseInfo, StepAction
-from row_taker.engine.game.models import Player
 from row_taker.engine.game.state import (
     GameState,
     PlayerState,
@@ -70,6 +69,20 @@ def row_to_dict(row: Row) -> dict[str, object]:
 def row_from_dict(data: dict[str, object]) -> Row:
     return Row(
         row_id=RowID(str(data["row_id"])),
+        cards=tuple(card_from_dict(card) for card in data["cards"]),
+    )
+
+
+def engine_row_to_dict(row: EngineRow) -> dict[str, object]:
+    return {
+        "row_id": str(row.row_id),
+        "cards": [card_to_dict(card) for card in row.cards],
+    }
+
+
+def engine_row_from_dict(data: dict[str, object]) -> EngineRow:
+    return EngineRow(
+        row_id=RowID(str(data["row_id"])),
         cards=[card_from_dict(card) for card in data["cards"]],
     )
 
@@ -108,8 +121,8 @@ def public_state_to_dict(state: PublicState) -> dict[str, object]:
 def public_state_from_dict(data: dict[str, object]) -> PublicState:
     return PublicState(
         config=rules_config_from_dict(data["config"]),
-        players=[public_player_info_from_dict(player) for player in data["players"]],
-        rows=[row_from_dict(row) for row in data["rows"]],
+        players=tuple(public_player_info_from_dict(player) for player in data["players"]),
+        rows=tuple(row_from_dict(row) for row in data["rows"]),
         round_no=int(data["round_no"]),
         trick_no=int(data["trick_no"]),
         phase_info=phase_info_from_dict(data["phase_info"]),
@@ -128,7 +141,7 @@ def player_state_from_dict(data: dict[str, object]) -> PlayerState:
     return PlayerState(
         public_state=public_state_from_dict(data["public_state"]),
         self_player_id=PlayerID(str(data["self_player_id"])),
-        hand=[card_from_dict(card) for card in data["hand"]],
+        hand=tuple(card_from_dict(card) for card in data["hand"]),
     )
 
 
@@ -154,7 +167,6 @@ def trick_resolution_step_from_dict(data: dict[str, object]) -> TrickResolutionS
         points_gained=int(data["points_gained"]),
         new_row_cards=tuple(card_from_dict(card) for card in data["new_row_cards"]),
     )
-
 
 
 def player_to_dict(player: Player) -> dict[str, object]:
@@ -223,7 +235,7 @@ def game_state_to_dict(state: GameState) -> dict[str, object]:
     return {
         "config": rules_config_to_dict(state.config),
         "players": [player_to_dict(player) for player in state.players],
-        "rows": [row_to_dict(row) for row in state.rows],
+        "rows": [engine_row_to_dict(row) for row in state.rows],
         "deck": [card_to_dict(card) for card in state.deck],
         "round_no": state.round_no,
         "trick_no": state.trick_no,
@@ -241,7 +253,7 @@ def game_state_from_dict(data: dict[str, object]) -> GameState:
     state = GameState(
         config=rules_config_from_dict(data["config"]),
         players=[player_from_dict(player) for player in data["players"]],
-        rows=[row_from_dict(row) for row in data["rows"]],
+        rows=[engine_row_from_dict(row) for row in data["rows"]],
         deck=[card_from_dict(card) for card in data["deck"]],
         round_no=int(data["round_no"]),
         trick_no=int(data["trick_no"]),

@@ -8,7 +8,7 @@ from row_taker.engine.game import (
     submit_play_card,
 )
 from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import Player, PlayerID, Row, RowID
+from row_taker.engine.game.models import EngineRow, Player, PlayerID, RowID
 from row_taker.engine.game.phases import Phase, PhaseInfo, StepAction
 from row_taker.engine.game.public_state_ops import apply_resolution_step
 from row_taker.engine.game.state import GameState, RulesConfig
@@ -32,7 +32,7 @@ def _make_state(*, p0_hand: list[int], p1_hand: list[int], rows: list[list[int]]
             ),
         ],
         rows=[
-            Row(row_id=RowID(f"row-{i}"), cards=[Card(v) for v in row_cards])
+            EngineRow(row_id=RowID(f"row-{i}"), cards=[Card(v) for v in row_cards])
             for i, row_cards in enumerate(rows)
         ],
         deck=[],

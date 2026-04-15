@@ -13,7 +13,7 @@ from row_taker.client.presentation_builder import (
 )
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import PublicPlayerInfo, Row
+from row_taker.engine.game.models import EngineRow, PublicPlayerInfo, Row
 from row_taker.engine.game.phases import StepAction
 from row_taker.engine.game.public_state_ops import apply_resolution_step
 from row_taker.engine.game.rules import place_card, take_row, target_row_index
@@ -51,7 +51,7 @@ def apply_trick_row_choice(state: TrickPresentationState, row_id: int) -> TrickP
     chosen_index = current_state.get_row_index(row_id)
     previous_cards = tuple(current_state.rows[chosen_index].cards)
 
-    rows = [Row(row_id=row.row_id, cards=list(row.cards)) for row in current_state.rows]
+    rows = [EngineRow(row_id=row.row_id, cards=list(row.cards)) for row in current_state.rows]
     bullheads, _taken = take_row(rows, chosen_index)
     rows[chosen_index].cards = [Card(play.card_value)]
 
@@ -120,7 +120,7 @@ def _advance_until_blocked(state: TrickPresentationState) -> TrickPresentationSt
 
         row = current.shadow_state.rows[row_index]
         previous_cards = tuple(row.cards)
-        rows = [Row(row_id=existing.row_id, cards=list(existing.cards)) for existing in current.shadow_state.rows]
+        rows = [EngineRow(row_id=existing.row_id, cards=list(existing.cards)) for existing in current.shadow_state.rows]
         bullheads, taken = place_card(rows, row_index, card, row_capacity=current.shadow_state.config.row_capacity)
         next_row_cards = tuple(rows[row_index].cards)
         step = TrickResolutionStep(
@@ -172,7 +172,7 @@ def _advance_until_blocked(state: TrickPresentationState) -> TrickPresentationSt
 def _clone_public_state(public_state: PublicState) -> PublicState:
     return PublicState(
         config=public_state.config,
-        players=[
+        players=tuple(
             PublicPlayerInfo(
                 player_id=player.player_id,
                 name=player.name,
@@ -180,8 +180,8 @@ def _clone_public_state(public_state: PublicState) -> PublicState:
                 hand_count=player.hand_count,
             )
             for player in public_state.players
-        ],
-        rows=[Row(row_id=row.row_id, cards=list(row.cards)) for row in public_state.rows],
+        ),
+        rows=tuple(Row(row_id=row.row_id, cards=tuple(row.cards)) for row in public_state.rows),
         round_no=public_state.round_no,
         trick_no=public_state.trick_no,
         phase_info=public_state.phase_info,

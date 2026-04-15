@@ -1,5 +1,5 @@
 from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import Row, RowID
+from row_taker.engine.game.models import EngineRow, Row, RowID
 from row_taker.engine.game.rules import place_card, target_row_index
 
 
@@ -18,7 +18,7 @@ def test_target_row_index_picks_best_lower_row() -> None:
 
 def test_place_card_appends_when_row_not_full() -> None:
     rows = [
-        Row(row_id=RowID("row-0"), cards=[Card(10), Card(12)]),
+        EngineRow(row_id=RowID("row-0"), cards=[Card(10), Card(12)]),
     ]
 
     points, taken = place_card(rows, 0, Card(15), row_capacity=5)
@@ -30,7 +30,7 @@ def test_place_card_appends_when_row_not_full() -> None:
 
 def test_place_card_takes_row_when_row_is_full() -> None:
     rows = [
-        Row(
+        EngineRow(
             row_id=RowID("row-0"),
             cards=[Card(10), Card(11), Card(12), Card(13), Card(14)],
         ),

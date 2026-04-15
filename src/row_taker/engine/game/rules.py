@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .models import Card, Row
+from .models import Card, EngineRow, Row
 
 
-def target_row_index(rows: Sequence[Row], card: Card) -> int | None:
+def target_row_index(rows: Sequence[EngineRow | Row], card: Card) -> int | None:
     """Return the target row index for ``card``.
 
     Target row = row with the greatest last card value that is still < card.value.
@@ -23,7 +23,7 @@ def target_row_index(rows: Sequence[Row], card: Card) -> int | None:
     return best_idx
 
 
-def take_row(rows: list[Row], row_index: int) -> tuple[int, list[Card]]:
+def take_row(rows: list[EngineRow], row_index: int) -> tuple[int, list[Card]]:
     """Take a row and return ``(bullheads, taken_cards)``.
 
     The row object keeps its ``row_id`` and becomes empty.
@@ -31,12 +31,12 @@ def take_row(rows: list[Row], row_index: int) -> tuple[int, list[Card]]:
     row = rows[row_index]
     taken = list(row.cards)
     bullheads = sum(card.bullheads for card in taken)
-    rows[row_index] = Row(row_id=row.row_id, cards=[])
+    rows[row_index] = EngineRow(row_id=row.row_id, cards=[])
     return bullheads, taken
 
 
 def place_card(
-    rows: list[Row],
+    rows: list[EngineRow],
     row_index: int,
     card: Card,
     *,
@@ -54,7 +54,7 @@ def place_card(
     if len(row.cards) >= row_capacity:
         taken_bullheads = sum(c.bullheads for c in row.cards)
         taken_cards = list(row.cards)
-        rows[row_index] = Row(row_id=row.row_id, cards=[card])
+        rows[row_index] = EngineRow(row_id=row.row_id, cards=[card])
         return taken_bullheads, taken_cards
 
     row.cards.append(card)

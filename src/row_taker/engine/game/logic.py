@@ -4,7 +4,7 @@ import random
 from collections.abc import Sequence
 
 from .cards import Card, Deck
-from .models import Player, PlayerID, Row, RowID
+from .models import EngineRow, Player, PlayerID, RowID
 from .phases import Phase, PhaseInfo, StepAction
 from .rules import place_card, take_row, target_row_index
 from .state import (
@@ -55,7 +55,7 @@ def setup_game(
         )
         for index, name in enumerate(player_list)
     ]
-    rows = [Row(row_id=RowID(f"row-{index}")) for index in range(config.row_count)]
+    rows = [EngineRow(row_id=RowID(f"row-{index}")) for index in range(config.row_count)]
 
     state = GameState(
         config=config,
