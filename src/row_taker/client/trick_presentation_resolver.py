@@ -13,11 +13,11 @@ from row_taker.client.presentation_builder import (
 )
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import EngineRow, PublicPlayerInfo, Row
+from row_taker.engine.game.models import EngineRow
 from row_taker.engine.game.phases import StepAction
 from row_taker.engine.game.public_state_ops import apply_resolution_step
 from row_taker.engine.game.rules import place_card, take_row, target_row_index
-from row_taker.engine.game.state import PublicState, TrickResolutionStep
+from row_taker.engine.game.state import EnginePublicState, PublicState, TrickResolutionStep
 from row_taker.protocol.messages import CardsRevealed, PlayedCardView
 
 
@@ -170,22 +170,7 @@ def _advance_until_blocked(state: TrickPresentationState) -> TrickPresentationSt
 
 
 def _clone_public_state(public_state: PublicState) -> PublicState:
-    return PublicState(
-        config=public_state.config,
-        players=tuple(
-            PublicPlayerInfo(
-                player_id=player.player_id,
-                name=player.name,
-                score=player.score,
-                hand_count=player.hand_count,
-            )
-            for player in public_state.players
-        ),
-        rows=tuple(Row(row_id=row.row_id, cards=tuple(row.cards)) for row in public_state.rows),
-        round_no=public_state.round_no,
-        trick_no=public_state.trick_no,
-        phase_info=public_state.phase_info,
-    )
+    return EnginePublicState.from_public_state(public_state).to_public_state()
 
 
 def _player_names_for_state(public_state: PublicState) -> dict[str, str]:

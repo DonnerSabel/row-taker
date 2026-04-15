@@ -115,6 +115,75 @@ class GameState:
             raise ValueError(f"player {player_id!r} has already selected a card")
 
 
+@dataclass(slots=True)
+class EnginePublicState:
+    config: RulesConfig
+    players: list[PublicPlayerInfo]
+    rows: list[EngineRow]
+    round_no: int
+    trick_no: int
+    phase_info: PhaseInfo
+
+    @classmethod
+    def from_public_state(cls, public_state: "PublicState") -> "EnginePublicState":
+        return cls(
+            config=public_state.config,
+            players=[
+                PublicPlayerInfo(
+                    player_id=player.player_id,
+                    name=player.name,
+                    score=player.score,
+                    hand_count=player.hand_count,
+                )
+                for player in public_state.players
+            ],
+            rows=[EngineRow(row_id=row.row_id, cards=list(row.cards)) for row in public_state.rows],
+            round_no=public_state.round_no,
+            trick_no=public_state.trick_no,
+            phase_info=public_state.phase_info,
+        )
+
+    def to_public_state(self) -> "PublicState":
+        return PublicState(
+            config=self.config,
+            players=tuple(self.players),
+            rows=tuple(Row(row_id=row.row_id, cards=tuple(row.cards)) for row in self.rows),
+            round_no=self.round_no,
+            trick_no=self.trick_no,
+            phase_info=self.phase_info,
+        )
+
+    def validate_row_id(self, row_id: RowID) -> None:
+        get_row_index(self.rows, row_id)
+
+    def get_row_index(self, row_id: RowID) -> int:
+        return get_row_index(self.rows, row_id)
+
+    def get_player_index(self, player_id: PlayerID) -> int:
+        return get_player_index(self.players, player_id)
+
+    def get_player_by_id(self, player_id: PlayerID) -> PublicPlayerInfo:
+        return self.players[self.get_player_index(player_id)]
+
+    def apply_resolution_step(self, step: TrickResolutionStep) -> None:
+        player_index = self.get_player_index(step.player_id)
+        row_index = self.get_row_index(step.affected_row_id)
+
+        old_row = self.rows[row_index]
+        self.rows[row_index] = EngineRow(
+            row_id=old_row.row_id,
+            cards=list(step.new_row_cards),
+        )
+
+        old_player = self.players[player_index]
+        self.players[player_index] = PublicPlayerInfo(
+            player_id=old_player.player_id,
+            name=old_player.name,
+            score=old_player.score + step.points_gained,
+            hand_count=old_player.hand_count - 1,
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class PublicState:
     config: RulesConfig
