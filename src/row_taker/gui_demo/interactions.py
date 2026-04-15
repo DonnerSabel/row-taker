@@ -124,7 +124,20 @@ def _build_card_targets(layout: DemoLayout, state: ClientState) -> tuple[CardTar
         return ()
 
     hand_rect = layout.main_bottom_rect.inflate(-24, -24)
-    cards_top = hand_rect.top + 54
+
+    info_lines = [
+        f"player: {player_state.self_player_name()}",
+        f"pending_action: {state.pending_action.value}",
+        "click a card to produce ClientActionChooseCard",
+    ]
+    if player_state.phase_info.phase.value == "choose_row" and player_state.pending_card_value() is not None:
+        info_lines.append(f"pending_card: {player_state.pending_card_value()}")
+
+    info_line_height = 22
+    info_gap = 6
+    info_height = len(info_lines) * info_line_height + max(0, len(info_lines) - 1) * info_gap
+    cards_top = hand_rect.top + info_height + 10
+
     card_width = 78
     card_height = 58
     row_gap = 10
@@ -154,7 +167,16 @@ def _build_row_targets(layout: DemoLayout, state: ClientState) -> tuple[RowTarge
         return ()
 
     top_rect = layout.main_top_rect.inflate(-24, -24)
-    rows_top = top_rect.top + 58
+
+    info_lines = [
+        f"round={public_state.round_no} trick={public_state.trick_no} phase={public_state.phase_info.phase.value}",
+        f"message: {public_state.phase_info.message or '-'}",
+    ]
+    info_line_height = 22
+    info_gap = 6
+    info_height = len(info_lines) * info_line_height + max(0, len(info_lines) - 1) * info_gap
+    rows_top = top_rect.top + info_height + 10
+
     row_area_height = 132
     row_width = max(120, (top_rect.width - 18) // max(1, len(public_state.rows)))
 

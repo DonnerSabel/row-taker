@@ -74,7 +74,7 @@ class PrimitiveDrawer:
         role: str = "body",
         color: pygame.Color | None = None,
         line_gap: int = 6,
-    ) -> None:
+    ) -> int:
         font = self._font_for_role(role)
         y = rect.top
         for line in lines:
@@ -84,7 +84,8 @@ class PrimitiveDrawer:
                 surface.blit(rendered, (rect.left, y))
                 y += rendered.get_height() + line_gap
                 if y > rect.bottom:
-                    return
+                    return y
+        return y
 
     def draw_card(
         self,
@@ -113,6 +114,26 @@ class PrimitiveDrawer:
         pygame.draw.rect(surface, CARD_SELECTED if active else CARD_FILL, rect)
         pygame.draw.rect(surface, ACCENT if active else PANEL_BORDER, rect, width=1)
         self.draw_text(surface, text, (rect.left + 8, rect.top + 6), role="small")
+
+    def measure_wrapped_lines(
+        self,
+        lines: list[str],
+        *,
+        max_width: int,
+        role: str = "body",
+        line_gap: int = 6,
+    ) -> int:
+        font = self._font_for_role(role)
+        height = 0
+        first = True
+        for line in lines:
+            wrapped_lines = self._wrap_line(font, line, max_width)
+            for wrapped_line in wrapped_lines:
+                if not first:
+                    height += line_gap
+                height += font.size(wrapped_line)[1]
+                first = False
+        return height
 
     def _font_for_role(self, role: str) -> pygame.font.Font:
         if role == "title":

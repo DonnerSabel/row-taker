@@ -168,18 +168,16 @@ def _render_rows_and_players(
         drawer.draw_wrapped_lines(screen, ["No public_state available."], rect)
         return
 
-    y = rect.top
-    phase_message = public_state.phase_info.message or "-"
-    drawer.draw_text(
-        screen,
+    info_lines = [
         f"round={public_state.round_no} trick={public_state.trick_no} phase={public_state.phase_info.phase.value}",
-        (rect.left, y),
-        role="small",
-        color=TEXT_MUTED,
-    )
-    y += 24
-    drawer.draw_text(screen, f"message: {phase_message}", (rect.left, y), role="small", color=TEXT_MUTED)
-    y += 34
+        f"message: {public_state.phase_info.message or '-'}",
+    ]
+    info_height = drawer.measure_wrapped_lines(info_lines, max_width=rect.width, role="small")
+    info_rect = rect.copy()
+    info_rect.height = info_height
+    info_bottom = drawer.draw_wrapped_lines(screen, info_lines, info_rect, role="small", color=TEXT_MUTED)
+
+    y = info_bottom + 10
 
     row_target_by_id = {target.row_id: target for target in interaction_map.row_targets}
     row_area_height = 132
@@ -232,7 +230,11 @@ def _render_hand(
     ]
     if player_state.phase_info.phase == Phase.CHOOSE_ROW and player_state.pending_card_value() is not None:
         info_lines.append(f"pending_card: {player_state.pending_card_value()}")
-    drawer.draw_wrapped_lines(screen, info_lines, rect, role="small", color=TEXT_MUTED)
+
+    info_height = drawer.measure_wrapped_lines(info_lines, max_width=rect.width, role="small")
+    info_rect = rect.copy()
+    info_rect.height = info_height
+    drawer.draw_wrapped_lines(screen, info_lines, info_rect, role="small", color=TEXT_MUTED)
 
     target_by_value = {target.card_value: target for target in interaction_map.card_targets}
     for card in player_state.hand:
