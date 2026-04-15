@@ -10,6 +10,8 @@ WINDOW_BACKGROUND = pygame.Color(20, 22, 25)
 TEXT_PRIMARY = pygame.Color(236, 239, 244)
 TEXT_MUTED = pygame.Color(175, 180, 187)
 ACCENT = pygame.Color(102, 163, 255)
+CARD_FILL = pygame.Color(43, 49, 56)
+CARD_SELECTED = pygame.Color(72, 88, 108)
 
 
 class PrimitiveDrawer:
@@ -17,6 +19,7 @@ class PrimitiveDrawer:
         self._title_font = pygame.font.SysFont(None, 30)
         self._body_font = pygame.font.SysFont(None, 24)
         self._small_font = pygame.font.SysFont(None, 20)
+        self._tiny_font = pygame.font.SysFont(None, 17)
 
     def draw_panel(
         self,
@@ -83,11 +86,41 @@ class PrimitiveDrawer:
                 if y > rect.bottom:
                     return
 
+    def draw_card(
+        self,
+        surface: pygame.Surface,
+        rect: pygame.Rect,
+        *,
+        value: int,
+        bullheads: int,
+        selected: bool = False,
+    ) -> None:
+        fill = CARD_SELECTED if selected else CARD_FILL
+        pygame.draw.rect(surface, fill, rect)
+        pygame.draw.rect(surface, PANEL_BORDER if not selected else ACCENT, rect, width=1)
+
+        self.draw_text(surface, str(value), (rect.left + 8, rect.top + 6), role="body")
+        self.draw_text(surface, f"{bullheads} bh", (rect.left + 8, rect.top + 30), role="small", color=TEXT_MUTED)
+
+    def draw_badge(
+        self,
+        surface: pygame.Surface,
+        rect: pygame.Rect,
+        *,
+        text: str,
+        active: bool = False,
+    ) -> None:
+        pygame.draw.rect(surface, CARD_SELECTED if active else CARD_FILL, rect)
+        pygame.draw.rect(surface, ACCENT if active else PANEL_BORDER, rect, width=1)
+        self.draw_text(surface, text, (rect.left + 8, rect.top + 6), role="small")
+
     def _font_for_role(self, role: str) -> pygame.font.Font:
         if role == "title":
             return self._title_font
         if role == "small":
             return self._small_font
+        if role == "tiny":
+            return self._tiny_font
         return self._body_font
 
     def _wrap_line(self, font: pygame.font.Font, text: str, max_width: int) -> list[str]:
