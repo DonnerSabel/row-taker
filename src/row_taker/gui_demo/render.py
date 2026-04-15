@@ -11,6 +11,7 @@ from row_taker.client.presentation_events import (
 )
 from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
+from row_taker.gui_demo.interactions import InteractionMap
 from row_taker.gui_demo.layout import DemoLayout
 from row_taker.gui_demo.primitives import (
     ACCENT,
@@ -28,11 +29,13 @@ def render_app(
     client_state: ClientState,
     frame_count: int,
     active_demo_scene: str | None,
+    interaction_map: InteractionMap,
+    last_action_summary: str,
 ) -> None:
     screen.fill(WINDOW_BACKGROUND)
     _render_header(screen, drawer, layout, client_state, active_demo_scene)
-    _render_main_area(screen, drawer, layout, client_state)
-    _render_sidebar(screen, drawer, layout, client_state, frame_count)
+    _render_main_area(screen, drawer, layout, client_state, interaction_map)
+    _render_sidebar(screen, drawer, layout, client_state, frame_count, last_action_summary, interaction_map)
     _render_footer(screen, drawer, layout, active_demo_scene)
 
 
@@ -46,7 +49,7 @@ def _render_header(
     content_rect = drawer.draw_panel(screen, layout.header_rect)
     drawer.draw_text(screen, "Row-Taker GUI Demo", (content_rect.left, content_rect.top), role="title")
     subtitle = (
-        "Patch 2: lobby and game panels render the real shared structures. "
+        "Patch 3: clicks now map to ClientAction objects and local GUI state. "
         f"Mode={client_state.client_mode.value}, pending_action={client_state.pending_action.value}"
     )
     drawer.draw_text(
@@ -66,12 +69,18 @@ def _render_header(
         drawer.draw_badge(screen, badge_rect, text=f"demo:{active_demo_scene}", active=True)
 
 
-def _render_main_area(screen, drawer: PrimitiveDrawer, layout: DemoLayout, client_state: ClientState) -> None:
+def _render_main_area(
+    screen,
+    drawer: PrimitiveDrawer,
+    layout: DemoLayout,
+    client_state: ClientState,
+    interaction_map: InteractionMap,
+) -> None:
     if client_state.client_mode.value == "lobby":
-        _render_lobby_panels(screen, drawer, layout, client_state)
+        _render_lobby_panels(screen, drawer, layout, client_state, interaction_map)
         return
     if client_state.public_state is not None or client_state.player_state is not None:
-        _render_game_panels(screen, drawer, layout, client_state)
+        _render_game_panels(screen, drawer, layout, client_state, interaction_map)
         return
 
     content_rect = drawer.draw_panel(screen, layout.main_rect, title="Current view")
@@ -85,34 +94,37 @@ def _render_main_area(screen, drawer: PrimitiveDrawer, layout: DemoLayout, clien
     )
 
 
-def _render_lobby_panels(screen, drawer: PrimitiveDrawer, layout: DemoLayout, client_state: ClientState) -> None:
+def _render_lobby_panels(
+    screen,
+    drawer: PrimitiveDrawer,
+    layout: DemoLayout,
+    client_state: ClientState,
+    interaction_map: InteractionMap,
+) -> None:
     top_content = drawer.draw_panel(screen, layout.main_top_rect, title="Lobby seats")
-    bottom_content = drawer.draw_panel(screen, layout.main_bottom_rect, title="Participants")
+    bottom_content = drawer.draw_panel(screen, layout.main_bottom_rect, title="Participants / commands")
 
     lobby_view = client_state.lobby_view
     if lobby_view is None:
         drawer.draw_wrapped_lines(screen, ["No lobby view available."], top_content)
         return
 
-    y = top_content.top
     drawer.draw_text(
         screen,
         f"server_endpoint: {lobby_view.server_endpoint or '-'}",
-        (top_content.left, y),
+        (top_content.left, top_content.top),
         role="small",
         color=TEXT_MUTED,
     )
-    y += 28
 
-    for seat in lobby_view.seats:
+    for target in interaction_map.seat_targets:
+        seat = lobby_view.seats[target.seat_index]
         occupant = seat.occupant_display_name or "-"
-        seat_text = f"Seat {seat.seat_index + 1}: {occupant}"
+        label = f"Seat {seat.seat_index + 1}: {occupant}"
         if seat.occupant_kind:
-            seat_text += f" [{seat.occupant_kind}]"
-        if client_state.navigation_state.selected_seat_index == seat.seat_index:
-            seat_text += "  <selected>"
-        drawer.draw_text(screen, seat_text, (top_content.left, y), role="body")
-        y += 28
+            label += f" [{seat.occupant_kind}]"
+        active = client_state.navigation_state.selected_seat_index == seat.seat_index
+        drawer.draw_badge(screen, target.rect, text=label, active=active)
 
     participant_lines = []
     for participant in lobby_view.participants:
@@ -120,24 +132,37 @@ def _render_lobby_panels(screen, drawer: PrimitiveDrawer, layout: DemoLayout, cl
         participant_lines.append(
             f"{participant.display_name} [{participant.participant_kind}] seat={seat_label} endpoint={participant.endpoint or '-'}"
         )
-    participant_lines.extend(
-        [
-            "",
-            "Planned next step: seats become clickable and map to lobby commands.",
-        ]
-    )
-    drawer.draw_wrapped_lines(screen, participant_lines, bottom_content, role="body")
+
+    participant_text_rect = bottom_content.copy()
+    participant_text_rect.height = max(60, bottom_content.height - 52)
+    drawer.draw_wrapped_lines(screen, participant_lines, participant_text_rect, role="body")
+
+    for target in interaction_map.lobby_button_targets:
+        active = target.button_id == "start_game" or client_state.navigation_state.selected_seat_index is not None
+        drawer.draw_badge(screen, target.rect, text=target.label, active=active)
 
 
-def _render_game_panels(screen, drawer: PrimitiveDrawer, layout: DemoLayout, client_state: ClientState) -> None:
+def _render_game_panels(
+    screen,
+    drawer: PrimitiveDrawer,
+    layout: DemoLayout,
+    client_state: ClientState,
+    interaction_map: InteractionMap,
+) -> None:
     top_content = drawer.draw_panel(screen, layout.main_top_rect, title="Rows and players")
     bottom_content = drawer.draw_panel(screen, layout.main_bottom_rect, title="Own hand")
 
-    _render_rows_and_players(screen, drawer, top_content, client_state)
-    _render_hand(screen, drawer, bottom_content, client_state)
+    _render_rows_and_players(screen, drawer, top_content, client_state, interaction_map)
+    _render_hand(screen, drawer, bottom_content, client_state, interaction_map)
 
 
-def _render_rows_and_players(screen, drawer: PrimitiveDrawer, rect, client_state: ClientState) -> None:
+def _render_rows_and_players(
+    screen,
+    drawer: PrimitiveDrawer,
+    rect,
+    client_state: ClientState,
+    interaction_map: InteractionMap,
+) -> None:
     public_state = client_state.public_state
     if public_state is None:
         drawer.draw_wrapped_lines(screen, ["No public_state available."], rect)
@@ -156,18 +181,23 @@ def _render_rows_and_players(screen, drawer: PrimitiveDrawer, rect, client_state
     drawer.draw_text(screen, f"message: {phase_message}", (rect.left, y), role="small", color=TEXT_MUTED)
     y += 34
 
+    row_target_by_id = {target.row_id: target for target in interaction_map.row_targets}
     row_area_height = 132
     row_width = max(120, (rect.width - 18) // max(1, len(public_state.rows)))
     for index, row in enumerate(public_state.rows):
-        row_rect = rect.copy()
-        row_rect.left = rect.left + index * row_width
-        row_rect.top = y
-        row_rect.width = row_width - 8
-        row_rect.height = row_area_height
+        row_rect = row_target_by_id.get(row.row_id, None)
+        if row_rect is None:
+            row_rect = type("RectHolder", (), {"rect": None})()
+        target_rect = row_target_by_id[row.row_id].rect if row.row_id in row_target_by_id else None
+        fallback_rect = rect.copy()
+        fallback_rect.left = rect.left + index * row_width
+        fallback_rect.top = y
+        fallback_rect.width = row_width - 8
+        fallback_rect.height = row_area_height
         _draw_row(
             screen,
             drawer,
-            row_rect,
+            target_rect or fallback_rect,
             row.row_id,
             row.cards,
             selectable=_is_row_selectable(client_state, row.row_id),
@@ -183,7 +213,13 @@ def _render_rows_and_players(screen, drawer: PrimitiveDrawer, rect, client_state
         players_y += 26
 
 
-def _render_hand(screen, drawer: PrimitiveDrawer, rect, client_state: ClientState) -> None:
+def _render_hand(
+    screen,
+    drawer: PrimitiveDrawer,
+    rect,
+    client_state: ClientState,
+    interaction_map: InteractionMap,
+) -> None:
     player_state = client_state.player_state
     if player_state is None:
         drawer.draw_wrapped_lines(screen, ["No player_state available."], rect)
@@ -192,26 +228,18 @@ def _render_hand(screen, drawer: PrimitiveDrawer, rect, client_state: ClientStat
     info_lines = [
         f"player: {player_state.self_player_name()}",
         f"pending_action: {client_state.pending_action.value}",
+        "click a card to produce ClientActionChooseCard",
     ]
     if player_state.phase_info.phase == Phase.CHOOSE_ROW and player_state.pending_card_value() is not None:
         info_lines.append(f"pending_card: {player_state.pending_card_value()}")
     drawer.draw_wrapped_lines(screen, info_lines, rect, role="small", color=TEXT_MUTED)
 
-    cards_top = rect.top + 54
-    card_width = 78
-    card_height = 58
-    row_gap = 10
-    col_gap = 10
-    columns = max(1, rect.width // (card_width + col_gap))
-    for index, card in enumerate(player_state.hand):
-        row_index = index // columns
-        column_index = index % columns
-        card_rect = rect.copy()
-        card_rect.left = rect.left + column_index * (card_width + col_gap)
-        card_rect.top = cards_top + row_index * (card_height + row_gap)
-        card_rect.width = card_width
-        card_rect.height = card_height
-        drawer.draw_card(screen, card_rect, value=card.value, bullheads=card.bullheads)
+    target_by_value = {target.card_value: target for target in interaction_map.card_targets}
+    for card in player_state.hand:
+        target = target_by_value.get(card.value)
+        if target is None:
+            continue
+        drawer.draw_card(screen, target.rect, value=card.value, bullheads=card.bullheads)
 
     if player_state.phase_info.phase == Phase.CHOOSE_ROW and player_state.pending_card_value() is not None:
         hint_rect = rect.copy()
@@ -256,6 +284,8 @@ def _render_sidebar(
     layout: DemoLayout,
     client_state: ClientState,
     frame_count: int,
+    last_action_summary: str,
+    interaction_map: InteractionMap,
 ) -> None:
     content_rect = drawer.draw_panel(screen, layout.sidebar_rect, title="State summary")
     y = content_rect.top
@@ -275,21 +305,32 @@ def _render_sidebar(
         drawer.draw_key_value(screen, key, value, (content_rect.left, y))
         y += 28
 
+    drawer.draw_text(screen, "last_gui_action", (content_rect.left, y + 6), role="small", color=TEXT_MUTED)
+    action_rect = content_rect.copy()
+    action_rect.top = y + 28
+    action_rect.height = 72
+    drawer.draw_wrapped_lines(screen, [last_action_summary], action_rect, role="small", color=ACCENT)
+
     flash_text = client_state.flash_message.text if client_state.flash_message is not None else "No flash message"
-    drawer.draw_text(screen, "flash_message", (content_rect.left, y + 8), role="small", color=TEXT_MUTED)
+    drawer.draw_text(screen, "flash_message", (content_rect.left, action_rect.bottom + 10), role="small", color=TEXT_MUTED)
     flash_rect = content_rect.copy()
-    flash_rect.top = y + 30
-    flash_rect.height = 72
+    flash_rect.top = action_rect.bottom + 32
+    flash_rect.height = 64
     drawer.draw_wrapped_lines(screen, [flash_text], flash_rect, role="body", color=ACCENT)
 
     events_rect = content_rect.copy()
     events_rect.top = flash_rect.bottom + 18
+    events_bottom = layout.sidebar_rect.bottom - 70
+    events_rect.height = max(40, events_bottom - events_rect.top)
     drawer.draw_text(screen, "presentation events", (events_rect.left, events_rect.top), role="small", color=TEXT_MUTED)
     events_rect.top += 22
     event_lines = [_format_presentation_event(event) for event in client_state.pending_presentation_events]
     if not event_lines:
         event_lines = ["No pending presentation events."]
     drawer.draw_wrapped_lines(screen, event_lines, events_rect, role="small")
+
+    if interaction_map.continue_target is not None:
+        drawer.draw_badge(screen, interaction_map.continue_target.rect, text="Continue [Space]", active=True)
 
 
 def _format_presentation_event(event: PresentationEvent) -> str:
@@ -314,7 +355,7 @@ def _render_footer(screen, drawer: PrimitiveDrawer, layout: DemoLayout, active_d
     footer_lines = [
         "ESC quit",
         "1 lobby   2 choose-card   3 choose-row   4 presentation",
-        "Patch 2 goal: real lobby/game rendering from shared structures.",
+        "Patch 3 goal: clickable surfaces produce ClientAction objects.",
     ]
     if active_demo_scene is None:
         footer_lines[1] = "Scene hotkeys disabled because the app is running with an external ClientState."

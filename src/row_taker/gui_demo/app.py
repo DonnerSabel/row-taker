@@ -3,8 +3,10 @@ from __future__ import annotations
 import pygame
 
 from row_taker.client.state import ClientState
+from row_taker.gui_demo.demo_local_reducer import apply_demo_action
 from row_taker.gui_demo.demo_state import build_demo_states
 from row_taker.gui_demo.input_mapping import map_pygame_event
+from row_taker.gui_demo.interactions import InteractionMap, build_interaction_map
 from row_taker.gui_demo.layout import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, compute_layout
 from row_taker.gui_demo.primitives import PrimitiveDrawer
 from row_taker.gui_demo.render import render_app
@@ -23,6 +25,8 @@ class GuiDemoApp:
         self._drawer: PrimitiveDrawer | None = None
         self._demo_states: dict[str, ClientState] = {}
         self._active_demo_scene: str | None = None
+        self._interaction_map = InteractionMap()
+        self._last_action_summary = "No GUI action yet."
 
         if initial_state is None:
             self._demo_states = build_demo_states()
@@ -41,6 +45,7 @@ class GuiDemoApp:
             )
             self._clock = pygame.time.Clock()
             self._drawer = PrimitiveDrawer()
+            self._refresh_interaction_map()
 
             while self._running:
                 self._handle_events()
@@ -53,18 +58,38 @@ class GuiDemoApp:
 
     def _handle_events(self) -> None:
         for event in pygame.event.get():
-            mapped = map_pygame_event(event)
+            mapped = map_pygame_event(
+                event,
+                state=self._client_state,
+                interaction_map=self._interaction_map,
+            )
             if mapped.request_quit:
                 self._running = False
             if mapped.demo_scene_name is not None and mapped.demo_scene_name in self._demo_states:
                 self._active_demo_scene = mapped.demo_scene_name
                 self._client_state = self._demo_states[mapped.demo_scene_name]
+                self._last_action_summary = f"Switched to demo scene '{mapped.demo_scene_name}'."
+                self._refresh_interaction_map()
+            if mapped.next_state is not None:
+                self._client_state = mapped.next_state
+                self._last_action_summary = "Updated local GUI navigation state."
+                self._refresh_interaction_map()
+            if mapped.client_action is not None:
+                self._last_action_summary = _format_action(mapped.client_action)
+                self._client_state, next_scene = apply_demo_action(self._client_state, mapped.client_action)
+                if next_scene is not None and next_scene in self._demo_states:
+                    self._active_demo_scene = next_scene
+                    self._demo_states[next_scene] = self._client_state
+                elif self._active_demo_scene is not None:
+                    self._demo_states[self._active_demo_scene] = self._client_state
+                self._refresh_interaction_map()
 
     def _render_frame(self) -> None:
         if self._screen is None or self._drawer is None:
             raise RuntimeError("GuiDemoApp not initialized")
 
         layout = compute_layout(*self._screen.get_size())
+        self._interaction_map = build_interaction_map(layout, self._client_state)
         render_app(
             self._screen,
             drawer=self._drawer,
@@ -72,6 +97,8 @@ class GuiDemoApp:
             client_state=self._client_state,
             frame_count=self._frame_count,
             active_demo_scene=self._active_demo_scene,
+            interaction_map=self._interaction_map,
+            last_action_summary=self._last_action_summary,
         )
         pygame.display.flip()
 
@@ -80,6 +107,16 @@ class GuiDemoApp:
             raise RuntimeError("GuiDemoApp not initialized")
         self._clock.tick(FPS)
         self._frame_count += 1
+
+    def _refresh_interaction_map(self) -> None:
+        if self._screen is None:
+            return
+        layout = compute_layout(*self._screen.get_size())
+        self._interaction_map = build_interaction_map(layout, self._client_state)
+
+
+def _format_action(action: object) -> str:
+    return f"GUI produced {action!r}"
 
 
 def run() -> int:
