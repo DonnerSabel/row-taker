@@ -16,6 +16,7 @@ from row_taker.client.presentation_events import (
 )
 from row_taker.client.state import ClientState, UiMessage, has_pending_presentation
 from row_taker.engine.game.state import PlayerState, PublicState
+from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import LobbyParticipantView, LobbySeatView
 
 
@@ -244,7 +245,7 @@ def _current_bot_name(state: ClientState, seat_index: int) -> str:
     lobby = state.lobby_view
     if lobby is not None:
         for seat in lobby.seats:
-            if seat.seat_index == seat_index and seat.occupant_kind == "bot" and seat.occupant_display_name:
+            if seat.seat_index == seat_index and seat.occupant_kind is ParticipantKind.BOT and seat.occupant_display_name:
                 return seat.occupant_display_name
     return f"Bot_{seat_index}"
 

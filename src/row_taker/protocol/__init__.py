@@ -4,6 +4,7 @@ from row_taker.protocol.codec import (
     server_message_from_dict,
     server_message_to_dict,
 )
+from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     CardsRevealed,
@@ -55,6 +56,7 @@ __all__ = [
     "LobbyStateUpdated",
     "LobbyView",
     "PlayedCardView",
+    "ParticipantKind",
     "SessionEnded",
     "SessionEndReason",
     "RequestStartGame",

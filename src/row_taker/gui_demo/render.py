@@ -12,6 +12,7 @@ from row_taker.client.presentation_events import (
     PresentationTrickFinished,
 )
 from row_taker.client.state import ClientState
+from row_taker.participants import ParticipantKind
 from row_taker.engine.game import Phase
 from row_taker.gui_demo.connect_screen import ConnectFormState, ConnectScreenTargets
 from row_taker.gui_demo.interactions import InteractionMap
@@ -176,7 +177,7 @@ def _render_lobby_panels(
         seat = lobby_view.seats[target.seat_index]
         occupant = seat.occupant_display_name or "-"
         label = f"Seat {seat.seat_index + 1}: {occupant}"
-        if seat.occupant_kind:
+        if seat.occupant_kind is not None:
             label += f" [{seat.occupant_kind}]"
         active = client_state.navigation_state.selected_seat_index == seat.seat_index
         drawer.draw_badge(screen, target.rect, text=label, active=active)

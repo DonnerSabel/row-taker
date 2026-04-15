@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from row_taker.engine.game.models import PlayerID, RowID
+from row_taker.participants import ParticipantKind
 from row_taker.engine.game.state_mappers import (
     game_state_from_dict,
     game_state_to_dict,
@@ -45,7 +46,7 @@ def _lobby_participant_to_dict(participant: LobbyParticipantView) -> dict[str, o
     return {
         "client_id": participant.client_id,
         "display_name": participant.display_name,
-        "participant_kind": participant.participant_kind,
+        "participant_kind": str(participant.participant_kind),
         "seat_index": participant.seat_index,
         "endpoint": participant.endpoint,
     }
@@ -58,7 +59,7 @@ def _lobby_participant_from_dict(data: object) -> LobbyParticipantView:
     return LobbyParticipantView(
         client_id=str(data["client_id"]),
         display_name=str(data["display_name"]),
-        participant_kind=str(data["participant_kind"]),
+        participant_kind=ParticipantKind(str(data["participant_kind"])),
         seat_index=None if data.get("seat_index") is None else int(data["seat_index"]),
         endpoint=None if endpoint is None else str(endpoint),
     )
@@ -69,7 +70,7 @@ def _lobby_seat_to_dict(seat: LobbySeatView) -> dict[str, object]:
         "seat_index": seat.seat_index,
         "occupant_client_id": seat.occupant_client_id,
         "occupant_display_name": seat.occupant_display_name,
-        "occupant_kind": seat.occupant_kind,
+        "occupant_kind": None if seat.occupant_kind is None else str(seat.occupant_kind),
         "occupant_endpoint": seat.occupant_endpoint,
     }
 
@@ -82,7 +83,7 @@ def _lobby_seat_from_dict(data: object) -> LobbySeatView:
         seat_index=int(data["seat_index"]),
         occupant_client_id=None if data.get("occupant_client_id") is None else str(data["occupant_client_id"]),
         occupant_display_name=None if data.get("occupant_display_name") is None else str(data["occupant_display_name"]),
-        occupant_kind=None if data.get("occupant_kind") is None else str(data["occupant_kind"]),
+        occupant_kind=None if data.get("occupant_kind") is None else ParticipantKind(str(data["occupant_kind"])),
         occupant_endpoint=None if occupant_endpoint is None else str(occupant_endpoint),
     )
 

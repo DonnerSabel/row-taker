@@ -9,6 +9,7 @@ from row_taker.protocol.messages import (
     LobbyStateUpdated,
     LobbyView,
 )
+from row_taker.participants import ParticipantKind
 from row_taker.server.client_registry import ClientRegistry
 
 
@@ -28,7 +29,7 @@ def build_lobby_view(
         LobbyParticipantView(
             client_id=participant.client_id,
             display_name=participant.display_name,
-            participant_kind=participant.kind.value,
+            participant_kind=participant.kind,
             seat_index=participant_seat_map.get(participant.client_id),
             endpoint=participant.endpoint_display,
         )
@@ -39,7 +40,7 @@ def build_lobby_view(
             LobbyParticipantView(
                 client_id=f"pending-bot-seat-{seat_index}",
                 display_name=display_name,
-                participant_kind="bot",
+                participant_kind=ParticipantKind.BOT,
                 seat_index=seat_index,
                 endpoint=None,
             )
@@ -53,12 +54,12 @@ def build_lobby_view(
         if occupant_client_id is not None:
             participant = registry.get_participant(occupant_client_id)
             occupant_display_name = participant.display_name
-            occupant_kind = participant.kind.value
+            occupant_kind = participant.kind
             occupant_endpoint = participant.endpoint_display
         elif seat.seat_index in pending_bot_display_names:
             occupant_client_id = f"pending-bot-seat-{seat.seat_index}"
             occupant_display_name = pending_bot_display_names[seat.seat_index]
-            occupant_kind = "bot"
+            occupant_kind = ParticipantKind.BOT
         seats.append(
             LobbySeatView(
                 seat_index=seat.seat_index,

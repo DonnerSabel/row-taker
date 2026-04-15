@@ -91,6 +91,29 @@ This applies in particular to:
 
 The engine is therefore the real semantic heart of the project.
 
+### Naming scheme for engine-internal and public state types
+
+Public immutable API types get the short base names.
+
+Examples:
+- `PublicState`
+- `PlayerState`
+- `Row`
+
+Engine-internal mutable counterparts, where they exist, use the prefix `Engine`.
+
+Examples:
+- `EnginePublicState`
+- `EnginePlayerState`
+- `EngineRow`
+
+Rationale:
+- higher layers should receive the concise public names
+- engine-internal working structures may carry the longer `Engine...` names
+- the prefix behaves like a compact namespace marker and keeps the family relation visible
+
+This naming rule is part of the intended public API design.
+
 ---
 
 ## 3. Protocol reconstruction principle
@@ -171,6 +194,14 @@ A participant has at least:
 Current distinctions include:
 - `HUMAN`
 - `BOT`
+
+In protocol-facing lobby views, participant kinds are represented as a shared
+`StrEnum`, not as naked strings.
+
+Consequences:
+- `LobbyParticipantView.participant_kind` is a `ParticipantKind`
+- `LobbySeatView.occupant_kind` is a `ParticipantKind | None`
+- the codec serializes these values as their string values on the wire
 
 and
 - `LOCAL`

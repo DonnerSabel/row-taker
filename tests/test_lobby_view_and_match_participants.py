@@ -1,5 +1,6 @@
 from row_taker.engine.game.models import PlayerID
 from row_taker.engine.lobby.state import LobbySeat, LobbyState
+from row_taker.participants import ParticipantKind
 from row_taker.server.client_registry import ClientRegistry
 from row_taker.server.lobby_view import build_lobby_view
 from row_taker.server.match_participants import build_match_participants
@@ -31,7 +32,7 @@ def test_lobby_view_can_overlay_pending_bot_metadata() -> None:
     )
     lobby = build_lobby_view(lobby_state, registry, {1: "Bot_Bob"})
     assert lobby.seats[1].occupant_display_name == "Bot_Bob"
-    assert lobby.seats[1].occupant_kind == "bot"
+    assert lobby.seats[1].occupant_kind is ParticipantKind.BOT
 
 
 def test_build_match_participants_from_sparse_seated_clients() -> None:

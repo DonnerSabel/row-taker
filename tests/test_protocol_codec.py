@@ -8,6 +8,7 @@ from row_taker.protocol.codec import (
     server_message_from_dict,
     server_message_to_dict,
 )
+from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     CardsRevealed,
@@ -41,12 +42,12 @@ def _lobby_view() -> LobbyView:
         seat_count=3,
         participants=(
             LobbyParticipantView(
-                client_id="client-0", display_name="Alice", participant_kind="human", seat_index=0
+                client_id="client-0", display_name="Alice", participant_kind=ParticipantKind.HUMAN, seat_index=0
             ),
             LobbyParticipantView(
                 client_id="pending-bot-seat-2",
                 display_name="Bot_1",
-                participant_kind="bot",
+                participant_kind=ParticipantKind.BOT,
                 seat_index=2,
             ),
         ),
@@ -55,7 +56,7 @@ def _lobby_view() -> LobbyView:
                 seat_index=0,
                 occupant_client_id="client-0",
                 occupant_display_name="Alice",
-                occupant_kind="human",
+                occupant_kind=ParticipantKind.HUMAN,
             ),
             LobbySeatView(
                 seat_index=1,
@@ -67,7 +68,7 @@ def _lobby_view() -> LobbyView:
                 seat_index=2,
                 occupant_client_id="pending-bot-seat-2",
                 occupant_display_name="Bot_1",
-                occupant_kind="bot",
+                occupant_kind=ParticipantKind.BOT,
             ),
         ),
         game_started=False,

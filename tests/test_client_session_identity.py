@@ -7,6 +7,7 @@ from row_taker.cli.render import render_screen
 from row_taker.cli.screens import LobbyScreen, current_screen
 from row_taker.client.game_client_core import GameClientCore
 from row_taker.client.state import ClientState, enter_lobby_submenu
+from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     IdentityAssigned,
@@ -27,16 +28,16 @@ def _lobby() -> LobbyView:
             LobbyParticipantView(
                 client_id="client-1",
                 display_name="Alice",
-                participant_kind="human",
+                participant_kind=ParticipantKind.HUMAN,
                 seat_index=None,
             ),
             LobbyParticipantView(
-                client_id="client-2", display_name="Bob", participant_kind="human", seat_index=1
+                client_id="client-2", display_name="Bob", participant_kind=ParticipantKind.HUMAN, seat_index=1
             ),
             LobbyParticipantView(
                 client_id="pending-bot-seat-2",
                 display_name="Bot_1",
-                participant_kind="bot",
+                participant_kind=ParticipantKind.BOT,
                 seat_index=2,
             ),
         ),
@@ -51,13 +52,13 @@ def _lobby() -> LobbyView:
                 seat_index=1,
                 occupant_client_id="client-2",
                 occupant_display_name="Bob",
-                occupant_kind="human",
+                occupant_kind=ParticipantKind.HUMAN,
             ),
             LobbySeatView(
                 seat_index=2,
                 occupant_client_id="pending-bot-seat-2",
                 occupant_display_name="Bot_1",
-                occupant_kind="bot",
+                occupant_kind=ParticipantKind.BOT,
             ),
         ),
         game_started=False,

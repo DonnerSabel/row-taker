@@ -1,17 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 
-
-class ParticipantKind(StrEnum):
-    HUMAN = "human"
-    BOT = "bot"
-
-
-class ParticipantLocation(StrEnum):
-    LOCAL = "local"
-    REMOTE = "remote"
+from row_taker.participants import ParticipantKind, ParticipantLocation
 
 
 @dataclass(slots=True, frozen=True)

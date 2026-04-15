@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from row_taker.engine.game.models import PlayerID, RowID
+from row_taker.participants import ParticipantKind
 from row_taker.engine.game.state import GameState, PlayerState, PublicState
 
 
@@ -11,7 +12,7 @@ from row_taker.engine.game.state import GameState, PlayerState, PublicState
 class LobbyParticipantView:
     client_id: str
     display_name: str
-    participant_kind: str
+    participant_kind: ParticipantKind
     seat_index: int | None
     endpoint: str | None = None
 
@@ -21,7 +22,7 @@ class LobbySeatView:
     seat_index: int
     occupant_client_id: str | None
     occupant_display_name: str | None
-    occupant_kind: str | None
+    occupant_kind: ParticipantKind | None
     occupant_endpoint: str | None = None
 
 
