@@ -13,7 +13,6 @@ from row_taker.client.presentation_builder import (
 )
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import EngineRow
 from row_taker.engine.game.phases import StepAction
 from row_taker.engine.game.public_state_ops import apply_resolution_step
 from row_taker.engine.game.rules import place_card, take_row, target_row_index
@@ -51,9 +50,10 @@ def apply_trick_row_choice(state: TrickPresentationState, row_id: int) -> TrickP
     chosen_index = current_state.get_row_index(row_id)
     previous_cards = tuple(current_state.rows[chosen_index].cards)
 
-    rows = [EngineRow(row_id=row.row_id, cards=list(row.cards)) for row in current_state.rows]
-    bullheads, _taken = take_row(rows, chosen_index)
-    rows[chosen_index].cards = [Card(play.card_value)]
+    engine_state = EnginePublicState.from_public_state(current_state)
+    bullheads, _taken = take_row(engine_state.rows, chosen_index)
+    engine_state.rows[chosen_index].cards = [Card(play.card_value)]
+    next_row_cards = tuple(engine_state.rows[chosen_index].cards)
 
     step = TrickResolutionStep(
         action=StepAction.TOOK_ROW_SMALL,
@@ -62,7 +62,7 @@ def apply_trick_row_choice(state: TrickPresentationState, row_id: int) -> TrickP
         played_card=Card(play.card_value),
         taken_cards=tuple(previous_cards),
         points_gained=bullheads,
-        new_row_cards=tuple(rows[chosen_index].cards),
+        new_row_cards=next_row_cards,
     )
     next_shadow_state = apply_resolution_step(current_state, step)
     player_names = _player_names_for_state(current_state)
@@ -87,7 +87,7 @@ def apply_trick_row_choice(state: TrickPresentationState, row_id: int) -> TrickP
                 taken_cards=tuple(card.value for card in previous_cards),
                 bullheads=bullheads,
                 replacement_card_value=play.card_value,
-                row_cards_after=tuple(card.value for card in rows[chosen_index].cards),
+                row_cards_after=tuple(card.value for card in next_row_cards),
             ),
         ),
     )
@@ -120,9 +120,14 @@ def _advance_until_blocked(state: TrickPresentationState) -> TrickPresentationSt
 
         row = current.shadow_state.rows[row_index]
         previous_cards = tuple(row.cards)
-        rows = [EngineRow(row_id=existing.row_id, cards=list(existing.cards)) for existing in current.shadow_state.rows]
-        bullheads, taken = place_card(rows, row_index, card, row_capacity=current.shadow_state.config.row_capacity)
-        next_row_cards = tuple(rows[row_index].cards)
+        engine_state = EnginePublicState.from_public_state(current.shadow_state)
+        bullheads, taken = place_card(
+            engine_state.rows,
+            row_index,
+            card,
+            row_capacity=current.shadow_state.config.row_capacity,
+        )
+        next_row_cards = tuple(engine_state.rows[row_index].cards)
         step = TrickResolutionStep(
             action=StepAction.PLACED if taken is None else StepAction.TOOK_ROW_OVERFLOW,
             player_id=play.player_id,

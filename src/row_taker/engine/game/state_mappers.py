@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+"""Serialization helpers for game state structures.
+
+Public protocol messages should only cross the wire using immutable API types:
+`Row`, `PublicState`, and `PlayerState`.
+
+`GameState` serialization is kept as an explicit debug-only escape hatch for
+`DebugStateSnapshot`. The mutable engine helpers used for that path stay private
+inside this module.
+"""
+
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import EngineRow, Player, PlayerID, PublicPlayerInfo, Row, RowID
 from row_taker.engine.game.phases import Phase, PhaseInfo, StepAction
@@ -8,8 +18,8 @@ from row_taker.engine.game.state import (
     PlayerState,
     PublicState,
     RevealedPlay,
-    RulesConfig,
     RowChoiceRequired,
+    RulesConfig,
     TrickResolutionCursor,
     TrickResolutionStep,
 )
@@ -70,20 +80,6 @@ def row_from_dict(data: dict[str, object]) -> Row:
     return Row(
         row_id=RowID(str(data["row_id"])),
         cards=tuple(card_from_dict(card) for card in data["cards"]),
-    )
-
-
-def engine_row_to_dict(row: EngineRow) -> dict[str, object]:
-    return {
-        "row_id": str(row.row_id),
-        "cards": [card_to_dict(card) for card in row.cards],
-    }
-
-
-def engine_row_from_dict(data: dict[str, object]) -> EngineRow:
-    return EngineRow(
-        row_id=RowID(str(data["row_id"])),
-        cards=[card_from_dict(card) for card in data["cards"]],
     )
 
 
@@ -169,7 +165,7 @@ def trick_resolution_step_from_dict(data: dict[str, object]) -> TrickResolutionS
     )
 
 
-def player_to_dict(player: Player) -> dict[str, object]:
+def _player_to_dict(player: Player) -> dict[str, object]:
     return {
         "player_id": str(player.player_id),
         "name": player.name,
@@ -178,7 +174,7 @@ def player_to_dict(player: Player) -> dict[str, object]:
     }
 
 
-def player_from_dict(data: dict[str, object]) -> Player:
+def _player_from_dict(data: dict[str, object]) -> Player:
     return Player(
         player_id=PlayerID(str(data["player_id"])),
         name=str(data["name"]),
@@ -187,21 +183,35 @@ def player_from_dict(data: dict[str, object]) -> Player:
     )
 
 
-def revealed_play_to_dict(play: RevealedPlay) -> dict[str, object]:
+def _engine_row_to_dict(row: EngineRow) -> dict[str, object]:
+    return {
+        "row_id": str(row.row_id),
+        "cards": [card_to_dict(card) for card in row.cards],
+    }
+
+
+def _engine_row_from_dict(data: dict[str, object]) -> EngineRow:
+    return EngineRow(
+        row_id=RowID(str(data["row_id"])),
+        cards=[card_from_dict(card) for card in data["cards"]],
+    )
+
+
+def _revealed_play_to_dict(play: RevealedPlay) -> dict[str, object]:
     return {
         "player_id": str(play.player_id),
         "card": card_to_dict(play.card),
     }
 
 
-def revealed_play_from_dict(data: dict[str, object]) -> RevealedPlay:
+def _revealed_play_from_dict(data: dict[str, object]) -> RevealedPlay:
     return RevealedPlay(
         player_id=PlayerID(str(data["player_id"])),
         card=card_from_dict(data["card"]),
     )
 
 
-def row_choice_required_to_dict(prompt: RowChoiceRequired) -> dict[str, object]:
+def _row_choice_required_to_dict(prompt: RowChoiceRequired) -> dict[str, object]:
     return {
         "player_id": str(prompt.player_id),
         "card": card_to_dict(prompt.card),
@@ -209,7 +219,7 @@ def row_choice_required_to_dict(prompt: RowChoiceRequired) -> dict[str, object]:
     }
 
 
-def row_choice_required_from_dict(data: dict[str, object]) -> RowChoiceRequired:
+def _row_choice_required_from_dict(data: dict[str, object]) -> RowChoiceRequired:
     return RowChoiceRequired(
         player_id=PlayerID(str(data["player_id"])),
         card=card_from_dict(data["card"]),
@@ -217,14 +227,14 @@ def row_choice_required_from_dict(data: dict[str, object]) -> RowChoiceRequired:
     )
 
 
-def trick_resolution_cursor_to_dict(cursor: TrickResolutionCursor) -> dict[str, object]:
+def _trick_resolution_cursor_to_dict(cursor: TrickResolutionCursor) -> dict[str, object]:
     return {
         "remaining_player_ids": [str(player_id) for player_id in cursor.remaining_player_ids],
         "steps": [trick_resolution_step_to_dict(step) for step in cursor.steps],
     }
 
 
-def trick_resolution_cursor_from_dict(data: dict[str, object]) -> TrickResolutionCursor:
+def _trick_resolution_cursor_from_dict(data: dict[str, object]) -> TrickResolutionCursor:
     return TrickResolutionCursor(
         remaining_player_ids=[PlayerID(str(player_id)) for player_id in data["remaining_player_ids"]],
         steps=[trick_resolution_step_from_dict(step) for step in data["steps"]],
@@ -234,8 +244,8 @@ def trick_resolution_cursor_from_dict(data: dict[str, object]) -> TrickResolutio
 def game_state_to_dict(state: GameState) -> dict[str, object]:
     return {
         "config": rules_config_to_dict(state.config),
-        "players": [player_to_dict(player) for player in state.players],
-        "rows": [engine_row_to_dict(row) for row in state.rows],
+        "players": [_player_to_dict(player) for player in state.players],
+        "rows": [_engine_row_to_dict(row) for row in state.rows],
         "deck": [card_to_dict(card) for card in state.deck],
         "round_no": state.round_no,
         "trick_no": state.trick_no,
@@ -244,16 +254,16 @@ def game_state_to_dict(state: GameState) -> dict[str, object]:
             {"player_id": str(player_id), "card": card_to_dict(card)}
             for player_id, card in state.selected_cards.items()
         ],
-        "current_trick_revealed_plays": [revealed_play_to_dict(play) for play in state.current_trick_revealed_plays],
-        "resolution_cursor": None if state.resolution_cursor is None else trick_resolution_cursor_to_dict(state.resolution_cursor),
+        "current_trick_revealed_plays": [_revealed_play_to_dict(play) for play in state.current_trick_revealed_plays],
+        "resolution_cursor": None if state.resolution_cursor is None else _trick_resolution_cursor_to_dict(state.resolution_cursor),
     }
 
 
 def game_state_from_dict(data: dict[str, object]) -> GameState:
     state = GameState(
         config=rules_config_from_dict(data["config"]),
-        players=[player_from_dict(player) for player in data["players"]],
-        rows=[engine_row_from_dict(row) for row in data["rows"]],
+        players=[_player_from_dict(player) for player in data["players"]],
+        rows=[_engine_row_from_dict(row) for row in data["rows"]],
         deck=[card_from_dict(card) for card in data["deck"]],
         round_no=int(data["round_no"]),
         trick_no=int(data["trick_no"]),
@@ -264,8 +274,30 @@ def game_state_from_dict(data: dict[str, object]) -> GameState:
         for entry in data["selected_cards"]
     }
     state.current_trick_revealed_plays = tuple(
-        revealed_play_from_dict(play) for play in data["current_trick_revealed_plays"]
+        _revealed_play_from_dict(play) for play in data["current_trick_revealed_plays"]
     )
     resolution_cursor = data["resolution_cursor"]
-    state.resolution_cursor = None if resolution_cursor is None else trick_resolution_cursor_from_dict(resolution_cursor)
+    state.resolution_cursor = None if resolution_cursor is None else _trick_resolution_cursor_from_dict(resolution_cursor)
     return state
+
+
+__all__ = [
+    "card_from_dict",
+    "card_to_dict",
+    "game_state_from_dict",
+    "game_state_to_dict",
+    "phase_info_from_dict",
+    "phase_info_to_dict",
+    "player_state_from_dict",
+    "player_state_to_dict",
+    "public_player_info_from_dict",
+    "public_player_info_to_dict",
+    "public_state_from_dict",
+    "public_state_to_dict",
+    "row_from_dict",
+    "row_to_dict",
+    "rules_config_from_dict",
+    "rules_config_to_dict",
+    "trick_resolution_step_from_dict",
+    "trick_resolution_step_to_dict",
+]

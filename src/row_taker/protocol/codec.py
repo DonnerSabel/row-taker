@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from row_taker.engine.game.models import PlayerID, RowID
+from row_taker.engine.game import PlayerID, RowID
 from row_taker.participants import ParticipantKind
 from row_taker.engine.game.state_mappers import (
     game_state_from_dict,

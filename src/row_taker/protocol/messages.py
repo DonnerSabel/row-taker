@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from row_taker.engine.game.models import PlayerID, RowID
+from row_taker.engine.game import GameState, PlayerID, PlayerState, PublicState, RowID
 from row_taker.participants import ParticipantKind
-from row_taker.engine.game.state import GameState, PlayerState, PublicState
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +164,8 @@ class SessionEndReason(StrEnum):
     QUIT = "quit"
     DISCONNECT = "disconnect"
     KICKED = "kicked"
+    SERVER_SHUTDOWN = "server_shutdown"
+    GAME_FINISHED = "game_finished"
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,11 +197,28 @@ ServerToClientMessage = (
 )
 
 GameClientMessage = SubmitCard | SubmitRowChoice
-GameServerMessage = StateUpdated | CardsRevealed | RowChoiceCommitted | ChooseCardRequested | ChooseRowRequested
+GameServerMessage = (
+    StateUpdated
+    | CardsRevealed
+    | RowChoiceCommitted
+    | ChooseCardRequested
+    | ChooseRowRequested
+    | DebugStateSnapshot
+    | SessionEnded
+    | ServerError
+)
 
 
-def get_game_message_revision(message: ServerToClientMessage) -> int | None:
-    if isinstance(message, StateUpdated | CardsRevealed | RowChoiceCommitted | ChooseCardRequested | ChooseRowRequested):
+def get_game_message_revision(message: GameServerMessage) -> int | None:
+    if isinstance(message, StateUpdated):
+        return message.revision
+    if isinstance(message, CardsRevealed):
+        return message.revision
+    if isinstance(message, RowChoiceCommitted):
+        return message.revision
+    if isinstance(message, ChooseCardRequested):
+        return message.revision
+    if isinstance(message, ChooseRowRequested):
         return message.revision
     if isinstance(message, DebugStateSnapshot):
         return message.revision
