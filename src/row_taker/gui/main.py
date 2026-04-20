@@ -11,6 +11,7 @@ from row_taker.gui.constants import (
     WINDOW_WIDTH,
 )
 from row_taker.gui.spielfeld import Spielfeld
+from row_taker.gui.icons import PlayerIcon, create_player_icons
 
 
 def create_demo_cards(window_width: int, window_height: int) -> list[Card]:
@@ -57,6 +58,8 @@ def run() -> int:
             for card in deck:
                 card.draw(screen, mouse_pos)  # ✅ Hover funktioniert
 
+            for PlayerIcon in create_player_icons(4, 20, 20, 10):
+                PlayerIcon.draw(screen)
             pygame.display.flip()
             clock.tick(FPS)
 
