@@ -28,11 +28,12 @@ def create_demo_cards(window_width: int, window_height: int) -> list[Card]:     
         card.x = x_pos
         card.y = OFFSET_Yo
         CARD_GAP = (
-            WINDOW_WIDTH               #TODO: (Andi) Aufbau kartendeck abhängig nur vom Spielfeld und nicht vom gesamten Fenster.
+            (WINDOW_WIDTH               #TODO: (Andi) Aufbau kartendeck abhängig nur vom Spielfeld und nicht vom gesamten Fenster.
             - OFFSET_Xl
             - (card.image.get_width() * DEMO_CARD_VALUES.__len__())
-            - OFFSET_Xr
-        ) / (DEMO_CARD_VALUES.__len__() - 1)
+            - OFFSET_Xr) 
+            / (DEMO_CARD_VALUES.__len__() - 1)
+        )
         x_pos += card.image.get_width() + CARD_GAP
 
     return deck
