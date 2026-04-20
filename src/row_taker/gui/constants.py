@@ -2,6 +2,7 @@
 
 WINDOW_TITLE = "Row Taker"
 
+# Diese Werte werden jetzt für das Fallback genutzt, Fullscreen überschreibt sie
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 700
 
