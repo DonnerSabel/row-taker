@@ -3,28 +3,36 @@ import pygame
 from row_taker.gui.card import Card
 from row_taker.gui.constants import (
     BACKGROUND_COLOR,
-    CARD_GAP,
     DEMO_CARD_VALUES,
     FPS,
     WINDOW_HEIGHT,
     WINDOW_TITLE,
     WINDOW_WIDTH,
+    OFFSET_Xr,
+    OFFSET_Xl,
+    OFFSET_Yo,
 )
 from row_taker.gui.spielfeld import Spielfeld
 
-
-def create_demo_cards(window_width: int, window_height: int) -> list[Card]:
+ind.
+def create_demo_cards(window_width: int, window_height: int) -> list[Card]:           #TODO: (Anid) Carten von Engine State verwenden  
     deck = [Card(value) for value in DEMO_CARD_VALUES]
 
     for card in deck:
         card.scale(window_width)
 
-    x_pos = CARD_GAP
+    x_pos = OFFSET_Xl
     for card in deck:
         if card.image is None:
             continue
         card.x = x_pos
-        card.y = window_height // 2 - card.image.get_height() // 2
+        card.y = OFFSET_Yo
+        CARD_GAP = (
+            WINDOW_WIDTH               #TODO: (Andi) Aufbau kartendeck abhängig nur vom Spielfeld und nicht vom gesamten Fenster.
+            - OFFSET_Xl
+            - (card.image.get_width() * DEMO_CARD_VALUES.__len__())
+            - OFFSET_Xr
+        ) / (DEMO_CARD_VALUES.__len__() - 1)
         x_pos += card.image.get_width() + CARD_GAP
 
     return deck

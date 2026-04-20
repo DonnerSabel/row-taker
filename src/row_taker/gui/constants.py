@@ -9,6 +9,9 @@ FPS = 60
 
 CARD_SCALE = 0.15
 CARD_ASPECT_RATIO = 1.5
-CARD_GAP = 50
+OFFSET_Xr = 60
+OFFSET_Xl = 30
+OFFSET_Yu = 20
+OFFSET_Yo = 70
 
-DEMO_CARD_VALUES = [1, 2, 3, 4, 5]
+DEMO_CARD_VALUES = [1, 2, 3, 4]  # TODO: (Anid) Carten von Engine State rules.config verwenden
