@@ -14,8 +14,10 @@ from row_taker.gui.constants import (
 )
 from row_taker.gui.spielfeld import Spielfeld
 
-ind.
-def create_demo_cards(window_width: int, window_height: int) -> list[Card]:           #TODO: (Anid) Carten von Engine State verwenden  
+
+def create_demo_cards(
+    window_width: int, window_height: int
+) -> list[Card]:  # TODO: (Anid) Carten von Engine State verwenden
     deck = [Card(value) for value in DEMO_CARD_VALUES]
 
     for card in deck:
@@ -28,10 +30,12 @@ def create_demo_cards(window_width: int, window_height: int) -> list[Card]:     
         card.x = x_pos
         card.y = OFFSET_Yo
         CARD_GAP = (
-            (WINDOW_WIDTH               #TODO: (Andi) Aufbau kartendeck abhängig nur vom Spielfeld und nicht vom gesamten Fenster.
-            - OFFSET_Xl
-            - (card.image.get_width() * DEMO_CARD_VALUES.__len__())
-            - OFFSET_Xr) 
+            (
+                WINDOW_WIDTH  # TODO: (Andi) Aufbau kartendeck abhängig nur vom Spielfeld und nicht vom gesamten Fenster.
+                - OFFSET_Xl
+                - (card.image.get_width() * DEMO_CARD_VALUES.__len__())
+                - OFFSET_Xr
+            )
             / (DEMO_CARD_VALUES.__len__() - 1)
         )
         x_pos += card.image.get_width() + CARD_GAP
