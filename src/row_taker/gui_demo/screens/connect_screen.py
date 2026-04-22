@@ -34,6 +34,10 @@ def handle_connect_event(
     connect_form: ConnectFormState,
     connect_targets: ConnectScreenTargets | None,
 ) -> ScreenResult:
+    if event.type == pygame.QUIT:
+        return ScreenResult(request_quit=True)
+    if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+        return ScreenResult(request_quit=True)
     if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB:
         return ScreenResult(next_connect_form=activate_next_field(connect_form))
     if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):

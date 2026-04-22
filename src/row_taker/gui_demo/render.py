@@ -15,7 +15,6 @@ from row_taker.client.state import ClientState
 from row_taker.participants import ParticipantKind
 from row_taker.engine.game import Phase
 from row_taker.gui_demo.connect_screen import ConnectFormState, ConnectScreenTargets
-from row_taker.gui_demo.interactions import InteractionMap
 from row_taker.gui_demo.layout import DemoLayout
 from row_taker.gui_demo.primitives import (
     ACCENT,
@@ -101,7 +100,7 @@ def render_session(
     layout: DemoLayout,
     client_state: ClientState,
     frame_count: int,
-    interaction_map: InteractionMap,
+    interaction_map: object,
     last_action_summary: str,
 ) -> None:
     screen.fill(WINDOW_BACKGROUND)
@@ -137,7 +136,7 @@ def _render_main_area(
     drawer: PrimitiveDrawer,
     layout: DemoLayout,
     client_state: ClientState,
-    interaction_map: InteractionMap,
+    interaction_map: object,
 ) -> None:
     if client_state.client_mode.value == "lobby":
         _render_lobby_panels(screen, drawer, layout, client_state, interaction_map)
@@ -155,7 +154,7 @@ def _render_lobby_panels(
     drawer: PrimitiveDrawer,
     layout: DemoLayout,
     client_state: ClientState,
-    interaction_map: InteractionMap,
+    interaction_map: object,
 ) -> None:
     top_content = drawer.draw_panel(screen, layout.main_top_rect, title="Lobby seats")
     bottom_content = drawer.draw_panel(screen, layout.main_bottom_rect, title="Participants / commands")
@@ -203,7 +202,7 @@ def _render_game_panels(
     drawer: PrimitiveDrawer,
     layout: DemoLayout,
     client_state: ClientState,
-    interaction_map: InteractionMap,
+    interaction_map: object,
 ) -> None:
     top_content = drawer.draw_panel(screen, layout.main_top_rect, title="Rows and players")
     bottom_content = drawer.draw_panel(screen, layout.main_bottom_rect, title="Own hand")
@@ -217,7 +216,7 @@ def _render_rows_and_players(
     drawer: PrimitiveDrawer,
     rect,
     client_state: ClientState,
-    interaction_map: InteractionMap,
+    interaction_map: object,
 ) -> None:
     public_state = client_state.public_state
     if public_state is None:
@@ -269,7 +268,7 @@ def _render_hand(
     drawer: PrimitiveDrawer,
     rect,
     client_state: ClientState,
-    interaction_map: InteractionMap,
+    interaction_map: object,
 ) -> None:
     player_state = client_state.player_state
     if player_state is None:
@@ -340,7 +339,7 @@ def _render_sidebar(
     client_state: ClientState,
     frame_count: int,
     last_action_summary: str,
-    interaction_map: InteractionMap,
+    interaction_map: object,
 ) -> None:
     content_rect = drawer.draw_panel(screen, layout.sidebar_rect, title="State summary")
     y = content_rect.top
