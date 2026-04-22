@@ -36,6 +36,45 @@ class LobbyScreenTargets:
     button_targets: tuple[LobbyButtonTarget, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class LobbyScreen:
+    state: ClientState
+    frame_count: int
+    last_action_summary: str
+
+    def build_targets(self, layout: DemoLayout) -> LobbyScreenTargets:
+        return build_lobby_screen_targets(layout, self.state)
+
+    def handle_event(
+        self,
+        event: pygame.event.Event,
+        targets: LobbyScreenTargets | None,
+    ) -> ScreenResult:
+        return handle_lobby_event(
+            event,
+            state=self.state,
+            lobby_targets=targets,
+        )
+
+    def render(
+        self,
+        screen: pygame.Surface,
+        *,
+        drawer: PrimitiveDrawer,
+        layout: DemoLayout,
+        targets: LobbyScreenTargets,
+    ) -> None:
+        render_lobby_screen(
+            screen,
+            drawer=drawer,
+            layout=layout,
+            client_state=self.state,
+            frame_count=self.frame_count,
+            lobby_targets=targets,
+            last_action_summary=self.last_action_summary,
+        )
+
+
 def build_lobby_screen_targets(layout: DemoLayout, state: ClientState) -> LobbyScreenTargets:
     return LobbyScreenTargets(
         seat_targets=_build_lobby_seat_targets(layout, state),

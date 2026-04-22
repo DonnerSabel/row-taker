@@ -7,23 +7,9 @@ from row_taker.client.state import ClientState
 from row_taker.gui_demo.layout import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, compute_layout
 from row_taker.gui_demo.live_client import LiveGuiClient
 from row_taker.gui_demo.primitives import PrimitiveDrawer
-from row_taker.gui_demo.screens.connect_screen import (
-    ConnectFormState,
-    build_connect_screen_targets,
-    handle_connect_event,
-    normalized_connection_values,
-    render_connect_screen,
-)
-from row_taker.gui_demo.screens.game_screen import (
-    build_game_screen_targets,
-    handle_game_event,
-    render_game_screen,
-)
-from row_taker.gui_demo.screens.lobby_screen import (
-    build_lobby_screen_targets,
-    handle_lobby_event,
-    render_lobby_screen,
-)
+from row_taker.gui_demo.screens.connect_screen import ConnectFormState, ConnectScreen
+from row_taker.gui_demo.screens.game_screen import GameScreen
+from row_taker.gui_demo.screens.lobby_screen import LobbyScreen
 from row_taker.gui_demo.ui.screen_result import ScreenResult
 from row_taker.protocol.transport import ClientTransport
 
@@ -56,8 +42,7 @@ class GuiDemoApp:
 
             while self._running:
                 self._poll_live_client()
-                self._handle_events()
-                self._render_frame()
+                self._process_current_screen()
                 self._tick()
 
             return 0
@@ -73,36 +58,50 @@ class GuiDemoApp:
         self._live_client.poll()
         self._client_state = self._live_client.state
 
-    def _handle_events(self) -> None:
-        for event in pygame.event.get():
-            result = self._handle_current_screen_event(event)
-            self._apply_screen_result(result)
+    def _process_current_screen(self) -> None:
+        if self._screen is None or self._drawer is None:
+            raise RuntimeError('GuiDemoApp not initialized')
 
-    def _handle_current_screen_event(self, event: pygame.event.Event) -> ScreenResult:
         layout = self._current_layout()
+        current_screen = self._build_current_screen()
+        targets = current_screen.build_targets(layout)
+
+        for event in pygame.event.get():
+            result = current_screen.handle_event(event, targets)
+            self._apply_screen_result(result)
+            if not self._running:
+                return
+
+            layout = self._current_layout()
+            current_screen = self._build_current_screen()
+            targets = current_screen.build_targets(layout)
+
+        current_screen.render(
+            self._screen,
+            drawer=self._drawer,
+            layout=layout,
+            targets=targets,
+        )
+        pygame.display.flip()
+
+    def _build_current_screen(self) -> ConnectScreen | LobbyScreen | GameScreen:
         if self._live_client is None:
-            connect_targets = build_connect_screen_targets(layout)
-            return handle_connect_event(
-                event,
-                connect_form=self._connect_form,
-                connect_targets=connect_targets,
-            )
+            return ConnectScreen(connect_form=self._connect_form)
 
-        if self._client_state is not None and self._client_state.client_mode.value == 'lobby':
-            lobby_targets = build_lobby_screen_targets(layout, self._client_state)
-            return handle_lobby_event(
-                event,
+        if self._client_state is None:
+            raise RuntimeError('Live client active without client state')
+
+        if self._client_state.client_mode.value == 'lobby':
+            return LobbyScreen(
                 state=self._client_state,
-                lobby_targets=lobby_targets,
+                frame_count=self._frame_count,
+                last_action_summary=self._last_action_summary,
             )
 
-        game_targets = None
-        if self._client_state is not None:
-            game_targets = build_game_screen_targets(layout, self._client_state)
-        return handle_game_event(
-            event,
+        return GameScreen(
             state=self._client_state,
-            game_targets=game_targets,
+            frame_count=self._frame_count,
+            last_action_summary=self._last_action_summary,
         )
 
     def _apply_screen_result(self, result: ScreenResult) -> None:
@@ -120,21 +119,21 @@ class GuiDemoApp:
 
         if result.next_state is not None:
             self._apply_local_state(result.next_state)
-            self._last_action_summary = 'Updated local GUI navigation state.'
+            self._last_action_summary = 'Lokale GUI-Navigation aktualisiert.'
             return
 
         if result.client_action is not None:
             self._apply_client_action(result.client_action)
 
     def _attempt_connect(self) -> None:
-        connection_values = normalized_connection_values(self._connect_form)
+        connection_values = self._build_current_screen().normalized_connection_values()
         if connection_values is None:
             self._connect_form = ConnectFormState(
                 host=self._connect_form.host,
                 port=self._connect_form.port,
                 display_name=self._connect_form.display_name,
                 active_field=self._connect_form.active_field,
-                error_message='Bitte gültige Werte für Server IP, Port und Display name eingeben.',
+                error_message='Bitte gültige Werte für Server IP, Port und Anzeigename eingeben.',
                 status_message=self._connect_form.status_message,
             )
             return
@@ -174,47 +173,6 @@ class GuiDemoApp:
         if self._screen is None:
             raise RuntimeError('GuiDemoApp not initialized')
         return compute_layout(*self._screen.get_size())
-
-    def _render_frame(self) -> None:
-        if self._screen is None or self._drawer is None:
-            raise RuntimeError('GuiDemoApp not initialized')
-
-        layout = self._current_layout()
-        if self._live_client is None:
-            connect_targets = build_connect_screen_targets(layout)
-            render_connect_screen(
-                self._screen,
-                drawer=self._drawer,
-                layout=layout,
-                connect_form=self._connect_form,
-                connect_targets=connect_targets,
-            )
-        else:
-            if self._client_state is None:
-                raise RuntimeError('Live client active without client state')
-            if self._client_state.client_mode.value == 'lobby':
-                lobby_targets = build_lobby_screen_targets(layout, self._client_state)
-                render_lobby_screen(
-                    self._screen,
-                    drawer=self._drawer,
-                    layout=layout,
-                    client_state=self._client_state,
-                    frame_count=self._frame_count,
-                    lobby_targets=lobby_targets,
-                    last_action_summary=self._last_action_summary,
-                )
-            else:
-                game_targets = build_game_screen_targets(layout, self._client_state)
-                render_game_screen(
-                    self._screen,
-                    drawer=self._drawer,
-                    layout=layout,
-                    client_state=self._client_state,
-                    frame_count=self._frame_count,
-                    game_targets=game_targets,
-                    last_action_summary=self._last_action_summary,
-                )
-        pygame.display.flip()
 
     def _tick(self) -> None:
         if self._clock is None:

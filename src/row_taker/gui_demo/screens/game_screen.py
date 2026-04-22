@@ -41,6 +41,45 @@ class GameScreenTargets:
     continue_target: ContinueTarget | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class GameScreen:
+    state: ClientState
+    frame_count: int
+    last_action_summary: str
+
+    def build_targets(self, layout: DemoLayout) -> GameScreenTargets:
+        return build_game_screen_targets(layout, self.state)
+
+    def handle_event(
+        self,
+        event: pygame.event.Event,
+        targets: GameScreenTargets | None,
+    ) -> ScreenResult:
+        return handle_game_event(
+            event,
+            state=self.state,
+            game_targets=targets,
+        )
+
+    def render(
+        self,
+        screen: pygame.Surface,
+        *,
+        drawer: PrimitiveDrawer,
+        layout: DemoLayout,
+        targets: GameScreenTargets,
+    ) -> None:
+        render_game_screen(
+            screen,
+            drawer=drawer,
+            layout=layout,
+            client_state=self.state,
+            frame_count=self.frame_count,
+            game_targets=targets,
+            last_action_summary=self.last_action_summary,
+        )
+
+
 def build_game_screen_targets(layout: DemoLayout, state: ClientState) -> GameScreenTargets:
     return GameScreenTargets(
         card_targets=_build_card_targets(layout, state),

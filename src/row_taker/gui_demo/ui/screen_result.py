@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from row_taker.client.state import ClientState
-from row_taker.gui_demo.connect_screen import ConnectFormState
+from row_taker.gui_demo.screens.connect_screen import ConnectFormState
 
 
 @dataclass(frozen=True, slots=True)
