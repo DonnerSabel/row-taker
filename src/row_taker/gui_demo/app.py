@@ -4,18 +4,28 @@ import pygame
 
 from row_taker.client.actions import ClientAction
 from row_taker.client.state import ClientState
-from row_taker.gui_demo.input_mapping import map_pygame_event
-from row_taker.gui_demo.interactions import InteractionMap, build_session_interaction_map
 from row_taker.gui_demo.layout import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, compute_layout
 from row_taker.gui_demo.live_client import LiveGuiClient
 from row_taker.gui_demo.primitives import PrimitiveDrawer
-from row_taker.gui_demo.render import render_session
 from row_taker.gui_demo.screens.connect_screen import (
     ConnectFormState,
+    ConnectScreenTargets,
     build_connect_screen_targets,
     handle_connect_event,
     normalized_connection_values,
     render_connect_screen,
+)
+from row_taker.gui_demo.screens.game_screen import (
+    GameScreenTargets,
+    build_game_screen_targets,
+    handle_game_event,
+    render_game_screen,
+)
+from row_taker.gui_demo.screens.lobby_screen import (
+    LobbyScreenTargets,
+    build_lobby_screen_targets,
+    handle_lobby_event,
+    render_lobby_screen,
 )
 from row_taker.protocol.transport import ClientTransport
 
@@ -30,12 +40,13 @@ class GuiDemoApp:
         self._screen: pygame.Surface | None = None
         self._clock: pygame.time.Clock | None = None
         self._drawer: PrimitiveDrawer | None = None
-        self._interaction_map = InteractionMap()
         self._last_action_summary = 'Noch keine GUI-Aktion.'
         self._live_client: LiveGuiClient | None = None
         self._client_state: ClientState | None = None
         self._connect_form = ConnectFormState()
-        self._connect_targets = None
+        self._connect_targets: ConnectScreenTargets | None = None
+        self._lobby_targets: LobbyScreenTargets | None = None
+        self._game_targets: GameScreenTargets | None = None
 
     def run(self) -> int:
         pygame.init()
@@ -79,11 +90,17 @@ class GuiDemoApp:
                 )
                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                     mapped = mapped if mapped.request_quit else type(mapped)(request_quit=True)
-            else:
-                mapped = map_pygame_event(
+            elif self._client_state is not None and self._client_state.client_mode.value == 'lobby':
+                mapped = handle_lobby_event(
                     event,
                     state=self._client_state,
-                    interaction_map=self._interaction_map,
+                    lobby_targets=self._lobby_targets,
+                )
+            else:
+                mapped = handle_game_event(
+                    event,
+                    state=self._client_state,
+                    game_targets=self._game_targets,
                 )
 
             if mapped.request_quit:
@@ -162,6 +179,8 @@ class GuiDemoApp:
         layout = compute_layout(*self._screen.get_size())
         if self._live_client is None:
             self._connect_targets = build_connect_screen_targets(layout)
+            if self._connect_targets is None:
+                raise RuntimeError('Connect screen targets missing')
             render_connect_screen(
                 self._screen,
                 drawer=self._drawer,
@@ -172,16 +191,28 @@ class GuiDemoApp:
         else:
             if self._client_state is None:
                 raise RuntimeError('Live client active without client state')
-            self._interaction_map = build_session_interaction_map(layout, self._client_state)
-            render_session(
-                self._screen,
-                drawer=self._drawer,
-                layout=layout,
-                client_state=self._client_state,
-                frame_count=self._frame_count,
-                interaction_map=self._interaction_map,
-                last_action_summary=self._last_action_summary,
-            )
+            if self._client_state.client_mode.value == 'lobby':
+                self._lobby_targets = build_lobby_screen_targets(layout, self._client_state)
+                render_lobby_screen(
+                    self._screen,
+                    drawer=self._drawer,
+                    layout=layout,
+                    client_state=self._client_state,
+                    frame_count=self._frame_count,
+                    lobby_targets=self._lobby_targets,
+                    last_action_summary=self._last_action_summary,
+                )
+            else:
+                self._game_targets = build_game_screen_targets(layout, self._client_state)
+                render_game_screen(
+                    self._screen,
+                    drawer=self._drawer,
+                    layout=layout,
+                    client_state=self._client_state,
+                    frame_count=self._frame_count,
+                    game_targets=self._game_targets,
+                    last_action_summary=self._last_action_summary,
+                )
         pygame.display.flip()
 
     def _tick(self) -> None:
@@ -196,6 +227,16 @@ class GuiDemoApp:
         layout = compute_layout(*self._screen.get_size())
         if self._live_client is None:
             self._connect_targets = build_connect_screen_targets(layout)
-            self._interaction_map = InteractionMap()
-        elif self._client_state is not None:
-            self._interaction_map = build_session_interaction_map(layout, self._client_state)
+            self._lobby_targets = None
+            self._game_targets = None
+            return
+        if self._client_state is None:
+            self._lobby_targets = None
+            self._game_targets = None
+            return
+        if self._client_state.client_mode.value == 'lobby':
+            self._lobby_targets = build_lobby_screen_targets(layout, self._client_state)
+            self._game_targets = None
+        else:
+            self._game_targets = build_game_screen_targets(layout, self._client_state)
+            self._lobby_targets = None
