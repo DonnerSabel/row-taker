@@ -17,7 +17,7 @@ class ConnectFormState:
     display_name: str = "Spieler"
     active_field: str = "display_name"
     error_message: str | None = None
-    status_message: str = "Enter verbindet. Tab wechselt das Feld."
+    status_message: str = "Enter verbindet. Tab wechselt zum nächsten Feld."
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,15 +63,15 @@ def build_connect_screen_targets(layout: DemoLayout) -> ConnectScreenTargets:
         ),
         ConnectFieldTarget(
             "display_name",
-            "Display name",
+            "Anzeigename",
             pygame.Rect(inner_left, inner_top + 2 * (field_height + field_gap), field_width, field_height),
         ),
     )
 
     button_y = panel_rect.bottom - 62
     button_targets = (
-        ConnectButtonTarget("connect", "Connect", pygame.Rect(inner_left, button_y, 150, 36)),
-        ConnectButtonTarget("quit", "Quit", pygame.Rect(inner_left + 164, button_y, 150, 36)),
+        ConnectButtonTarget("connect", "Verbinden", pygame.Rect(inner_left, button_y, 150, 36)),
+        ConnectButtonTarget("quit", "Beenden", pygame.Rect(inner_left + 164, button_y, 150, 36)),
     )
 
     return ConnectScreenTargets(

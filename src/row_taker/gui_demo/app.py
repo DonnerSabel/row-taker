@@ -157,7 +157,7 @@ class GuiDemoApp:
 
         self._live_client = live_client
         self._client_state = live_client.state
-        self._last_action_summary = f'Connected to {host}:{port} as {display_name}.'
+        self._last_action_summary = f'Verbunden mit {host}:{port} als {display_name}.'
 
     def _apply_local_state(self, next_state: ClientState) -> None:
         self._client_state = next_state

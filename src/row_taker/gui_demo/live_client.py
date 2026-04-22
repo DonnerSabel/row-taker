@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+"""Laufzeit-Hülle für den GUI-Demo-Client.
+
+Dieses Modul gehört bewusst zur Infrastruktur. Es verbindet Transport,
+GameClientCore und einen kleinen Hintergrund-Receive-Loop. Für eigene
+GUI-Experimente der Schüler ist es normalerweise nicht der erste Ort für
+Änderungen.
+"""
+
 import queue
 import threading
 
@@ -13,6 +21,14 @@ from row_taker.protocol.transport import ClientTransport
 
 
 class LiveGuiClient:
+    """Infrastruktur-Baustein zwischen GUI, Transport und ClientCore.
+
+    Die GUI spricht mit dieser Klasse nur über wenige Operationen:
+    start(), poll(), apply_local_state(), apply_action() und close().
+    Dadurch kann der Rest der Demo-UI den Netzwerkteil weitgehend als
+    Black Box behandeln.
+    """
+
     def __init__(
         self,
         transport: ClientTransport,
@@ -59,7 +75,7 @@ class LiveGuiClient:
     def apply_action(self, action: ClientAction) -> str:
         update = self.core.on_ui_action(action)
         self._apply_update(update)
-        return f"GUI produced {action!r}"
+        return f"GUI-Aktion erzeugt: {action!r}"
 
     def close(self, *, send_leave_session: bool) -> None:
         if self._closed:

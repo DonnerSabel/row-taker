@@ -143,15 +143,15 @@ def _build_lobby_button_targets(layout: DemoLayout, state: ClientState) -> tuple
 
     if selected_seat_index is None:
         start_rect = pygame.Rect(top_rect.right - 170, top_rect.top + 28, 150, 34)
-        buttons.append(LobbyButtonTarget(button_id='start_game', label='Start game', rect=start_rect))
+        buttons.append(LobbyButtonTarget(button_id='start_game', label='Spiel starten', rect=start_rect))
         return tuple(buttons)
 
     button_specs = [
-        ('take_seat', 'Take seat'),
-        ('create_bot', 'Create bot'),
-        ('clear_seat', 'Clear seat'),
-        ('back', 'Back'),
-        ('start_game', 'Start game'),
+        ('take_seat', 'Platz nehmen'),
+        ('create_bot', 'Bot erzeugen'),
+        ('clear_seat', 'Platz leeren'),
+        ('back', 'Zurück'),
+        ('start_game', 'Spiel starten'),
     ]
 
     button_width = 150
@@ -175,17 +175,17 @@ def _render_lobby_panels(
     client_state: ClientState,
     lobby_targets: LobbyScreenTargets,
 ) -> None:
-    top_content = drawer.draw_panel(screen, layout.main_top_rect, title='Lobby seats')
-    bottom_content = drawer.draw_panel(screen, layout.main_bottom_rect, title='Participants / commands')
+    top_content = drawer.draw_panel(screen, layout.main_top_rect, title='Lobby-Plätze')
+    bottom_content = drawer.draw_panel(screen, layout.main_bottom_rect, title='Teilnehmer / Befehle')
 
     lobby_view = client_state.lobby_view
     if lobby_view is None:
-        drawer.draw_wrapped_lines(screen, ['No lobby view available.'], top_content)
+        drawer.draw_wrapped_lines(screen, ['Keine Lobby-Ansicht verfügbar.'], top_content)
         return
 
     drawer.draw_text(
         screen,
-        f'server_endpoint: {lobby_view.server_endpoint or "-"}',
+        f'Server-Endpunkt: {lobby_view.server_endpoint or "-"}',
         (top_content.left, top_content.top),
         role='small',
         color=TEXT_MUTED,
@@ -224,7 +224,7 @@ def _render_sidebar(
     frame_count: int,
     last_action_summary: str,
 ) -> None:
-    content_rect = drawer.draw_panel(screen, layout.sidebar_rect, title='State summary')
+    content_rect = drawer.draw_panel(screen, layout.sidebar_rect, title='Zustandsübersicht')
     y = content_rect.top
 
     entries = [
@@ -248,7 +248,7 @@ def _render_sidebar(
     action_rect.height = 72
     drawer.draw_wrapped_lines(screen, [last_action_summary], action_rect, role='small')
 
-    flash_text = client_state.flash_message.text if client_state.flash_message is not None else 'No flash message'
+    flash_text = client_state.flash_message.text if client_state.flash_message is not None else 'Keine Meldung'
     drawer.draw_text(screen, 'flash_message', (content_rect.left, action_rect.bottom + 10), role='small', color=TEXT_MUTED)
     flash_rect = content_rect.copy()
     flash_rect.top = action_rect.bottom + 32
@@ -263,6 +263,6 @@ def _render_sidebar(
     events_rect.top += 22
     event_lines = [format_presentation_event(event) for event in client_state.pending_presentation_events]
     if not event_lines:
-        event_lines = ['No pending presentation events.']
+        event_lines = ['Keine ausstehenden Präsentationsereignisse.']
     drawer.draw_wrapped_lines(screen, event_lines, events_rect, role='small')
 

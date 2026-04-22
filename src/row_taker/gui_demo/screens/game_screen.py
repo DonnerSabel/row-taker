@@ -110,7 +110,7 @@ def _build_card_targets(layout: DemoLayout, state: ClientState) -> tuple[CardTar
     info_lines = [
         f'player: {player_state.self_player_name()}',
         f'pending_action: {state.pending_action.value}',
-        'click a card to send the choice',
+        'Klicke eine Karte, um die Auswahl zu senden.',
     ]
     if player_state.phase_info.phase.value == 'choose_row' and player_state.pending_card_value() is not None:
         info_lines.append(f'pending_card: {player_state.pending_card_value()}')
@@ -196,8 +196,8 @@ def _render_game_panels(
     client_state: ClientState,
     game_targets: GameScreenTargets,
 ) -> None:
-    top_content = drawer.draw_panel(screen, layout.main_top_rect, title='Rows and players')
-    bottom_content = drawer.draw_panel(screen, layout.main_bottom_rect, title='Own hand')
+    top_content = drawer.draw_panel(screen, layout.main_top_rect, title='Reihen und Spieler')
+    bottom_content = drawer.draw_panel(screen, layout.main_bottom_rect, title='Eigene Hand')
 
     _render_rows_and_players(screen, drawer, top_content, client_state, game_targets)
     _render_hand(screen, drawer, bottom_content, client_state, game_targets)
@@ -212,7 +212,7 @@ def _render_rows_and_players(
 ) -> None:
     public_state = client_state.public_state
     if public_state is None:
-        drawer.draw_wrapped_lines(screen, ['No public_state available.'], rect)
+        drawer.draw_wrapped_lines(screen, ['Kein public_state verfügbar.'], rect)
         return
 
     info_lines = [
@@ -264,13 +264,13 @@ def _render_hand(
 ) -> None:
     player_state = client_state.player_state
     if player_state is None:
-        drawer.draw_wrapped_lines(screen, ['No player_state available.'], rect)
+        drawer.draw_wrapped_lines(screen, ['Kein player_state verfügbar.'], rect)
         return
 
     info_lines = [
         f'player: {player_state.self_player_name()}',
         f'pending_action: {client_state.pending_action.value}',
-        'click a card to send the choice',
+        'Klicke eine Karte, um die Auswahl zu senden.',
     ]
     if player_state.phase_info.phase == Phase.CHOOSE_ROW and player_state.pending_card_value() is not None:
         info_lines.append(f'pending_card: {player_state.pending_card_value()}')
@@ -341,7 +341,7 @@ def _render_sidebar(
     last_action_summary: str,
     game_targets: GameScreenTargets,
 ) -> None:
-    content_rect = drawer.draw_panel(screen, layout.sidebar_rect, title='State summary')
+    content_rect = drawer.draw_panel(screen, layout.sidebar_rect, title='Zustandsübersicht')
     y = content_rect.top
 
     entries = [
@@ -365,7 +365,7 @@ def _render_sidebar(
     action_rect.height = 72
     drawer.draw_wrapped_lines(screen, [last_action_summary], action_rect, role='small', color=ACCENT)
 
-    flash_text = client_state.flash_message.text if client_state.flash_message is not None else 'No flash message'
+    flash_text = client_state.flash_message.text if client_state.flash_message is not None else 'Keine Meldung'
     drawer.draw_text(screen, 'flash_message', (content_rect.left, action_rect.bottom + 10), role='small', color=TEXT_MUTED)
     flash_rect = content_rect.copy()
     flash_rect.top = action_rect.bottom + 32
@@ -380,9 +380,9 @@ def _render_sidebar(
     events_rect.top += 22
     event_lines = [format_presentation_event(event) for event in client_state.pending_presentation_events]
     if not event_lines:
-        event_lines = ['No pending presentation events.']
+        event_lines = ['Keine ausstehenden Präsentationsereignisse.']
     drawer.draw_wrapped_lines(screen, event_lines, events_rect, role='small')
 
     if game_targets.continue_target is not None:
-        drawer.draw_badge(screen, game_targets.continue_target.rect, text='Continue [Space]', active=True)
+        drawer.draw_badge(screen, game_targets.continue_target.rect, text='Weiter [Leertaste]', active=True)
 

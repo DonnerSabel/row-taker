@@ -26,7 +26,7 @@ def render_standard_header(
     drawer.draw_text(screen, 'Row-Taker GUI Demo', (content_rect.left, content_rect.top), role='title')
     subtitle = (
         'Einfaches pygame-Frontend auf dem gemeinsamen ClientState. '
-        f'Mode={client_state.client_mode.value}, pending_action={client_state.pending_action.value}'
+        f'Modus={client_state.client_mode.value}, pending_action={client_state.pending_action.value}'
     )
     drawer.draw_text(
         screen,
@@ -42,9 +42,9 @@ def render_standard_footer(screen: pygame.Surface, drawer: PrimitiveDrawer, layo
     drawer.draw_wrapped_lines(
         screen,
         [
-            'ESC quit',
-            'Space continue presentation',
-            'Mouse for seats, buttons, cards and rows',
+            'ESC beenden',
+            'Leertaste Präsentation fortsetzen',
+            'Maus für Plätze, Buttons, Karten und Reihen',
         ],
         content_rect,
         role='small',
@@ -55,15 +55,15 @@ def render_standard_footer(screen: pygame.Surface, drawer: PrimitiveDrawer, layo
 def format_presentation_event(event: PresentationEvent) -> str:
     if isinstance(event, PresentationCardsRevealed):
         cards = ', '.join(f'{play.player_name}:{play.card_value}' for play in event.plays)
-        return f'cards revealed -> {cards}'
+        return f'Karten aufgedeckt -> {cards}'
     if isinstance(event, PresentationRowChoiceRequired):
-        return f'row choice required -> {event.player_name} with {event.card_value}'
+        return f'Reihenauswahl nötig -> {event.player_name} mit {event.card_value}'
     if isinstance(event, PresentationRowChosen):
-        return f'row chosen -> {event.player_name} takes {event.row_id}'
+        return f'Reihe gewählt -> {event.player_name} nimmt {event.row_id}'
     if isinstance(event, PresentationRowTaken):
-        return f'row taken -> {event.player_name} got {event.bullheads} bullheads'
+        return f'Reihe genommen -> {event.player_name} erhielt {event.bullheads} Hornochsen'
     if isinstance(event, PresentationOverflowResolved):
-        return f'overflow resolved -> {event.player_name} got {event.bullheads} bullheads'
+        return f'Überlauf aufgelöst -> {event.player_name} erhielt {event.bullheads} Hornochsen'
     if isinstance(event, PresentationTrickFinished):
-        return 'trick finished'
+        return 'Stich beendet'
     return event.__class__.__name__

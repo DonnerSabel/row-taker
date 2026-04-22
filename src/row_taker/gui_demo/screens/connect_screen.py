@@ -85,7 +85,7 @@ def render_connect_screen(
     pygame.draw.rect(screen, PANEL_BORDER, connect_targets.panel_rect, width=1)
 
     title_pos = (connect_targets.panel_rect.left + 24, connect_targets.panel_rect.top + 18)
-    drawer.draw_text(screen, 'Connect', title_pos, role='title')
+    drawer.draw_text(screen, 'Verbinden', title_pos, role='title')
 
     for target in connect_targets.field_targets:
         active = connect_form.active_field == target.field_name
@@ -119,8 +119,8 @@ def render_connect_screen(
         screen,
         [
             'Tab nächstes Feld',
-            'Enter connect',
-            'ESC quit',
+            'Enter verbinden',
+            'ESC beenden',
         ],
         footer_content,
         role='small',
