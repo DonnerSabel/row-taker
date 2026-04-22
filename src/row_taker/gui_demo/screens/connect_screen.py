@@ -6,20 +6,11 @@ import pygame
 
 from row_taker.gui_demo.layout import DemoLayout
 from row_taker.gui_demo.primitives import ACCENT, PANEL_BORDER, PANEL_FILL, TEXT_MUTED, WINDOW_BACKGROUND, PrimitiveDrawer
+from row_taker.gui_demo.ui.connect_form_state import ConnectFormState
 from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 
 CONNECT_FIELD_ORDER = ('host', 'port', 'display_name')
-
-
-@dataclass(frozen=True, slots=True)
-class ConnectFormState:
-    host: str = '127.0.0.1'
-    port: str = '8765'
-    display_name: str = 'Spieler'
-    active_field: str = 'display_name'
-    error_message: str | None = None
-    status_message: str = 'Enter verbindet. Tab wechselt zum nächsten Feld.'
 
 
 @dataclass(frozen=True, slots=True)

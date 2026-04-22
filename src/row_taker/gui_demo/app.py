@@ -7,7 +7,8 @@ from row_taker.client.state import ClientState
 from row_taker.gui_demo.layout import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, compute_layout
 from row_taker.gui_demo.live_client import LiveGuiClient
 from row_taker.gui_demo.primitives import PrimitiveDrawer
-from row_taker.gui_demo.screens.connect_screen import ConnectFormState, ConnectScreen
+from row_taker.gui_demo.screens.connect_screen import ConnectScreen
+from row_taker.gui_demo.ui.connect_form_state import ConnectFormState
 from row_taker.gui_demo.screens.game_screen import GameScreen
 from row_taker.gui_demo.screens.lobby_screen import LobbyScreen
 from row_taker.gui_demo.ui.screen_result import ScreenResult
