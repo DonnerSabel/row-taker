@@ -9,19 +9,11 @@ from row_taker.client.actions import (
     ClientActionChooseCard,
     ClientActionChooseRow,
 )
-from row_taker.client.presentation_events import (
-    PresentationCardsRevealed,
-    PresentationEvent,
-    PresentationOverflowResolved,
-    PresentationRowChoiceRequired,
-    PresentationRowChosen,
-    PresentationRowTaken,
-    PresentationTrickFinished,
-)
 from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
 from row_taker.gui_demo.layout import DemoLayout
 from row_taker.gui_demo.primitives import ACCENT, TEXT_MUTED, WINDOW_BACKGROUND, PrimitiveDrawer
+from row_taker.gui_demo.ui.common_render import format_presentation_event, render_standard_footer, render_standard_header
 from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 
@@ -87,10 +79,10 @@ def render_game_screen(
     last_action_summary: str,
 ) -> None:
     screen.fill(WINDOW_BACKGROUND)
-    _render_header(screen, drawer, layout, client_state)
+    render_standard_header(screen, drawer, layout, client_state)
     _render_game_panels(screen, drawer, layout, client_state, game_targets)
     _render_sidebar(screen, drawer, layout, client_state, frame_count, last_action_summary, game_targets)
-    _render_footer(screen, drawer, layout)
+    render_standard_footer(screen, drawer, layout)
 
 
 def _handle_left_click(position: tuple[int, int], *, game_targets: GameScreenTargets) -> ScreenResult:
@@ -195,27 +187,6 @@ def _build_continue_target(layout: DemoLayout, state: ClientState) -> ContinueTa
         34,
     )
     return ContinueTarget(rect=rect)
-
-
-def _render_header(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    layout: DemoLayout,
-    client_state: ClientState,
-) -> None:
-    content_rect = drawer.draw_panel(screen, layout.header_rect)
-    drawer.draw_text(screen, 'Row-Taker GUI Demo', (content_rect.left, content_rect.top), role='title')
-    subtitle = (
-        'Einfaches pygame-Frontend auf dem gemeinsamen ClientState. '
-        f'Mode={client_state.client_mode.value}, pending_action={client_state.pending_action.value}'
-    )
-    drawer.draw_text(
-        screen,
-        subtitle,
-        (content_rect.left, content_rect.top + 34),
-        role='small',
-        color=TEXT_MUTED,
-    )
 
 
 def _render_game_panels(
@@ -407,7 +378,7 @@ def _render_sidebar(
     events_rect.height = max(40, events_bottom - events_rect.top)
     drawer.draw_text(screen, 'presentation events', (events_rect.left, events_rect.top), role='small', color=TEXT_MUTED)
     events_rect.top += 22
-    event_lines = [_format_presentation_event(event) for event in client_state.pending_presentation_events]
+    event_lines = [format_presentation_event(event) for event in client_state.pending_presentation_events]
     if not event_lines:
         event_lines = ['No pending presentation events.']
     drawer.draw_wrapped_lines(screen, event_lines, events_rect, role='small')
@@ -415,34 +386,3 @@ def _render_sidebar(
     if game_targets.continue_target is not None:
         drawer.draw_badge(screen, game_targets.continue_target.rect, text='Continue [Space]', active=True)
 
-
-def _format_presentation_event(event: PresentationEvent) -> str:
-    if isinstance(event, PresentationCardsRevealed):
-        cards = ', '.join(f'{play.player_name}:{play.card_value}' for play in event.plays)
-        return f'cards revealed -> {cards}'
-    if isinstance(event, PresentationRowChoiceRequired):
-        return f'row choice required -> {event.player_name} with {event.card_value}'
-    if isinstance(event, PresentationRowChosen):
-        return f'row chosen -> {event.player_name} takes {event.row_id}'
-    if isinstance(event, PresentationRowTaken):
-        return f'row taken -> {event.player_name} got {event.bullheads} bullheads'
-    if isinstance(event, PresentationOverflowResolved):
-        return f'overflow resolved -> {event.player_name} got {event.bullheads} bullheads'
-    if isinstance(event, PresentationTrickFinished):
-        return 'trick finished'
-    return event.__class__.__name__
-
-
-def _render_footer(screen: pygame.Surface, drawer: PrimitiveDrawer, layout: DemoLayout) -> None:
-    content_rect = drawer.draw_panel(screen, layout.footer_rect)
-    drawer.draw_wrapped_lines(
-        screen,
-        [
-            'ESC quit',
-            'Space continue presentation',
-            'Mouse for cards, rows and continue',
-        ],
-        content_rect,
-        role='small',
-        color=TEXT_MUTED,
-    )

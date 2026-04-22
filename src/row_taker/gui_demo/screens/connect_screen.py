@@ -13,8 +13,7 @@ from row_taker.gui_demo.connect_screen import (
     normalized_connection_values,
 )
 from row_taker.gui_demo.layout import DemoLayout
-from row_taker.gui_demo.primitives import PrimitiveDrawer
-from row_taker.gui_demo.render import render_connect_screen as _render_connect_screen
+from row_taker.gui_demo.primitives import ACCENT, PANEL_BORDER, PANEL_FILL, TEXT_MUTED, WINDOW_BACKGROUND, PrimitiveDrawer
 from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 
@@ -70,10 +69,60 @@ def render_connect_screen(
     connect_form: ConnectFormState,
     connect_targets: ConnectScreenTargets,
 ) -> None:
-    _render_connect_screen(
+    screen.fill(WINDOW_BACKGROUND)
+
+    header_content = drawer.draw_panel(screen, layout.header_rect)
+    drawer.draw_text(screen, 'Row-Taker GUI Demo', (header_content.left, header_content.top), role='title')
+    drawer.draw_text(
         screen,
-        drawer=drawer,
-        layout=layout,
-        connect_form=connect_form,
-        connect_targets=connect_targets,
+        'Einfach verbinden und dann direkt spielen.',
+        (header_content.left, header_content.top + 34),
+        role='small',
+        color=TEXT_MUTED,
+    )
+
+    pygame.draw.rect(screen, PANEL_FILL, connect_targets.panel_rect)
+    pygame.draw.rect(screen, PANEL_BORDER, connect_targets.panel_rect, width=1)
+
+    title_pos = (connect_targets.panel_rect.left + 24, connect_targets.panel_rect.top + 18)
+    drawer.draw_text(screen, 'Connect', title_pos, role='title')
+
+    for target in connect_targets.field_targets:
+        active = connect_form.active_field == target.field_name
+        value = getattr(connect_form, target.field_name)
+        label_pos = (target.rect.left, target.rect.top - 18)
+        drawer.draw_text(screen, target.label, label_pos, role='small', color=TEXT_MUTED)
+        drawer.draw_badge(screen, target.rect, text=value or ' ', active=active)
+
+    for target in connect_targets.button_targets:
+        drawer.draw_badge(screen, target.rect, text=target.label, active=(target.button_id == 'connect'))
+
+    status_rect = pygame.Rect(
+        connect_targets.panel_rect.left + 24,
+        connect_targets.panel_rect.bottom - 114,
+        connect_targets.panel_rect.width - 48,
+        20,
+    )
+    drawer.draw_text(screen, connect_form.status_message, (status_rect.left, status_rect.top), role='small', color=TEXT_MUTED)
+
+    if connect_form.error_message is not None:
+        error_rect = pygame.Rect(
+            connect_targets.panel_rect.left + 24,
+            connect_targets.panel_rect.bottom - 88,
+            connect_targets.panel_rect.width - 48,
+            44,
+        )
+        drawer.draw_wrapped_lines(screen, [connect_form.error_message], error_rect, role='small', color=ACCENT)
+
+    footer_content = drawer.draw_panel(screen, layout.footer_rect)
+    drawer.draw_wrapped_lines(
+        screen,
+        [
+            'Tab nächstes Feld',
+            'Enter connect',
+            'ESC quit',
+        ],
+        footer_content,
+        role='small',
+        color=TEXT_MUTED,
     )

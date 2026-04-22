@@ -13,7 +13,7 @@ from row_taker.client.actions import (
 from row_taker.client.state import ClientState, enter_lobby_submenu
 from row_taker.gui_demo.layout import DemoLayout
 from row_taker.gui_demo.primitives import TEXT_MUTED, WINDOW_BACKGROUND, PrimitiveDrawer
-from row_taker.gui_demo.render import _format_presentation_event
+from row_taker.gui_demo.ui.common_render import format_presentation_event, render_standard_footer, render_standard_header
 from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 
@@ -71,10 +71,10 @@ def render_lobby_screen(
     last_action_summary: str,
 ) -> None:
     screen.fill(WINDOW_BACKGROUND)
-    _render_header(screen, drawer, layout, client_state)
+    render_standard_header(screen, drawer, layout, client_state)
     _render_lobby_panels(screen, drawer, layout, client_state, lobby_targets)
     _render_sidebar(screen, drawer, layout, client_state, frame_count, last_action_summary)
-    _render_footer(screen, drawer, layout)
+    render_standard_footer(screen, drawer, layout)
 
 
 def _handle_left_click(
@@ -166,27 +166,6 @@ def _build_lobby_button_targets(layout: DemoLayout, state: ClientState) -> tuple
         x += button_width + button_gap
 
     return tuple(buttons)
-
-
-def _render_header(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    layout: DemoLayout,
-    client_state: ClientState,
-) -> None:
-    content_rect = drawer.draw_panel(screen, layout.header_rect)
-    drawer.draw_text(screen, 'Row-Taker GUI Demo', (content_rect.left, content_rect.top), role='title')
-    subtitle = (
-        'Einfaches pygame-Frontend auf dem gemeinsamen ClientState. '
-        f'Mode={client_state.client_mode.value}, pending_action={client_state.pending_action.value}'
-    )
-    drawer.draw_text(
-        screen,
-        subtitle,
-        (content_rect.left, content_rect.top + 34),
-        role='small',
-        color=TEXT_MUTED,
-    )
 
 
 def _render_lobby_panels(
@@ -282,21 +261,8 @@ def _render_sidebar(
     events_rect.height = max(40, events_bottom - events_rect.top)
     drawer.draw_text(screen, 'presentation events', (events_rect.left, events_rect.top), role='small', color=TEXT_MUTED)
     events_rect.top += 22
-    event_lines = [_format_presentation_event(event) for event in client_state.pending_presentation_events]
+    event_lines = [format_presentation_event(event) for event in client_state.pending_presentation_events]
     if not event_lines:
         event_lines = ['No pending presentation events.']
     drawer.draw_wrapped_lines(screen, event_lines, events_rect, role='small')
 
-
-def _render_footer(screen: pygame.Surface, drawer: PrimitiveDrawer, layout: DemoLayout) -> None:
-    content_rect = drawer.draw_panel(screen, layout.footer_rect)
-    drawer.draw_wrapped_lines(
-        screen,
-        [
-            'ESC quit',
-            'Mouse for seats and lobby buttons',
-        ],
-        content_rect,
-        role='small',
-        color=TEXT_MUTED,
-    )
