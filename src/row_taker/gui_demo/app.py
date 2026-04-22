@@ -4,20 +4,22 @@ import pygame
 
 from row_taker.client.actions import ClientAction
 from row_taker.client.state import ClientState
-from row_taker.gui_demo.connect_screen import (
-    ConnectFormState,
-    build_connect_screen_targets,
-    normalized_connection_values,
-)
 from row_taker.gui_demo.input_mapping import map_pygame_event
 from row_taker.gui_demo.interactions import InteractionMap, build_session_interaction_map
 from row_taker.gui_demo.layout import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, compute_layout
 from row_taker.gui_demo.live_client import LiveGuiClient
 from row_taker.gui_demo.primitives import PrimitiveDrawer
-from row_taker.gui_demo.render import render_connect_screen, render_session
+from row_taker.gui_demo.render import render_session
+from row_taker.gui_demo.screens.connect_screen import (
+    ConnectFormState,
+    build_connect_screen_targets,
+    handle_connect_event,
+    normalized_connection_values,
+    render_connect_screen,
+)
 from row_taker.protocol.transport import ClientTransport
 
-WINDOW_TITLE = "Row-Taker GUI Demo"
+WINDOW_TITLE = 'Row-Taker GUI Demo'
 FPS = 30
 
 
@@ -29,7 +31,7 @@ class GuiDemoApp:
         self._clock: pygame.time.Clock | None = None
         self._drawer: PrimitiveDrawer | None = None
         self._interaction_map = InteractionMap()
-        self._last_action_summary = "Noch keine GUI-Aktion."
+        self._last_action_summary = 'Noch keine GUI-Aktion.'
         self._live_client: LiveGuiClient | None = None
         self._client_state: ClientState | None = None
         self._connect_form = ConnectFormState()
@@ -69,13 +71,20 @@ class GuiDemoApp:
 
     def _handle_events(self) -> None:
         for event in pygame.event.get():
-            mapped = map_pygame_event(
-                event,
-                state=self._client_state,
-                interaction_map=self._interaction_map if self._live_client is not None else None,
-                connect_form=self._connect_form if self._live_client is None else None,
-                connect_targets=self._connect_targets if self._live_client is None else None,
-            )
+            if self._live_client is None:
+                mapped = handle_connect_event(
+                    event,
+                    connect_form=self._connect_form,
+                    connect_targets=self._connect_targets,
+                )
+                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                    mapped = mapped if mapped.request_quit else type(mapped)(request_quit=True)
+            else:
+                mapped = map_pygame_event(
+                    event,
+                    state=self._client_state,
+                    interaction_map=self._interaction_map,
+                )
 
             if mapped.request_quit:
                 self._running = False
@@ -93,7 +102,7 @@ class GuiDemoApp:
 
             if mapped.next_state is not None:
                 self._apply_local_state(mapped.next_state)
-                self._last_action_summary = "Updated local GUI navigation state."
+                self._last_action_summary = 'Updated local GUI navigation state.'
                 self._refresh_targets()
                 continue
 
@@ -109,7 +118,7 @@ class GuiDemoApp:
                 port=self._connect_form.port,
                 display_name=self._connect_form.display_name,
                 active_field=self._connect_form.active_field,
-                error_message="Bitte gültige Werte für Server IP, Port und Display name eingeben.",
+                error_message='Bitte gültige Werte für Server IP, Port und Display name eingeben.',
                 status_message=self._connect_form.status_message,
             )
             return
@@ -124,15 +133,15 @@ class GuiDemoApp:
                 host=host,
                 port=str(port),
                 display_name=display_name,
-                active_field="host",
-                error_message=f"Verbindung fehlgeschlagen: {exc}",
-                status_message="Bitte Werte prüfen und erneut verbinden.",
+                active_field='host',
+                error_message=f'Verbindung fehlgeschlagen: {exc}',
+                status_message='Bitte Werte prüfen und erneut verbinden.',
             )
             return
 
         self._live_client = live_client
         self._client_state = live_client.state
-        self._last_action_summary = f"Connected to {host}:{port} as {display_name}."
+        self._last_action_summary = f'Connected to {host}:{port} as {display_name}.'
         self._refresh_targets()
 
     def _apply_local_state(self, next_state: ClientState) -> None:
@@ -148,7 +157,7 @@ class GuiDemoApp:
 
     def _render_frame(self) -> None:
         if self._screen is None or self._drawer is None:
-            raise RuntimeError("GuiDemoApp not initialized")
+            raise RuntimeError('GuiDemoApp not initialized')
 
         layout = compute_layout(*self._screen.get_size())
         if self._live_client is None:
@@ -162,7 +171,7 @@ class GuiDemoApp:
             )
         else:
             if self._client_state is None:
-                raise RuntimeError("Live client active without client state")
+                raise RuntimeError('Live client active without client state')
             self._interaction_map = build_session_interaction_map(layout, self._client_state)
             render_session(
                 self._screen,
@@ -177,7 +186,7 @@ class GuiDemoApp:
 
     def _tick(self) -> None:
         if self._clock is None:
-            raise RuntimeError("GuiDemoApp not initialized")
+            raise RuntimeError('GuiDemoApp not initialized')
         self._clock.tick(FPS)
         self._frame_count += 1
 
