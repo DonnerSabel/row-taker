@@ -34,7 +34,7 @@ class CardSprite:
 
         if self.image_path is None:
             project_root = Path(__file__).resolve().parents[3]
-            self.image_path = project_root / "images" / f"{self.value:03}.png"
+            self.image_path = project_root / "images" / f"karte_{self.value:03}.png"
 
         if self.image_path.exists():
             self.image_orig = pygame.image.load(str(self.image_path)).convert_alpha()
@@ -51,6 +51,10 @@ class CardSprite:
 
     @property
     def bullheads(self) -> int:
+        return self.card.bullheads
+
+    @property
+    def points(self) -> int:
         return self.card.bullheads
 
     def move_to(self, x: float, y: float) -> None:

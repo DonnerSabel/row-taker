@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(slots=True)
@@ -42,11 +44,19 @@ class BotProcessHandle:
         if log_file:
             argv.extend(["--log-file", log_file])
 
+        env = os.environ.copy()
+        src_path = str(Path(__file__).resolve().parents[2])
+        old_pythonpath = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = (
+            src_path if not old_pythonpath else f"{src_path}{os.pathsep}{old_pythonpath}"
+        )
+
         process = subprocess.Popen(
             argv,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            env=env,
         )
         return cls(process=process)
 
