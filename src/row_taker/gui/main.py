@@ -17,8 +17,8 @@ from row_taker.gui.spielfeld import Spielfeld
 
 
 def create_demo_cards(window_width: int, window_height: int) -> tuple[list[Card], list[Card]]:
-    board_rows = 4
-    board_columns = 6
+    board_rows = 6
+    board_columns = 4
     hand_columns = 10
 
     # Calculate play area in pixels from ratios
