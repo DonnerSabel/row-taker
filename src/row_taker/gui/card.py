@@ -22,6 +22,7 @@ class Card:
         self.rect: pygame.Rect | None = None
         self.x = 0
         self.y = 0
+        self.selected = False  # New: selection state
 
         # Pfad zum Bild
         project_root = Path(__file__).resolve().parents[3]
@@ -87,3 +88,7 @@ class Card:
             surface.blit(self.hover_image, (hover_x, hover_y))
         else:
             surface.blit(self.image, self.rect.topleft)
+
+        # Draw selection border
+        if self.selected:
+            pygame.draw.rect(surface, (255, 255, 0), self.rect, 3)  # Yellow border for selected
