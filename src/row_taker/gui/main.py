@@ -12,7 +12,9 @@ from row_taker.gui.constants import (
     CARD_GAP,
     CARD_SCALE,
     FPS,
+    HANDCARD_GAP,
     HANDCARD_SCALE,
+    OFFSET_HANDCARD_x,
     WINDOW_TITLE,
 )
 from row_taker.gui.spielfeld import Spielfeld
@@ -30,7 +32,7 @@ def create_demo_cards(window_width: int, window_height: int) -> tuple[list[CardS
     play_area_height = int(window_height * BOARD_PLAY_AREA_HEIGHT_RATIO)
 
     # Hand area below play area
-    hand_y = play_area_y + play_area_height + CARD_GAP
+    hand_y = play_area_y + play_area_height
 
     deck = [
         CardSprite(Card(value))
@@ -84,25 +86,25 @@ def create_demo_cards(window_width: int, window_height: int) -> tuple[list[CardS
 
     # Hand cards
     hand_cards = deck[board_rows * board_columns :]
-    
+
     # Rescale hand cards with HANDCARD_SCALE
     handcard_window_width = int(window_width * HANDCARD_SCALE / CARD_SCALE)
     for card in hand_cards:
         card.scale(handcard_window_width)
-    
+
     handcard_width = (
         hand_cards[0].image.get_width()
         if hand_cards and hand_cards[0].image is not None
         else int(window_width * HANDCARD_SCALE)
     )
-    hand_y_start = hand_y + CARD_GAP
+    hand_y_start = hand_y
 
     for index, card_sprite in enumerate(hand_cards):
         if card_sprite.image is None:
             continue
 
         card_sprite.move_to(
-            play_area_x + CARD_GAP + index * (handcard_width + CARD_GAP),
+            play_area_x + OFFSET_HANDCARD_x + index * (handcard_width + HANDCARD_GAP),
             hand_y_start,
         )
 
