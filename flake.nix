@@ -31,8 +31,9 @@
 
         extraPackages = with pkgs; [
           python3Packages.pygame-avx2
+          python3Packages.prompt-toolkit
           python3Packages.pytest
-          python3Packages.ruff
+          unstable.python3Packages.ruff
           vscode-fhs
         ];
 

@@ -1,8 +1,10 @@
-from copy import deepcopy
+from __future__ import annotations
+
 from dataclasses import dataclass
 
-from row_taker.engine.game import StepResult
-from row_taker.engine.state import GameState
+from row_taker.engine.game.phases import StepAction
+from row_taker.engine.game.public_state_ops import apply_resolution_step
+from row_taker.engine.game.state import PublicState, TrickResolutionStep
 
 
 @dataclass(slots=True, frozen=True)
@@ -21,10 +23,12 @@ class RowDisplayMapping:
         return self.state_to_cli[state_row_index]
 
 
-def build_row_display_mapping(state: GameState) -> RowDisplayMapping:
+def build_row_display_mapping(state: PublicState) -> RowDisplayMapping:
     row_order = sorted(
         range(len(state.rows)),
-        key=lambda row_index: state.rows[row_index].cards[-1].value if state.rows[row_index].cards else 0,
+        key=lambda row_index: (
+            state.rows[row_index].cards[-1].value if state.rows[row_index].cards else 0
+        ),
     )
 
     cli_to_state = {cli_row: state_index for cli_row, state_index in enumerate(row_order, start=1)}
@@ -37,43 +41,33 @@ def build_row_display_mapping(state: GameState) -> RowDisplayMapping:
     )
 
 
-def apply_result_to_shadow_state(state: GameState, result: StepResult) -> None:
-    row = state.rows[result.row_index]
-
-    if result.action == "placed":
-        row.cards.append(result.card)
-        return
-
-    if result.action in {"took_row_small", "took_row_overflow"}:
-        row.cards = [result.card]
-        state.players[result.player_index].score += result.points_gained
-        return
-
-    raise ValueError(f"Unbekannte Aktion: {result.action}")
-
-
-def format_results_for_cli(before_state: GameState, results: list[StepResult]) -> list[str]:
-    shadow_state = deepcopy(before_state)
+def format_resolution_steps_for_cli(
+    before_state: PublicState, steps: list[TrickResolutionStep] | tuple[TrickResolutionStep, ...]
+) -> list[str]:
+    shadow_state = before_state
     lines: list[str] = []
 
-    for result in results:
+    for step in steps:
+        row_index = shadow_state.get_row_index(step.affected_row_id)
         mapping = build_row_display_mapping(shadow_state)
-        cli_row = mapping.to_cli_row(result.row_index)
-        player = shadow_state.players[result.player_index]
+        cli_row = mapping.to_cli_row(row_index)
+        player = next(player for player in shadow_state.players if player.player_id == step.player_id)
 
-        if result.action == "placed":
-            lines.append(f"- {player.name} legt {result.card.value} an Reihe {cli_row}.")
-        elif result.action == "took_row_small":
+        if step.action == StepAction.PLACED:
+            lines.append(f"- {player.name} legt {step.played_card.value} an Reihe {cli_row}.")
+        elif step.action == StepAction.TOOK_ROW_SMALL:
             lines.append(
-                f"- {player.name} nimmt Reihe {cli_row} ({result.points_gained} Punkte) und startet mit {result.card.value}."
+                f"- {player.name} nimmt Reihe {cli_row} ({step.points_gained} Hornochsen) "
+                f"und startet mit {step.played_card.value}."
             )
-        elif result.action == "took_row_overflow":
+        elif step.action == StepAction.TOOK_ROW_OVERFLOW:
             lines.append(
-                f"- {player.name} füllt Reihe {cli_row} (nimmt {result.points_gained} Punkte) und startet mit {result.card.value}."
+                f"- {player.name} füllt Reihe {cli_row} (nimmt {step.points_gained} Hornochsen) "
+                f"und startet mit {step.played_card.value}."
             )
         else:
-            raise ValueError(f"Unbekannte Aktion: {result.action}")
+            raise ValueError(f"Unbekannte Schritt-Klassifikation: {step.action}")
 
-        apply_result_to_shadow_state(shadow_state, result)
+        shadow_state = apply_resolution_step(shadow_state, step)
 
     return lines
