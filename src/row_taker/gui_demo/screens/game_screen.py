@@ -13,7 +13,11 @@ from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
 from row_taker.gui_demo.layout import DemoLayout
 from row_taker.gui_demo.primitives import ACCENT, TEXT_MUTED, WINDOW_BACKGROUND, PrimitiveDrawer
-from row_taker.gui_demo.ui.common_render import format_presentation_event, render_standard_footer, render_standard_header
+from row_taker.gui_demo.ui.common_render import (
+    format_presentation_event,
+    render_standard_footer,
+    render_standard_header,
+)
 from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 

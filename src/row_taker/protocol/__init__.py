@@ -1,19 +1,19 @@
+from row_taker.participants import ParticipantKind
 from row_taker.protocol.codec import (
     client_message_from_dict,
     client_message_to_dict,
     server_message_from_dict,
     server_message_to_dict,
 )
-from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     CardsRevealed,
-    DebugStateSnapshot,
     ChooseCardRequested,
     ChooseRowRequested,
     ClearSeat,
     ClientToServerMessage,
     CreateLocalBotOnSeat,
+    DebugStateSnapshot,
     GameStarting,
     IdentityAssigned,
     JoinLobby,
@@ -26,7 +26,6 @@ from row_taker.protocol.messages import (
     PlayedCardView,
     RequestStartGame,
     RowChoiceCommitted,
-    get_game_message_revision,
     ServerError,
     ServerToClientMessage,
     SessionEnded,
@@ -35,6 +34,7 @@ from row_taker.protocol.messages import (
     StateUpdated,
     SubmitCard,
     SubmitRowChoice,
+    get_game_message_revision,
 )
 
 __all__ = [

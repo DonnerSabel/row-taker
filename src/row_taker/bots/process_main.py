@@ -11,7 +11,6 @@ from row_taker.protocol.errors import ConnectionClosed, TransportError
 from row_taker.protocol.messages import JoinLobby, SessionEnded
 from row_taker.protocol.transport import ClientTransport
 
-
 logger = logging.getLogger("row_taker.bot.process")
 
 

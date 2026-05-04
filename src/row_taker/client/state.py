@@ -3,7 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
-from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction, initial_client_core_state
+from row_taker.client.core_state import (
+    ClientCoreState,
+    ClientMode,
+    PendingAction,
+    initial_client_core_state,
+)
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.client.trick_presentation_resolver import TrickPresentationState
 from row_taker.engine.game.state import PlayerState, PublicState

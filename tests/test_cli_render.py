@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from client_test_support import player_state_for
+
+from row_taker.cli.render import determine_prompt, render_resolution_lines, render_screen
 from row_taker.client.core_state import ClientCoreState, PendingAction
 from row_taker.client.presentation_events import PresentationCardsRevealed
 from row_taker.client.state import ClientState, enter_game_mode
-from row_taker.cli.render import determine_prompt, render_resolution_lines, render_screen
-
-from client_test_support import player_state_for
 
 
 def test_pending_presentation_uses_enter_prompt_until_queue_is_empty() -> None:

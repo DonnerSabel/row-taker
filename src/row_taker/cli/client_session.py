@@ -5,8 +5,8 @@ import asyncio
 from row_taker.cli.app import CliApp
 from row_taker.cli.console import CliConsole as _CliConsole
 from row_taker.cli.render import render_public_state
-from row_taker.client.state import initial_client_state as _initial_client_state
 from row_taker.cli.terminal import clear_screen
+from row_taker.client.state import initial_client_state as _initial_client_state
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.transport import ClientTransport
 

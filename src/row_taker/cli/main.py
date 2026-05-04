@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-
 import asyncio
 
 from row_taker.cli.client_session import ClientSession, print_final_result

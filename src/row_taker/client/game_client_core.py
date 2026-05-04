@@ -4,9 +4,19 @@ from collections import deque
 
 from row_taker.client.actions import ClientAction
 from row_taker.client.core_reducer import apply_ui_action, reduce_server_message
-from row_taker.client.state import ClientState, initial_client_state, with_core_updates, with_feedback_updates
+from row_taker.client.state import (
+    ClientState,
+    initial_client_state,
+    with_core_updates,
+    with_feedback_updates,
+)
 from row_taker.client.update import CoreUpdate
-from row_taker.protocol.messages import ServerError, ServerToClientMessage, SessionEnded, get_game_message_revision
+from row_taker.protocol.messages import (
+    ServerError,
+    ServerToClientMessage,
+    SessionEnded,
+    get_game_message_revision,
+)
 
 
 class GameClientCore:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from row_taker.engine.game import PlayerID, RowID
-from row_taker.participants import ParticipantKind
 from row_taker.engine.game.state_mappers import (
     game_state_from_dict,
     game_state_to_dict,
@@ -10,15 +9,16 @@ from row_taker.engine.game.state_mappers import (
     public_state_from_dict,
     public_state_to_dict,
 )
+from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     CardsRevealed,
-    DebugStateSnapshot,
     ChooseCardRequested,
     ChooseRowRequested,
     ClearSeat,
     ClientToServerMessage,
     CreateLocalBotOnSeat,
+    DebugStateSnapshot,
     GameStarting,
     IdentityAssigned,
     JoinLobby,

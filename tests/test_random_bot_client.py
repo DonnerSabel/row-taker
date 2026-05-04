@@ -7,7 +7,12 @@ from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import PlayerID, PublicPlayerInfo, Row, RowID
 from row_taker.engine.game.phases import Phase, PhaseInfo
 from row_taker.engine.game.state import PlayerState, PublicState, RulesConfig
-from row_taker.protocol.messages import ChooseCardRequested, ChooseRowRequested, SubmitCard, SubmitRowChoice
+from row_taker.protocol.messages import (
+    ChooseCardRequested,
+    ChooseRowRequested,
+    SubmitCard,
+    SubmitRowChoice,
+)
 
 
 def _choose_card_state() -> PlayerState:

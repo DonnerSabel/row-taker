@@ -13,7 +13,12 @@ import threading
 
 from row_taker.client.actions import ClientAction, ClientActionLeaveSession
 from row_taker.client.game_client_core import GameClientCore
-from row_taker.client.state import ClientState, UiMessage, initial_client_state, with_feedback_updates
+from row_taker.client.state import (
+    ClientState,
+    UiMessage,
+    initial_client_state,
+    with_feedback_updates,
+)
 from row_taker.client.update import CoreUpdate
 from row_taker.protocol.errors import ConnectionClosed
 from row_taker.protocol.messages import JoinLobby, ServerToClientMessage

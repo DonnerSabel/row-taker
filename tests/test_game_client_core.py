@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+from client_test_support import apply_server_message, player_state_for
+
 from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction
 from row_taker.client.presentation_events import PresentationCardsRevealed, PresentationRowTaken
 from row_taker.client.state import ClientState
-from row_taker.protocol.messages import CardsRevealed, PlayedCardView, RowChoiceCommitted, SessionEndReason, SessionEnded, StateUpdated
-
-from client_test_support import apply_server_message, player_state_for
+from row_taker.protocol.messages import (
+    CardsRevealed,
+    PlayedCardView,
+    RowChoiceCommitted,
+    SessionEnded,
+    SessionEndReason,
+    StateUpdated,
+)
 
 
 def test_state_updated_sets_public_state() -> None:

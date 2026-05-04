@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from row_taker.client.trick_presentation_resolver import apply_trick_row_choice, start_trick_presentation
 from row_taker.client.actions import (
     ClientAction,
     ClientActionAdvancePresentation,
@@ -24,6 +23,10 @@ from row_taker.client.state import (
     enter_lobby_submenu,
     with_core_updates,
     with_feedback_updates,
+)
+from row_taker.client.trick_presentation_resolver import (
+    apply_trick_row_choice,
+    start_trick_presentation,
 )
 from row_taker.engine.game.player_state_ops import validate_submit_card, validate_submit_row_choice
 from row_taker.protocol.messages import (

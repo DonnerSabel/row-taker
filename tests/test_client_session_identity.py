@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from row_taker.client.core_state import ClientCoreState
-
 from row_taker.cli.frontend import CliFrontend, set_flash
 from row_taker.cli.render import render_screen
 from row_taker.cli.screens import LobbyScreen, current_screen
+from row_taker.client.core_state import ClientCoreState
 from row_taker.client.game_client_core import GameClientCore
 from row_taker.client.state import ClientState, enter_lobby_submenu
 from row_taker.participants import ParticipantKind
@@ -16,7 +15,6 @@ from row_taker.protocol.messages import (
     LobbyStateUpdated,
     LobbyView,
 )
-
 
 _FRONTEND = CliFrontend()
 

@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pygame
 
-from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, initial_cli_state
 from row_taker.cli.state_machine import UserInputResult, reduce_server_message, reduce_user_input
+from row_taker.cli.state_models import CliState, GameScreen, LobbyScreen, initial_cli_state
 from row_taker.protocol.errors import ConnectionClosed
 from row_taker.protocol.messages import JoinLobby, ServerToClientMessage
 from row_taker.protocol.transport import ClientTransport

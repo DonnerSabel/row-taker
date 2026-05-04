@@ -178,7 +178,7 @@ def test_leave_session_aborts_active_match_for_remaining_clients() -> None:
     assert "Alice" in session_ended[0].message.message
 
 
-from row_taker.protocol.messages import SubmitCard, StateUpdated, CardsRevealed, ChooseRowRequested
+from row_taker.protocol.messages import CardsRevealed, ChooseRowRequested, SubmitCard
 
 
 def test_game_messages_are_revisioned_when_routed() -> None:

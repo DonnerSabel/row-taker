@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from row_taker.engine.game import (
     all_cards_selected,
     begin_trick_resolution,
-    current_revealed_plays,
     finish_trick,
     has_pending_resolution_step,
     has_pending_row_choice,
@@ -17,7 +16,14 @@ from row_taker.engine.game import (
 )
 from row_taker.engine.game.models import PlayerID
 from row_taker.engine.game.phases import Phase
-from row_taker.engine.game.state import GameState, PlayerState, PublicState, RevealedPlay, RowChoiceRequired, TrickResolutionStep
+from row_taker.engine.game.state import (
+    GameState,
+    PlayerState,
+    PublicState,
+    RevealedPlay,
+    RowChoiceRequired,
+    TrickResolutionStep,
+)
 from row_taker.engine.game.views import build_player_state, build_public_state
 from row_taker.protocol.messages import (
     CardsRevealed,
@@ -31,7 +37,6 @@ from row_taker.protocol.messages import (
     SubmitCard,
     SubmitRowChoice,
 )
-
 
 logger = logging.getLogger("row_taker.hub.match_hub")
 

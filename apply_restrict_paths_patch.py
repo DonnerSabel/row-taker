@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import stat
 import textwrap
-
+from pathlib import Path
 
 SCRIPT_CONTENT = textwrap.dedent("""\
 #!/usr/bin/env bash

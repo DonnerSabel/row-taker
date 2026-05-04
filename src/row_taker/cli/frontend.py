@@ -18,7 +18,6 @@ from row_taker.client.core_state import ClientMode, PendingAction
 from row_taker.client.state import (
     ClientState,
     UiMessage,
-    enter_game_mode,
     enter_lobby_submenu,
     has_pending_presentation,
     with_feedback_updates,

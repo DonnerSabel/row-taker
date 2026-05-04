@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from client_test_support import apply_user_input
+
 from row_taker.client.core_state import ClientCoreState, PendingAction
 from row_taker.client.presentation_events import PresentationCardsRevealed, PresentationRowTaken
 from row_taker.client.state import ClientState, enter_game_mode
 from row_taker.protocol.messages import LeaveSession
-
-from client_test_support import apply_user_input, player_state_for
 
 
 def test_uppercase_x_triggers_leave_session_and_suppresses_final_result() -> None:

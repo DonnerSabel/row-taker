@@ -2,18 +2,19 @@ from row_taker.engine.game import setup_game
 from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game.views import build_public_state
 from row_taker.engine.lobby.state import LobbySeat, LobbyState
+from row_taker.participants import ParticipantKind
 from row_taker.protocol.codec import (
     client_message_from_dict,
     client_message_to_dict,
     server_message_from_dict,
     server_message_to_dict,
 )
-from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     CardsRevealed,
     ClearSeat,
     CreateLocalBotOnSeat,
+    DebugStateSnapshot,
     GameStarting,
     IdentityAssigned,
     JoinLobby,
@@ -23,7 +24,6 @@ from row_taker.protocol.messages import (
     LobbySeatView,
     LobbyStateUpdated,
     LobbyView,
-    DebugStateSnapshot,
     PlayedCardView,
     RequestStartGame,
     RowChoiceCommitted,

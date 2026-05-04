@@ -15,7 +15,13 @@ from .logic import (
 )
 from .models import EngineRow, Player, PlayerID, PublicPlayerInfo, Row, RowID
 from .phases import Phase, PhaseInfo, StepAction
-from .player_state_ops import playable_card_values, playable_cards, selectable_row_ids, validate_submit_card, validate_submit_row_choice
+from .player_state_ops import (
+    playable_card_values,
+    playable_cards,
+    selectable_row_ids,
+    validate_submit_card,
+    validate_submit_row_choice,
+)
 from .public_state_ops import apply_resolution_step, apply_resolution_steps, played_card_from_step
 from .rules import place_card, take_row, target_row_index
 from .state import (

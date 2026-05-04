@@ -5,7 +5,13 @@ import random
 from row_taker.cli.frontend import CliFrontend, set_flash
 from row_taker.client.core_reducer import reduce_server_message as direct_reduce_server_message
 from row_taker.client.game_client_core import GameClientCore
-from row_taker.client.state import ClientState, enter_ended_mode, enter_game_mode, enter_lobby_submenu, with_feedback_updates
+from row_taker.client.state import (
+    ClientState,
+    enter_ended_mode,
+    enter_game_mode,
+    enter_lobby_submenu,
+    with_feedback_updates,
+)
 from row_taker.engine.game import build_player_state, setup_game
 
 _FRONTEND = CliFrontend()

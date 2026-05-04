@@ -3,13 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from row_taker.engine.lobby.state import LobbyState
+from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import (
     LobbyParticipantView,
     LobbySeatView,
     LobbyStateUpdated,
     LobbyView,
 )
-from row_taker.participants import ParticipantKind
 from row_taker.server.client_registry import ClientRegistry
 
 

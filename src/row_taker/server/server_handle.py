@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 
 from row_taker.server.bot_process_handle import BotProcessHandle
 

@@ -125,7 +125,7 @@ class EnginePublicState:
     phase_info: PhaseInfo
 
     @classmethod
-    def from_public_state(cls, public_state: "PublicState") -> "EnginePublicState":
+    def from_public_state(cls, public_state: PublicState) -> EnginePublicState:
         return cls(
             config=public_state.config,
             players=[
@@ -143,7 +143,7 @@ class EnginePublicState:
             phase_info=public_state.phase_info,
         )
 
-    def to_public_state(self) -> "PublicState":
+    def to_public_state(self) -> PublicState:
         return PublicState(
             config=self.config,
             players=tuple(self.players),

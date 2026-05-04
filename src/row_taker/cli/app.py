@@ -7,9 +7,9 @@ from contextlib import suppress
 from row_taker.cli.console import CliConsole, InputAborted
 from row_taker.cli.frontend import CliFrontend, set_flash
 from row_taker.cli.render import build_view
-from row_taker.client.state import ClientState, initial_client_state
 from row_taker.client.actions import ClientActionAdvancePresentation
 from row_taker.client.game_client_core import GameClientCore
+from row_taker.client.state import ClientState, initial_client_state
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.errors import ConnectionClosed
 from row_taker.protocol.messages import ServerToClientMessage
