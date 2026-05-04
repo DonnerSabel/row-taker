@@ -167,19 +167,26 @@ def _board_layout(window_rect: pygame.Rect, state: ClientState) -> BoardLayout:
     public_state = state.public_state
     row_count = len(public_state.rows) if public_state is not None else 4
 
-    margin_x = max(24, round(window_rect.width * 0.035))
-    top_margin = max(46, round(window_rect.height * 0.075))
-    hand_visible_height = max(92, round(window_rect.height * 0.18))
-    row_area_bottom = window_rect.height - hand_visible_height - max(24, round(window_rect.height * 0.035))
-    row_area_height = max(220, row_area_bottom - top_margin)
+    # Schülerlayout:
+    # - Das Boardbild ist der komplette Fensterhintergrund.
+    # - Die vier Reihen liegen von oben nach unten im oberen Spielfeldbereich.
+    # - Unten bleibt Platz für die Handkarten, von denen nur die obere Hälfte sichtbar ist.
+    margin_x = max(18, round(window_rect.width * 0.025))
+    top_margin = max(34, round(window_rect.height * 0.055))
+    hand_visible_height = max(112, round(window_rect.height * 0.22))
+    bottom_margin = max(8, round(window_rect.height * 0.015))
 
-    row_gap = max(10, round(row_area_height * 0.025))
-    row_height = max(70, (row_area_height - (row_count - 1) * row_gap) // max(1, row_count))
+    row_area_top = top_margin
+    row_area_bottom = window_rect.height - hand_visible_height - bottom_margin
+    row_area_height = max(260, row_area_bottom - row_area_top)
+
+    row_gap = max(8, round(row_area_height * 0.018))
+    row_height = max(82, (row_area_height - (row_count - 1) * row_gap) // max(1, row_count))
 
     row_rects = tuple(
         pygame.Rect(
             margin_x,
-            top_margin + index * (row_height + row_gap),
+            row_area_top + index * (row_height + row_gap),
             window_rect.width - 2 * margin_x,
             row_height,
         )
@@ -195,9 +202,9 @@ def _board_layout(window_rect: pygame.Rect, state: ClientState) -> BoardLayout:
 
     overlay_rect = pygame.Rect(
         margin_x,
-        12,
-        min(560, window_rect.width - 2 * margin_x),
-        max(32, top_margin - 20),
+        10,
+        min(620, window_rect.width - 2 * margin_x),
+        max(46, top_margin + 12),
     )
 
     return BoardLayout(
@@ -265,13 +272,14 @@ def _build_continue_target(board_layout: BoardLayout, state: ClientState) -> Con
 
 
 def _draw_full_background(screen: pygame.Surface, window_rect: pygame.Rect) -> None:
-    board = _scaled_board_image_cover(window_rect.width, window_rect.height)
+    board = _scaled_board_image_full(window_rect.width, window_rect.height)
     if board is None:
         screen.fill((18, 84, 38))
         return
 
-    board_rect = board.get_rect(center=window_rect.center)
-    screen.blit(board, board_rect)
+    # Schülerlayout: board.png ist der komplette Hintergrund.
+    # Kein Cropping, Aspect Ratio ist hier bewusst egal.
+    screen.blit(board, window_rect.topleft)
 
 
 def _draw_rows(
@@ -308,22 +316,27 @@ def _draw_row_lane(
     cards: tuple[Any, ...],
     selectable: bool,
 ) -> None:
-    lane_fill = pygame.Color(0, 0, 0, 82)
+    # Nur ein sehr dezentes Overlay: Das Boardbild soll optisch dominieren.
     lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(lane_surface, lane_fill, lane_surface.get_rect(), border_radius=10)
+    pygame.draw.rect(lane_surface, pygame.Color(0, 0, 0, 36), lane_surface.get_rect(), border_radius=10)
     screen.blit(lane_surface, rect)
 
-    border = ACCENT if selectable else pygame.Color(255, 255, 255, 70)
+    border = ACCENT if selectable else pygame.Color(255, 255, 255, 42)
     pygame.draw.rect(screen, border, rect, 3 if selectable else 1, border_radius=10)
 
-    label = f"Reihe {row_id}"
-    drawer.draw_text(screen, label, (rect.left + 10, rect.top + 8), role="small", color=ACCENT if selectable else TEXT_MUTED)
+    drawer.draw_text(
+        screen,
+        f"Reihe {row_id}",
+        (rect.left + 10, rect.top + 6),
+        role="small",
+        color=ACCENT if selectable else TEXT_MUTED,
+    )
 
     bullheads = sum(card.bullheads for card in cards)
     drawer.draw_text(
         screen,
         f"{bullheads} Hornochsen",
-        (rect.right - 118, rect.top + 8),
+        (rect.right - 118, rect.top + 6),
         role="small",
         color=TEXT_MUTED,
     )
@@ -334,15 +347,16 @@ def _draw_row_lane(
     card_width = _row_card_width(rect, len(cards))
     card_height = round(card_width * 1.5)
 
-    # Reihen wachsen von oben nach unten. Karten dürfen sich überdecken.
-    y_step = max(24, min(round(card_height * 0.42), max(24, (rect.height - card_height) // max(1, len(cards)))))
-    x = rect.left + 28
-    y = rect.top + 30
+    # Schülerlayout: Eine Reihe wächst von oben nach unten.
+    # Die Karten dürfen sich überdecken; der obere Teil jeder Karte bleibt sichtbar.
+    x = rect.left + max(42, round(rect.width * 0.055))
+    y = rect.top + 28
+    visible_step = max(28, round(card_height * 0.34))
 
     for index, card in enumerate(cards):
         card_rect = pygame.Rect(
-            x + min(index, 2) * 8,
-            y + index * y_step,
+            x,
+            y + index * visible_step,
             card_width,
             card_height,
         )
@@ -491,19 +505,23 @@ def _draw_card_image_or_fallback(
 
 
 def _row_card_width(row_rect: pygame.Rect, card_count: int) -> int:
-    if card_count <= 1:
-        return min(94, max(60, row_rect.width // 8))
-
-    return min(88, max(52, row_rect.width // 11))
+    # Karten sollen den verfügbaren Platz sichtbar ausnutzen.
+    # Weil die Reihen vertikal wachsen und sich überdecken dürfen, darf die Karte
+    # deutlich höher als die einzelne sichtbare Stufe sein.
+    by_height = max(84, round(row_rect.height * 0.78))
+    by_width = max(84, round(row_rect.width * 0.13))
+    return min(170, max(96, min(by_height, by_width)))
 
 
 def _hand_card_size(hand_rect: pygame.Rect, card_count: int) -> tuple[int, int]:
     if card_count <= 0:
-        return (86, 129)
+        return (120, 180)
 
-    desired_width = max(64, min(110, hand_rect.width // max(7, card_count)))
-    max_height_width = max(54, hand_rect.height * 2 // 3)
-    width = min(desired_width, max_height_width)
+    # Handkarten müssen gut lesbar sein. Sie dürfen sich horizontal überdecken;
+    # unten ist nur die obere Hälfte sichtbar.
+    by_height = max(110, round(hand_rect.height * 1.35))
+    by_width = max(110, round(hand_rect.width / max(6.8, min(card_count, 10))))
+    width = min(185, max(118, min(by_height, by_width)))
     return (width, round(width * 1.5))
 
 
@@ -512,30 +530,19 @@ def _hand_overlap(hand_rect: pygame.Rect, card_width: int, card_count: int) -> i
         return card_width
 
     available_step = (hand_rect.width - card_width) // max(1, card_count - 1)
-    return max(34, min(card_width + 12, available_step))
+    # Bewusst überlappend, aber so, dass die Kartenwerte noch erreichbar bleiben.
+    return max(44, min(round(card_width * 0.78), available_step))
 
 
 @lru_cache(maxsize=64)
-def _scaled_board_image_cover(width: int, height: int) -> pygame.Surface | None:
+def _scaled_board_image_full(width: int, height: int) -> pygame.Surface | None:
     image = _load_board_image()
     if image is None:
         return None
 
-    source_width, source_height = image.get_size()
-    if source_width <= 0 or source_height <= 0:
-        return None
-
-    scale = max(width / source_width, height / source_height)
-    scaled_width = max(1, round(source_width * scale))
-    scaled_height = max(1, round(source_height * scale))
-    scaled = pygame.transform.smoothscale(image, (scaled_width, scaled_height))
-
-    if scaled_width == width and scaled_height == height:
-        return scaled
-
-    crop_rect = pygame.Rect(0, 0, width, height)
-    crop_rect.center = scaled.get_rect().center
-    return scaled.subsurface(crop_rect).copy()
+    # Schülerlayout: kein Letterboxing, kein Cropping.
+    # Das Boardbild wird direkt auf die Fenstergröße skaliert.
+    return pygame.transform.smoothscale(image, (width, height))
 
 
 @lru_cache(maxsize=1)
