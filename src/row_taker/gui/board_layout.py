@@ -74,21 +74,16 @@ def compute_board_geometry(
 
     window_rect = pygame.Rect(0, 0, window_size[0], window_size[1])
 
-    # These ratios are based on the current board.png:
-    # - big green field in the upper left
-    # - narrow opponent strip at the right edge of that field
-    # - stats field in the upper right
-    # - hand field at the bottom
-    # Tuned against the current board.png debug screenshot:
+    # Tuned against the current board.png debug screenshots:
     # - main_play_rect follows the large upper-left green field.
     # - stats_rect follows the narrow upper-right green field.
     # - hand_rect follows the lower green hand-card field.
     main_play_rect = _relative_rect(window_rect, 0.018, 0.066, 0.780, 0.790)
-    stats_rect = _relative_rect(window_rect, 0.823, 0.045, 0.160, 0.755)
-    hand_rect = _relative_rect(window_rect, 0.014, 0.900, 0.970, 0.080)
+    stats_rect = _relative_rect(window_rect, 0.823, 0.046, 0.160, 0.760)
+    hand_rect = _relative_rect(window_rect, 0.014, 0.904, 0.970, 0.085)
 
     opponent_area_width = _opponent_area_width(main_play_rect, opponent_count)
-    gap = max(8, round(window_rect.width * 0.010))
+    gap = max(6, round(window_rect.width * 0.006))
 
     opponent_area_rect = pygame.Rect(
         main_play_rect.right - opponent_area_width,
@@ -112,11 +107,13 @@ def compute_board_geometry(
     staged_card_size = _staged_card_size(opponent_area_rect, opponent_count)
     opponent_slots = _opponent_slots(opponent_area_rect, opponent_count, staged_card_size)
 
+    overlay_margin_x = max(8, round(stats_rect.width * 0.055))
+    overlay_margin_y = max(8, round(stats_rect.height * 0.035))
     overlay_rect = pygame.Rect(
-        stats_rect.left + max(8, round(stats_rect.width * 0.06)),
-        stats_rect.top + max(8, round(stats_rect.height * 0.035)),
-        max(1, stats_rect.width - 2 * max(8, round(stats_rect.width * 0.06))),
-        max(42, round(stats_rect.height * 0.135)),
+        stats_rect.left + overlay_margin_x,
+        stats_rect.top + overlay_margin_y,
+        max(1, stats_rect.width - 2 * overlay_margin_x),
+        max(86, round(stats_rect.height * 0.155)),
     )
 
     return BoardGeometry(
@@ -156,13 +153,13 @@ def row_card_placements(
 
     card_width, card_height = geometry.row_card_size
     center_x = column.centerx
-    first_center_y = column.top + max(card_height // 2, round(column.height * 0.12))
+    first_center_y = column.top + max(card_height // 2, round(column.height * 0.115))
 
     if count == 1:
         step = 0
     else:
         available_step = (column.bottom - first_center_y - card_height // 2) // max(1, count - 1)
-        step = max(30, min(round(card_height * 0.38), available_step))
+        step = max(30, min(round(card_height * 0.36), available_step))
 
     return tuple(
         CardPlacement(
@@ -181,19 +178,23 @@ def hand_card_placements(
     """Return placements for the player's hand cards.
 
     The card centers may intentionally be outside the visible window.
-    For exactly half-visible cards, center_y equals the window bottom.
+    As long as the upper-left card area is visible, all important information
+    can still be read.
     """
 
     count = max(0, card_count)
     if count == 0:
         return ()
 
-    card_width, _card_height = geometry.hand_card_size
+    card_width, card_height = geometry.hand_card_size
     spacing = hand_card_spacing(geometry, card_count=count)
 
     total_width = card_width + (count - 1) * spacing
     first_center_x = geometry.hand_rect.centerx - total_width // 2 + card_width // 2
-    center_y = geometry.window_rect.bottom
+
+    # Put the center below the visible hand frame. This makes the cards larger
+    # while keeping the upper card information visible.
+    center_y = geometry.hand_rect.top + round(card_height * 0.72)
 
     return tuple(
         CardPlacement(
@@ -211,7 +212,10 @@ def hand_card_spacing(geometry: BoardGeometry, *, card_count: int) -> int:
         return card_width
 
     exact_spacing = (geometry.hand_rect.width - card_width) // max(1, count - 1)
-    return max(46, min(round(card_width * 0.96), exact_spacing))
+
+    # Better fill the lower frame. With many cards this may overlap, but not so
+    # much that the upper-left information disappears.
+    return max(52, min(round(card_width * 0.92), exact_spacing))
 
 
 def _relative_rect(base: pygame.Rect, x: float, y: float, width: float, height: float) -> pygame.Rect:
@@ -224,7 +228,9 @@ def _relative_rect(base: pygame.Rect, x: float, y: float, width: float, height: 
 
 
 def _row_columns(row_area_rect: pygame.Rect, row_count: int) -> tuple[pygame.Rect, ...]:
-    gap = max(8, round(row_area_rect.width * 0.018))
+    # The student layout wants the columns closer together than the first debug
+    # version. Keep a small gap so screenshots still show the boundaries.
+    gap = max(5, round(row_area_rect.width * 0.010))
     column_width = max(72, (row_area_rect.width - (row_count - 1) * gap) // row_count)
 
     return tuple(
@@ -249,23 +255,23 @@ def _row_card_size(row_columns: tuple[pygame.Rect, ...], row_count: int) -> tupl
         return (110, 165)
 
     column = row_columns[0]
-    width_by_column = round(column.width * 0.86)
+    width_by_column = round(column.width * 0.88)
     width_by_height = round(column.height * 0.38)
 
     # Four rows are the normal case; still keep this dynamic for future variants.
-    width_by_row_count = round(column.width * (0.90 if row_count <= 4 else 0.82))
+    width_by_row_count = round(column.width * (0.92 if row_count <= 4 else 0.84))
 
-    width = min(210, max(112, min(width_by_column, width_by_height, width_by_row_count)))
+    width = min(215, max(112, min(width_by_column, width_by_height, width_by_row_count)))
     return (width, round(width * 1.5))
 
 
 def _hand_card_size(hand_rect: pygame.Rect, hand_card_count: int) -> tuple[int, int]:
     count = max(1, hand_card_count)
 
-    # The hand card is only half visible, so it may be taller than the hand frame.
-    width_by_visible_height = round(hand_rect.height * 1.16)
-    width_by_available_space = round(hand_rect.width / max(5.8, count * 0.78))
-    width = min(205, max(118, min(width_by_visible_height, width_by_available_space)))
+    # Hand cards may be large; only the upper-left part needs to be visible.
+    width_by_visible_height = round(hand_rect.height * 2.10)
+    width_by_available_space = round(hand_rect.width / max(4.9, count * 0.66))
+    width = min(260, max(145, min(width_by_visible_height, width_by_available_space)))
 
     return (width, round(width * 1.5))
 
