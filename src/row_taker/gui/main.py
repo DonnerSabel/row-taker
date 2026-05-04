@@ -79,7 +79,7 @@ def create_demo_cards(window_width: int, window_height: int) -> tuple[list[CardS
         column = index % board_columns
         card_sprite.move_to(
             play_area_x + CARD_GAP + column * (card_width + CARD_GAP),
-            y_start + row * (card_height + CARD_GAP),
+            y_start + row * (card_height // 5),
         )
 
     # Hand cards
@@ -91,11 +91,11 @@ def create_demo_cards(window_width: int, window_height: int) -> tuple[list[CardS
             continue
 
         card_sprite.move_to(
-            play_area_x + CARD_GAP + index * (card_width + CARD_GAP),
+            play_area_x + 2 * CARD_GAP + index * (card_width + CARD_GAP) * 2,
             hand_y_start,
         )
 
-    return board_cards, hand_cards
+    return board_cards, hand_cards, play_area_x, play_area_y, card_width, card_height, board_columns
 
 
 def run() -> int:
@@ -108,7 +108,15 @@ def run() -> int:
         pygame.display.set_caption(WINDOW_TITLE)
         clock = pygame.time.Clock()
 
-        board_cards, hand_cards = create_demo_cards(*spielfeld.get_image_size())
+        (
+            board_cards,
+            hand_cards,
+            play_area_x,
+            play_area_y,
+            card_width,
+            card_height,
+            board_columns,
+        ) = create_demo_cards(*spielfeld.get_image_size())
 
         running = True
         while running:
@@ -123,6 +131,36 @@ def run() -> int:
                             break
 
             mouse_pos = pygame.mouse.get_pos()
+
+            # Determine which column the mouse is over (based on x position)
+            hovered_column = None
+            if (
+                play_area_x
+                <= mouse_pos[0]
+                <= play_area_x + card_width * board_columns + CARD_GAP * (board_columns + 1)
+            ):
+                # Calculate which column based on x position
+                relative_x = mouse_pos[0] - play_area_x
+                col = (relative_x - CARD_GAP) // (card_width + CARD_GAP)
+                if 0 <= col < board_columns:
+                    hovered_column = col
+
+            # Update board card positions based on hover state
+            play_area_height = int(spielfeld.get_image_size()[1] * BOARD_PLAY_AREA_HEIGHT_RATIO)
+            total_height = 6 * card_height + (6 + 1) * CARD_GAP
+            y_start = play_area_y + max(CARD_GAP, (play_area_height - total_height) // 2)
+
+            for index, card_sprite in enumerate(board_cards):
+                row = index // board_columns
+                column = index % board_columns
+                x = play_area_x + CARD_GAP + column * (card_width + CARD_GAP)
+                if hovered_column == column:
+                    # Spread cards vertically with full height when hovering over this column.
+                    y = y_start + row * (card_height + CARD_GAP)
+                else:
+                    # Stack cards with 1/5 offset when not hovering.
+                    y = y_start + row * (card_height // 5)
+                card_sprite.move_to(x, y)
 
             if spielfeld.image is None:
                 screen.fill(BACKGROUND_COLOR)
