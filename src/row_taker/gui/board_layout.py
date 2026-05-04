@@ -79,9 +79,13 @@ def compute_board_geometry(
     # - narrow opponent strip at the right edge of that field
     # - stats field in the upper right
     # - hand field at the bottom
-    main_play_rect = _relative_rect(window_rect, 0.018, 0.080, 0.780, 0.725)
-    stats_rect = _relative_rect(window_rect, 0.818, 0.045, 0.164, 0.742)
-    hand_rect = _relative_rect(window_rect, 0.014, 0.875, 0.970, 0.110)
+    # Tuned against the current board.png debug screenshot:
+    # - main_play_rect follows the large upper-left green field.
+    # - stats_rect follows the narrow upper-right green field.
+    # - hand_rect follows the lower green hand-card field.
+    main_play_rect = _relative_rect(window_rect, 0.018, 0.066, 0.780, 0.790)
+    stats_rect = _relative_rect(window_rect, 0.823, 0.045, 0.160, 0.755)
+    hand_rect = _relative_rect(window_rect, 0.014, 0.900, 0.970, 0.080)
 
     opponent_area_width = _opponent_area_width(main_play_rect, opponent_count)
     gap = max(8, round(window_rect.width * 0.010))
@@ -108,7 +112,12 @@ def compute_board_geometry(
     staged_card_size = _staged_card_size(opponent_area_rect, opponent_count)
     opponent_slots = _opponent_slots(opponent_area_rect, opponent_count, staged_card_size)
 
-    overlay_rect = _relative_rect(window_rect, 0.020, 0.010, 0.520, 0.050)
+    overlay_rect = pygame.Rect(
+        stats_rect.left + max(8, round(stats_rect.width * 0.06)),
+        stats_rect.top + max(8, round(stats_rect.height * 0.035)),
+        max(1, stats_rect.width - 2 * max(8, round(stats_rect.width * 0.06))),
+        max(42, round(stats_rect.height * 0.135)),
+    )
 
     return BoardGeometry(
         window_rect=window_rect,
@@ -265,9 +274,9 @@ def _staged_card_size(opponent_area_rect: pygame.Rect, opponent_count: int) -> t
     count = max(1, opponent_count)
 
     available_height_per_player = opponent_area_rect.height / count
-    width_by_height = round(available_height_per_player * 0.42)
-    width_by_area = round(opponent_area_rect.width * 0.42)
-    width = min(92, max(48, min(width_by_height, width_by_area)))
+    width_by_height = round(available_height_per_player * 0.38)
+    width_by_area = round(opponent_area_rect.width * 0.36)
+    width = min(84, max(44, min(width_by_height, width_by_area)))
 
     return (width, round(width * 1.5))
 
@@ -282,24 +291,38 @@ def _opponent_slots(
         return ()
 
     circle_radius = _opponent_circle_radius(opponent_area_rect, count)
-    top_padding = max(12, round(opponent_area_rect.height * 0.035))
-    bottom_padding = top_padding
-    usable_height = max(circle_radius * 2, opponent_area_rect.height - top_padding - bottom_padding)
+    staged_width, staged_height = staged_card_size
+
+    # Keep both the circle and the staged card fully inside the opponent area.
+    vertical_margin = max(
+        10,
+        circle_radius + 2,
+        staged_height // 2 + 2,
+        round(opponent_area_rect.height * 0.025),
+    )
+    usable_height = max(1, opponent_area_rect.height - 2 * vertical_margin)
 
     if count == 1:
         center_ys = [opponent_area_rect.centery]
     else:
         step = usable_height / (count - 1)
         center_ys = [
-            round(opponent_area_rect.top + top_padding + index * step)
+            round(opponent_area_rect.top + vertical_margin + index * step)
             for index in range(count)
         ]
 
-    circle_center_x = opponent_area_rect.right - circle_radius - max(10, round(opponent_area_rect.width * 0.07))
-    staged_width, _staged_height = staged_card_size
-    staged_center_x = max(
+    circle_center_x = opponent_area_rect.right - circle_radius - max(8, round(opponent_area_rect.width * 0.055))
+    circle_center_x = _clamp(
+        circle_center_x,
+        opponent_area_rect.left + circle_radius,
+        opponent_area_rect.right - circle_radius,
+    )
+
+    staged_center_x = circle_center_x - circle_radius - max(8, round(opponent_area_rect.width * 0.055)) - staged_width // 2
+    staged_center_x = _clamp(
+        staged_center_x,
         opponent_area_rect.left + staged_width // 2,
-        circle_center_x - circle_radius - max(8, round(opponent_area_rect.width * 0.06)) - staged_width // 2,
+        opponent_area_rect.right - staged_width // 2,
     )
 
     return tuple(
@@ -313,6 +336,10 @@ def _opponent_slots(
         )
         for center_y in center_ys
     )
+
+
+def _clamp(value: int, lower: int, upper: int) -> int:
+    return max(lower, min(value, upper))
 
 
 def _opponent_circle_radius(opponent_area_rect: pygame.Rect, opponent_count: int) -> int:

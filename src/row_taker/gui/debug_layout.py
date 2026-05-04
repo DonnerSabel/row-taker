@@ -18,17 +18,17 @@ DEFAULT_SIZE = (1200, 800)
 FPS = 30
 
 COLOR_MAIN = pygame.Color(255, 255, 255)
-COLOR_ROW_AREA = pygame.Color(80, 220, 255)
-COLOR_OPPONENT_AREA = pygame.Color(255, 190, 70)
-COLOR_STATS = pygame.Color(255, 90, 210)
-COLOR_HAND = pygame.Color(110, 255, 110)
-COLOR_OVERLAY = pygame.Color(180, 140, 255)
-COLOR_ROW_COLUMN = pygame.Color(255, 255, 60)
-COLOR_ROW_CARD = pygame.Color(20, 240, 90)
-COLOR_HAND_CARD = pygame.Color(255, 120, 40)
-COLOR_STAGED_CARD = pygame.Color(80, 170, 255)
-COLOR_CIRCLE = pygame.Color(255, 80, 80)
-COLOR_TEXT_BG = pygame.Color(0, 0, 0, 155)
+COLOR_ROW_AREA = pygame.Color(0, 235, 255)
+COLOR_OPPONENT_AREA = pygame.Color(255, 210, 0)
+COLOR_STATS = pygame.Color(255, 0, 210)
+COLOR_HAND = pygame.Color(70, 255, 70)
+COLOR_OVERLAY = pygame.Color(185, 80, 255)
+COLOR_ROW_COLUMN = pygame.Color(255, 255, 0)
+COLOR_ROW_CARD = pygame.Color(0, 255, 90)
+COLOR_HAND_CARD = pygame.Color(255, 115, 0)
+COLOR_STAGED_CARD = pygame.Color(0, 150, 255)
+COLOR_CIRCLE = pygame.Color(255, 45, 45)
+COLOR_TEXT_BG = pygame.Color(0, 0, 0, 180)
 
 
 class LayoutDebugApp:
@@ -101,7 +101,7 @@ class LayoutDebugApp:
         self._draw_row_centers(geometry)
         self._draw_hand_centers(geometry)
         self._draw_opponent_slots(geometry)
-        self._draw_help(geometry.window_rect)
+        self._draw_help(geometry)
 
         pygame.display.flip()
 
@@ -211,28 +211,35 @@ class LayoutDebugApp:
         self._screen.blit(bg, bg_rect)
         self._screen.blit(surface, position)
 
-    def _draw_help(self, window_rect: pygame.Rect) -> None:
+    def _draw_help(self, geometry: BoardGeometry) -> None:
         if self._screen is None or self._font is None:
             raise RuntimeError("LayoutDebugApp not initialized")
 
         lines = [
             "Layout Debug",
-            f"Mitspieler: {self._opponent_count}   Handkarten: {self._hand_card_count}   Karten/Reihe: {self._row_card_count}",
-            "1-5 Mitspieler | H/J Hand +/- | R/F Reihe +/- | D Labels | ESC Ende",
+            f"Mitspieler: {self._opponent_count}",
+            f"Handkarten: {self._hand_card_count}",
+            f"Karten/Reihe: {self._row_card_count}",
+            "1-5 Gegner",
+            "H/J Hand +/-",
+            "R/F Reihe +/-",
+            "D Labels",
+            "ESC Ende",
         ]
 
-        x = window_rect.left + 16
-        y = window_rect.bottom - 78
-        width = min(860, window_rect.width - 32)
-        bg_rect = pygame.Rect(x - 8, y - 8, width, 72)
+        rect = geometry.stats_rect.inflate(-14, -14)
+        bg = pygame.Surface(rect.size, pygame.SRCALPHA)
+        bg.fill(pygame.Color(0, 0, 0, 105))
+        self._screen.blit(bg, rect)
 
-        bg = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
-        bg.fill(COLOR_TEXT_BG)
-        self._screen.blit(bg, bg_rect)
-
+        y = rect.top + 8
         for index, line in enumerate(lines):
-            surface = self._font.render(line, True, pygame.Color(255, 255, 255))
-            self._screen.blit(surface, (x, y + index * 22))
+            color = pygame.Color(255, 255, 255) if index == 0 else pygame.Color(225, 225, 225)
+            surface = self._font.render(line, True, color)
+            self._screen.blit(surface, (rect.left + 8, y))
+            y += 22
+            if y > rect.bottom - 18:
+                break
 
     def _tick(self) -> None:
         if self._clock is None:
