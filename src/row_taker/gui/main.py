@@ -9,6 +9,7 @@ from row_taker.gui.constants import (
     BOARD_PLAY_AREA_Y_RATIO,
     CARD_ASPECT_RATIO,
     CARD_GAP,
+    HANDCARD_SCALE,
     CARD_SCALE,
     FPS,
     WINDOW_TITLE,
@@ -47,7 +48,6 @@ def create_demo_cards(
         if deck and deck[0].image is not None
         else int(card_width * CARD_ASPECT_RATIO)
     )
-
     # Board cards
     board_cards = deck[: board_rows * board_columns]
     total_height = board_rows * card_height + (board_rows + 1) * CARD_GAP
@@ -64,12 +64,29 @@ def create_demo_cards(
 
     # Hand cards
     hand_cards = deck[board_rows * board_columns :]
+    
+    # Rescale hand cards with HANDCARD_SCALE
+    handcard_window_width = int(window_width * HANDCARD_SCALE / CARD_SCALE)
+    for card in hand_cards:
+        card.scale(handcard_window_width)
+    
+    handcard_width = (
+        hand_cards[0].image.get_width()
+        if hand_cards and hand_cards[0].image is not None
+        else int(window_width * HANDCARD_SCALE)
+    )
+    handcard_height = (
+        hand_cards[0].image.get_height()
+        if hand_cards and hand_cards[0].image is not None
+        else int(handcard_width * CARD_ASPECT_RATIO)
+    )
+    
     hand_y_start = hand_y + CARD_GAP
     for index, card in enumerate(hand_cards):
         if card.image is None:
             continue
 
-        card.x = play_area_x + 2 * CARD_GAP + index * (card_width + CARD_GAP) * 2
+        card.x = play_area_x + CARD_GAP + index * (handcard_width + CARD_GAP)
         card.y = hand_y_start
 
     return board_cards, hand_cards, play_area_x, play_area_y, card_width, card_height, board_columns
