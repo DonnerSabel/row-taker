@@ -37,22 +37,6 @@ def create_demo_cards(
     for card in deck:
         card.scale(window_width)
 
-    if deck and deck[0].image is not None:
-        # Calculate target dimensions to fit the board play area
-        max_columns = max(board_columns, hand_columns)
-        available_width = play_area_width - max_columns * CARD_GAP
-        available_height = play_area_height - board_rows * CARD_GAP
-        target_width_from_width = available_width / max_columns
-        target_width_from_height = (available_height / board_rows) / CARD_ASPECT_RATIO
-        target_width = min(target_width_from_width, target_width_from_height)
-
-        # Calculate effective window width for scaling
-        effective_window_width = int(target_width / CARD_SCALE)
-
-        # Rescale cards
-        for card in deck:
-            card.scale(effective_window_width)
-
     card_width = (
         deck[0].image.get_width()
         if deck and deck[0].image is not None
