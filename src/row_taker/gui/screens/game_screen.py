@@ -14,14 +14,17 @@ from row_taker.client.actions import (
 )
 from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
-from row_taker.gui import constants as c
 from row_taker.gui_demo.layout import DemoLayout
-from row_taker.gui_demo.primitives import ACCENT, TEXT_MUTED, WINDOW_BACKGROUND, PrimitiveDrawer
-from row_taker.gui_demo.ui.common_render import (
-    format_presentation_event,
-    render_standard_footer,
-    render_standard_header,
+from row_taker.gui_demo.primitives import (
+    ACCENT,
+    CARD_FILL,
+    CARD_SELECTED,
+    PANEL_BORDER,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
+    PrimitiveDrawer,
 )
+from row_taker.gui_demo.ui.common_render import format_presentation_event
 from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 
@@ -50,10 +53,11 @@ class GameScreenTargets:
 
 
 @dataclass(frozen=True, slots=True)
-class GuiBoardGeometry:
-    board_rect: pygame.Rect
-    play_rect: pygame.Rect
+class BoardLayout:
+    window_rect: pygame.Rect
     row_rects: tuple[pygame.Rect, ...]
+    hand_rect: pygame.Rect
+    overlay_rect: pygame.Rect
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +67,8 @@ class GameScreen:
     last_action_summary: str
 
     def build_targets(self, layout: DemoLayout) -> GameScreenTargets:
-        return build_game_screen_targets(layout, self.state)
+        board_layout = _board_layout(layout.window_rect, self.state)
+        return build_game_screen_targets(board_layout, self.state)
 
     def handle_event(
         self,
@@ -84,22 +89,22 @@ class GameScreen:
         layout: DemoLayout,
         targets: GameScreenTargets,
     ) -> None:
+        board_layout = _board_layout(layout.window_rect, self.state)
         render_game_screen(
             screen,
             drawer=drawer,
-            layout=layout,
+            board_layout=board_layout,
             client_state=self.state,
-            frame_count=self.frame_count,
             game_targets=targets,
             last_action_summary=self.last_action_summary,
         )
 
 
-def build_game_screen_targets(layout: DemoLayout, state: ClientState) -> GameScreenTargets:
+def build_game_screen_targets(board_layout: BoardLayout, state: ClientState) -> GameScreenTargets:
     return GameScreenTargets(
-        card_targets=_build_card_targets(layout, state),
-        row_targets=_build_row_targets(layout, state),
-        continue_target=_build_continue_target(layout, state),
+        card_targets=_build_card_targets(board_layout, state),
+        row_targets=_build_row_targets(board_layout, state),
+        continue_target=_build_continue_target(board_layout, state),
     )
 
 
@@ -111,14 +116,19 @@ def handle_game_event(
 ) -> ScreenResult:
     if event.type == pygame.QUIT:
         return ScreenResult(request_quit=True)
+
     if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
         return ScreenResult(request_quit=True)
+
     if state is None or game_targets is None:
         return NO_SCREEN_RESULT
+
     if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and state.pending_presentation_events:
         return ScreenResult(client_action=ClientActionAdvancePresentation())
+
     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
         return _handle_left_click(event.pos, game_targets=game_targets)
+
     return NO_SCREEN_RESULT
 
 
@@ -126,22 +136,20 @@ def render_game_screen(
     screen: pygame.Surface,
     *,
     drawer: PrimitiveDrawer,
-    layout: DemoLayout,
+    board_layout: BoardLayout,
     client_state: ClientState,
-    frame_count: int,
     game_targets: GameScreenTargets,
     last_action_summary: str,
 ) -> None:
-    screen.fill(WINDOW_BACKGROUND)
-    render_standard_header(screen, drawer, layout, client_state)
-    _render_board_panel(screen, drawer, layout, client_state, game_targets)
-    _render_hand_panel(screen, drawer, layout, client_state, game_targets)
-    _render_sidebar(screen, drawer, layout, client_state, frame_count, last_action_summary, game_targets)
-    render_standard_footer(screen, drawer, layout)
+    _draw_full_background(screen, board_layout.window_rect)
+    _draw_rows(screen, drawer, board_layout, client_state, game_targets)
+    _draw_hand(screen, drawer, client_state, game_targets)
+    _draw_status_overlay(screen, drawer, board_layout, client_state, last_action_summary, game_targets)
 
 
 def _handle_left_click(position: tuple[int, int], *, game_targets: GameScreenTargets) -> ScreenResult:
-    for target in game_targets.card_targets:
+    # Handkarten liegen visuell übereinander. Deshalb von hinten nach vorne prüfen.
+    for target in reversed(game_targets.card_targets):
         if target.rect.collidepoint(position):
             return ScreenResult(client_action=ClientActionChooseCard(card_value=target.card_value))
 
@@ -155,122 +163,201 @@ def _handle_left_click(position: tuple[int, int], *, game_targets: GameScreenTar
     return NO_SCREEN_RESULT
 
 
-def _build_card_targets(layout: DemoLayout, state: ClientState) -> tuple[CardTarget, ...]:
+def _board_layout(window_rect: pygame.Rect, state: ClientState) -> BoardLayout:
+    public_state = state.public_state
+    row_count = len(public_state.rows) if public_state is not None else 4
+
+    margin_x = max(24, round(window_rect.width * 0.035))
+    top_margin = max(46, round(window_rect.height * 0.075))
+    hand_visible_height = max(92, round(window_rect.height * 0.18))
+    row_area_bottom = window_rect.height - hand_visible_height - max(24, round(window_rect.height * 0.035))
+    row_area_height = max(220, row_area_bottom - top_margin)
+
+    row_gap = max(10, round(row_area_height * 0.025))
+    row_height = max(70, (row_area_height - (row_count - 1) * row_gap) // max(1, row_count))
+
+    row_rects = tuple(
+        pygame.Rect(
+            margin_x,
+            top_margin + index * (row_height + row_gap),
+            window_rect.width - 2 * margin_x,
+            row_height,
+        )
+        for index in range(max(1, row_count))
+    )
+
+    hand_rect = pygame.Rect(
+        margin_x,
+        window_rect.height - hand_visible_height,
+        window_rect.width - 2 * margin_x,
+        hand_visible_height,
+    )
+
+    overlay_rect = pygame.Rect(
+        margin_x,
+        12,
+        min(560, window_rect.width - 2 * margin_x),
+        max(32, top_margin - 20),
+    )
+
+    return BoardLayout(
+        window_rect=window_rect,
+        row_rects=row_rects,
+        hand_rect=hand_rect,
+        overlay_rect=overlay_rect,
+    )
+
+
+def _build_card_targets(board_layout: BoardLayout, state: ClientState) -> tuple[CardTarget, ...]:
     player_state = state.player_state
     if player_state is None:
         return ()
 
-    hand_content = _content_rect(layout.main_bottom_rect)
-    hand_cards_rect = hand_content.inflate(-12, -12)
-    hand_cards_rect.top += 44
-    hand_cards_rect.height = max(1, hand_cards_rect.height - 44)
+    card_count = len(player_state.hand)
+    if card_count == 0:
+        return ()
 
-    card_size = _hand_card_size(hand_cards_rect, len(player_state.hand))
-    card_width, card_height = card_size
-    gap = max(8, min(22, card_width // 5))
-    columns = max(1, hand_cards_rect.width // (card_width + gap))
+    card_width, card_height = _hand_card_size(board_layout.hand_rect, card_count)
+    overlap = _hand_overlap(board_layout.hand_rect, card_width, card_count)
+    visible_y = board_layout.window_rect.height - card_height // 2
 
     targets: list[CardTarget] = []
     for index, card in enumerate(player_state.hand):
-        row_index = index // columns
-        column_index = index % columns
         rect = pygame.Rect(
-            hand_cards_rect.left + column_index * (card_width + gap),
-            hand_cards_rect.top + row_index * (card_height + gap),
+            board_layout.hand_rect.left + index * overlap,
+            visible_y,
             card_width,
             card_height,
         )
         targets.append(CardTarget(card_value=card.value, rect=rect))
+
     return tuple(targets)
 
 
-def _build_row_targets(layout: DemoLayout, state: ClientState) -> tuple[RowTarget, ...]:
+def _build_row_targets(board_layout: BoardLayout, state: ClientState) -> tuple[RowTarget, ...]:
     public_state = state.public_state
     player_state = state.player_state
     if public_state is None or player_state is None:
         return ()
+
     if player_state.phase_info.phase != Phase.CHOOSE_ROW:
         return ()
 
-    geometry = _board_geometry(layout, len(public_state.rows))
     selectable = set(player_state.get_selectable_row_ids_for_choose_row())
-
     targets: list[RowTarget] = []
-    for row, rect in zip(public_state.rows, geometry.row_rects, strict=False):
+    for row, rect in zip(public_state.rows, board_layout.row_rects, strict=False):
         if row.row_id in selectable:
             targets.append(RowTarget(row_id=row.row_id, rect=rect))
     return tuple(targets)
 
 
-def _build_continue_target(layout: DemoLayout, state: ClientState) -> ContinueTarget | None:
+def _build_continue_target(board_layout: BoardLayout, state: ClientState) -> ContinueTarget | None:
     if not state.pending_presentation_events:
         return None
+
     rect = pygame.Rect(
-        layout.sidebar_rect.left + 20,
-        layout.sidebar_rect.bottom - 54,
-        layout.sidebar_rect.width - 40,
+        board_layout.window_rect.right - 210,
+        board_layout.window_rect.top + 16,
+        190,
         34,
     )
     return ContinueTarget(rect=rect)
 
 
-def _render_board_panel(
+def _draw_full_background(screen: pygame.Surface, window_rect: pygame.Rect) -> None:
+    board = _scaled_board_image_cover(window_rect.width, window_rect.height)
+    if board is None:
+        screen.fill((18, 84, 38))
+        return
+
+    board_rect = board.get_rect(center=window_rect.center)
+    screen.blit(board, board_rect)
+
+
+def _draw_rows(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    layout: DemoLayout,
+    board_layout: BoardLayout,
     client_state: ClientState,
     game_targets: GameScreenTargets,
 ) -> None:
-    content = drawer.draw_panel(screen, layout.main_top_rect, title="Spielfeld")
     public_state = client_state.public_state
-
     if public_state is None:
-        drawer.draw_wrapped_lines(screen, ["Kein public_state verfügbar."], content)
+        _draw_overlay_box(screen, board_layout.overlay_rect)
+        drawer.draw_text(
+            screen,
+            "Kein Spielzustand vorhanden.",
+            (board_layout.overlay_rect.left + 10, board_layout.overlay_rect.top + 9),
+            role="body",
+        )
         return
-
-    geometry = _board_geometry(layout, len(public_state.rows))
-    _draw_board_background(screen, geometry.board_rect)
 
     row_target_by_id = {target.row_id: target for target in game_targets.row_targets}
-    for row, row_rect in zip(public_state.rows, geometry.row_rects, strict=False):
+
+    for row, row_rect in zip(public_state.rows, board_layout.row_rects, strict=False):
         selectable = row.row_id in row_target_by_id
-        _draw_board_row(
-            screen,
-            drawer,
-            row_rect,
-            row_id=row.row_id,
-            cards=row.cards,
-            selectable=selectable,
-        )
-
-    _draw_score_strip(screen, drawer, content, client_state)
+        _draw_row_lane(screen, drawer, row_rect, row_id=row.row_id, cards=row.cards, selectable=selectable)
 
 
-def _render_hand_panel(
+def _draw_row_lane(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    layout: DemoLayout,
+    rect: pygame.Rect,
+    *,
+    row_id: object,
+    cards: tuple[Any, ...],
+    selectable: bool,
+) -> None:
+    lane_fill = pygame.Color(0, 0, 0, 82)
+    lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(lane_surface, lane_fill, lane_surface.get_rect(), border_radius=10)
+    screen.blit(lane_surface, rect)
+
+    border = ACCENT if selectable else pygame.Color(255, 255, 255, 70)
+    pygame.draw.rect(screen, border, rect, 3 if selectable else 1, border_radius=10)
+
+    label = f"Reihe {row_id}"
+    drawer.draw_text(screen, label, (rect.left + 10, rect.top + 8), role="small", color=ACCENT if selectable else TEXT_MUTED)
+
+    bullheads = sum(card.bullheads for card in cards)
+    drawer.draw_text(
+        screen,
+        f"{bullheads} Hornochsen",
+        (rect.right - 118, rect.top + 8),
+        role="small",
+        color=TEXT_MUTED,
+    )
+
+    if not cards:
+        return
+
+    card_width = _row_card_width(rect, len(cards))
+    card_height = round(card_width * 1.5)
+
+    # Reihen wachsen von oben nach unten. Karten dürfen sich überdecken.
+    y_step = max(24, min(round(card_height * 0.42), max(24, (rect.height - card_height) // max(1, len(cards)))))
+    x = rect.left + 28
+    y = rect.top + 30
+
+    for index, card in enumerate(cards):
+        card_rect = pygame.Rect(
+            x + min(index, 2) * 8,
+            y + index * y_step,
+            card_width,
+            card_height,
+        )
+        _draw_card_image_or_fallback(screen, drawer, card_rect, card, selected=selectable)
+
+
+def _draw_hand(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
     client_state: ClientState,
     game_targets: GameScreenTargets,
 ) -> None:
-    content = drawer.draw_panel(screen, layout.main_bottom_rect, title="Eigene Hand")
     player_state = client_state.player_state
-
     if player_state is None:
-        drawer.draw_wrapped_lines(screen, ["Kein player_state verfügbar."], content)
         return
-
-    info_lines = [
-        f"Spieler: {player_state.self_player_name()}",
-        f"Aktion: {client_state.pending_action.value}",
-        "Klicke eine Karte, um sie auszuwählen.",
-    ]
-    if player_state.phase_info.phase == Phase.CHOOSE_ROW and player_state.pending_card_value() is not None:
-        info_lines.append(f"Ausliegende Karte: {player_state.pending_card_value()}")
-
-    info_rect = content.copy()
-    info_rect.height = 42
-    drawer.draw_wrapped_lines(screen, info_lines, info_rect, role="small", color=TEXT_MUTED)
 
     target_by_value = {target.card_value: target for target in game_targets.card_targets}
     for card in player_state.hand:
@@ -280,71 +367,105 @@ def _render_hand_panel(
         _draw_card_image_or_fallback(screen, drawer, target.rect, card)
 
     if player_state.phase_info.phase == Phase.CHOOSE_ROW and player_state.pending_card_value() is not None:
-        hint_rect = pygame.Rect(content.right - 170, content.top, 150, 32)
-        drawer.draw_badge(screen, hint_rect, text=f"Reihe wählen: {player_state.pending_card_value()}", active=True)
+        pending_rect = pygame.Rect(24, client_state_overlay_y(game_targets), 250, 34)
+        _draw_overlay_box(screen, pending_rect)
+        drawer.draw_text(
+            screen,
+            f"Reihe für Karte {player_state.pending_card_value()} wählen",
+            (pending_rect.left + 10, pending_rect.top + 8),
+            role="small",
+            color=ACCENT,
+        )
 
 
-def _draw_board_row(
+def client_state_overlay_y(game_targets: GameScreenTargets) -> int:
+    if game_targets.card_targets:
+        return max(60, game_targets.card_targets[0].rect.top - 42)
+    return 60
+
+
+def _draw_status_overlay(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    rect: pygame.Rect,
-    *,
-    row_id: object,
-    cards: tuple[Any, ...],
-    selectable: bool,
+    board_layout: BoardLayout,
+    client_state: ClientState,
+    last_action_summary: str,
+    game_targets: GameScreenTargets,
 ) -> None:
-    border_color = ACCENT if selectable else TEXT_MUTED
-    pygame.draw.rect(screen, (8, 20, 12), rect, border_radius=10)
-    pygame.draw.rect(screen, border_color, rect, 2 if selectable else 1, border_radius=10)
+    _draw_overlay_box(screen, board_layout.overlay_rect)
 
-    title_rect = pygame.Rect(rect.left + 8, rect.top + 6, 90, 22)
-    drawer.draw_text(screen, str(row_id), title_rect.topleft, role="small", color=border_color)
+    public_state = client_state.public_state
+    player_state = client_state.player_state
+    phase = player_state.phase_info.phase.value if player_state is not None else "-"
+    player_name = player_state.self_player_name() if player_state is not None else "-"
 
-    bullheads = sum(card.bullheads for card in cards)
+    score_parts: list[str] = []
+    if public_state is not None:
+        for player in public_state.players:
+            marker = "★" if player.player_id == client_state.own_player_id else ""
+            score_parts.append(f"{marker}{player.name}: {player.score}")
+
+    line_1 = f"{player_name}  |  Phase: {phase}  |  Aktion: {client_state.pending_action.value}"
+    line_2 = "   ".join(score_parts) if score_parts else last_action_summary
+
+    drawer.draw_text(screen, line_1, (board_layout.overlay_rect.left + 10, board_layout.overlay_rect.top + 8), role="small")
     drawer.draw_text(
         screen,
-        f"{bullheads} Hornochsen",
-        (rect.right - 112, rect.top + 6),
-        role="small",
+        line_2,
+        (board_layout.overlay_rect.left + 10, board_layout.overlay_rect.top + 30),
+        role="tiny",
         color=TEXT_MUTED,
     )
 
-    if not cards:
-        return
-
-    card_gap = 8
-    max_width = max(36, (rect.width - 20 - (len(cards) - 1) * card_gap) // max(1, len(cards)))
-    card_width = min(72, max_width)
-    card_height = round(card_width * 1.5)
-    y = rect.centery - card_height // 2
-
-    for index, card in enumerate(cards):
-        card_rect = pygame.Rect(
-            rect.left + 10 + index * (card_width + card_gap),
-            y,
-            card_width,
-            card_height,
+    if client_state.flash_message is not None:
+        flash_rect = pygame.Rect(
+            board_layout.overlay_rect.left,
+            board_layout.overlay_rect.bottom + 8,
+            min(560, board_layout.window_rect.width - 48),
+            34,
         )
-        _draw_card_image_or_fallback(screen, drawer, card_rect, card, selected=selectable)
+        _draw_overlay_box(screen, flash_rect)
+        drawer.draw_text(
+            screen,
+            client_state.flash_message.text,
+            (flash_rect.left + 10, flash_rect.top + 8),
+            role="small",
+            color=ACCENT,
+        )
+
+    if client_state.pending_presentation_events:
+        events_rect = pygame.Rect(
+            board_layout.window_rect.right - 330,
+            board_layout.window_rect.top + 60,
+            306,
+            120,
+        )
+        _draw_overlay_box(screen, events_rect)
+        lines = [format_presentation_event(event) for event in client_state.pending_presentation_events[:4]]
+        drawer.draw_wrapped_lines(
+            screen,
+            lines,
+            events_rect.inflate(-18, -18),
+            role="small",
+            color=TEXT_PRIMARY,
+        )
+
+    if game_targets.continue_target is not None:
+        _draw_overlay_box(screen, game_targets.continue_target.rect)
+        drawer.draw_text(
+            screen,
+            "Weiter [Leertaste]",
+            (game_targets.continue_target.rect.left + 10, game_targets.continue_target.rect.top + 8),
+            role="small",
+            color=ACCENT,
+        )
 
 
-def _draw_score_strip(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    content: pygame.Rect,
-    client_state: ClientState,
-) -> None:
-    public_state = client_state.public_state
-    if public_state is None:
-        return
-
-    y = content.bottom - 30
-    x = content.left
-    for player in public_state.players:
-        marker = " ★" if player.player_id == client_state.own_player_id else ""
-        text = f"{player.name}: {player.score}{marker}"
-        drawer.draw_text(screen, text, (x, y), role="small", color=ACCENT if marker else TEXT_MUTED)
-        x += max(130, len(text) * 8)
+def _draw_overlay_box(screen: pygame.Surface, rect: pygame.Rect) -> None:
+    overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(overlay, pygame.Color(0, 0, 0, 145), overlay.get_rect(), border_radius=8)
+    screen.blit(overlay, rect)
+    pygame.draw.rect(screen, pygame.Color(255, 255, 255, 60), rect, 1, border_radius=8)
 
 
 def _draw_card_image_or_fallback(
@@ -357,7 +478,10 @@ def _draw_card_image_or_fallback(
 ) -> None:
     image = _scaled_card_image(card.value, rect.width, rect.height)
     if image is None:
-        drawer.draw_card(screen, rect, value=card.value, bullheads=card.bullheads, selected=selected)
+        pygame.draw.rect(screen, CARD_SELECTED if selected else CARD_FILL, rect, border_radius=6)
+        pygame.draw.rect(screen, ACCENT if selected else PANEL_BORDER, rect, 2 if selected else 1, border_radius=6)
+        drawer.draw_text(screen, str(card.value), (rect.left + 8, rect.top + 6), role="body")
+        drawer.draw_text(screen, f"{card.bullheads} bh", (rect.left + 8, rect.top + 30), role="small", color=TEXT_MUTED)
         return
 
     image_rect = image.get_rect(center=rect.center)
@@ -366,79 +490,52 @@ def _draw_card_image_or_fallback(
         pygame.draw.rect(screen, ACCENT, image_rect.inflate(4, 4), 2, border_radius=6)
 
 
-def _board_geometry(layout: DemoLayout, row_count: int) -> GuiBoardGeometry:
-    content = _content_rect(layout.main_top_rect)
-    board_rect = _fit_rect(_board_image_size(), content)
+def _row_card_width(row_rect: pygame.Rect, card_count: int) -> int:
+    if card_count <= 1:
+        return min(94, max(60, row_rect.width // 8))
 
-    play_rect = pygame.Rect(
-        board_rect.left + round(board_rect.width * c.BOARD_PLAY_AREA_X_RATIO),
-        board_rect.top + round(board_rect.height * c.BOARD_PLAY_AREA_Y_RATIO),
-        round(board_rect.width * c.BOARD_PLAY_AREA_WIDTH_RATIO),
-        round(board_rect.height * c.BOARD_PLAY_AREA_HEIGHT_RATIO),
-    )
-
-    rows = max(1, row_count)
-    row_gap = max(8, play_rect.height // 40)
-    row_height = max(44, (play_rect.height - (rows - 1) * row_gap) // rows)
-
-    row_rects = tuple(
-        pygame.Rect(
-            play_rect.left,
-            play_rect.top + index * (row_height + row_gap),
-            play_rect.width,
-            row_height,
-        )
-        for index in range(rows)
-    )
-
-    return GuiBoardGeometry(board_rect=board_rect, play_rect=play_rect, row_rects=row_rects)
+    return min(88, max(52, row_rect.width // 11))
 
 
-def _content_rect(panel_rect: pygame.Rect) -> pygame.Rect:
-    rect = panel_rect.inflate(-24, -44)
-    rect.top += 20
-    return rect
-
-
-def _fit_rect(source_size: tuple[int, int], target: pygame.Rect) -> pygame.Rect:
-    source_width, source_height = source_size
-    if source_width <= 0 or source_height <= 0:
-        return target.copy()
-
-    scale = min(target.width / source_width, target.height / source_height)
-    width = max(1, round(source_width * scale))
-    height = max(1, round(source_height * scale))
-    rect = pygame.Rect(0, 0, width, height)
-    rect.center = target.center
-    return rect
-
-
-def _hand_card_size(rect: pygame.Rect, card_count: int) -> tuple[int, int]:
+def _hand_card_size(hand_rect: pygame.Rect, card_count: int) -> tuple[int, int]:
     if card_count <= 0:
-        return (72, 108)
+        return (86, 129)
 
-    columns = min(card_count, 10)
-    width_by_columns = (rect.width - (columns - 1) * 10) // max(1, columns)
-    width_by_height = max(36, (rect.height - 10) * 2 // 3)
-    width = max(44, min(96, width_by_columns, width_by_height))
+    desired_width = max(64, min(110, hand_rect.width // max(7, card_count)))
+    max_height_width = max(54, hand_rect.height * 2 // 3)
+    width = min(desired_width, max_height_width)
     return (width, round(width * 1.5))
 
 
-def _draw_board_background(screen: pygame.Surface, board_rect: pygame.Rect) -> None:
-    board = _scaled_board_image(board_rect.width, board_rect.height)
-    if board is None:
-        pygame.draw.rect(screen, (20, 70, 32), board_rect, border_radius=12)
-        pygame.draw.rect(screen, ACCENT, board_rect, 1, border_radius=12)
-        return
-    screen.blit(board, board_rect)
+def _hand_overlap(hand_rect: pygame.Rect, card_width: int, card_count: int) -> int:
+    if card_count <= 1:
+        return card_width
+
+    available_step = (hand_rect.width - card_width) // max(1, card_count - 1)
+    return max(34, min(card_width + 12, available_step))
 
 
 @lru_cache(maxsize=64)
-def _scaled_board_image(width: int, height: int) -> pygame.Surface | None:
+def _scaled_board_image_cover(width: int, height: int) -> pygame.Surface | None:
     image = _load_board_image()
     if image is None:
         return None
-    return pygame.transform.smoothscale(image, (width, height))
+
+    source_width, source_height = image.get_size()
+    if source_width <= 0 or source_height <= 0:
+        return None
+
+    scale = max(width / source_width, height / source_height)
+    scaled_width = max(1, round(source_width * scale))
+    scaled_height = max(1, round(source_height * scale))
+    scaled = pygame.transform.smoothscale(image, (scaled_width, scaled_height))
+
+    if scaled_width == width and scaled_height == height:
+        return scaled
+
+    crop_rect = pygame.Rect(0, 0, width, height)
+    crop_rect.center = scaled.get_rect().center
+    return scaled.subsurface(crop_rect).copy()
 
 
 @lru_cache(maxsize=1)
@@ -465,67 +562,5 @@ def _load_card_image(card_value: int) -> pygame.Surface | None:
     return pygame.image.load(str(image_path)).convert_alpha()
 
 
-@lru_cache(maxsize=1)
-def _board_image_size() -> tuple[int, int]:
-    image = _load_board_image()
-    if image is None:
-        return (1200, 800)
-    return image.get_size()
-
-
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[4]
-
-
-def _render_sidebar(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    layout: DemoLayout,
-    client_state: ClientState,
-    frame_count: int,
-    last_action_summary: str,
-    game_targets: GameScreenTargets,
-) -> None:
-    content_rect = drawer.draw_panel(screen, layout.sidebar_rect, title="Zustandsübersicht")
-    y = content_rect.top
-
-    entries = [
-        ("client_mode", client_state.client_mode.value),
-        ("pending_action", client_state.pending_action.value),
-        ("own_client_id", client_state.own_client_id or "-"),
-        ("own_player_id", client_state.own_player_id or "-"),
-        ("session_error", client_state.session_error or "-"),
-        ("presentation", str(len(client_state.pending_presentation_events))),
-        ("frame", str(frame_count)),
-    ]
-
-    for key, value in entries:
-        drawer.draw_key_value(screen, key, value, (content_rect.left, y))
-        y += 28
-
-    drawer.draw_text(screen, "last_gui_action", (content_rect.left, y + 6), role="small", color=TEXT_MUTED)
-    action_rect = content_rect.copy()
-    action_rect.top = y + 28
-    action_rect.height = 72
-    drawer.draw_wrapped_lines(screen, [last_action_summary], action_rect, role="small", color=ACCENT)
-
-    flash_text = client_state.flash_message.text if client_state.flash_message is not None else "Keine Meldung"
-    drawer.draw_text(screen, "flash_message", (content_rect.left, action_rect.bottom + 10), role="small", color=TEXT_MUTED)
-    flash_rect = content_rect.copy()
-    flash_rect.top = action_rect.bottom + 32
-    flash_rect.height = 64
-    drawer.draw_wrapped_lines(screen, [flash_text], flash_rect, role="body", color=ACCENT)
-
-    events_rect = content_rect.copy()
-    events_rect.top = flash_rect.bottom + 18
-    events_bottom = layout.sidebar_rect.bottom - 70
-    events_rect.height = max(40, events_bottom - events_rect.top)
-    drawer.draw_text(screen, "presentation events", (events_rect.left, events_rect.top), role="small", color=TEXT_MUTED)
-    events_rect.top += 22
-    event_lines = [format_presentation_event(event) for event in client_state.pending_presentation_events]
-    if not event_lines:
-        event_lines = ["Keine ausstehenden Präsentationsereignisse."]
-    drawer.draw_wrapped_lines(screen, event_lines, events_rect, role="small")
-
-    if game_targets.continue_target is not None:
-        drawer.draw_badge(screen, game_targets.continue_target.rect, text="Weiter [Leertaste]", active=True)
