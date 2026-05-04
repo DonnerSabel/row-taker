@@ -40,7 +40,7 @@ def create_demo_cards(window_width: int, window_height: int) -> tuple[list[CardS
         card_sprite.scale(window_width)
 
     if deck and deck[0].image is not None:
-        # Calculate target dimensions to fit the board play area
+        # Calculate target dimensions to fit the board play area.
         max_columns = max(board_columns, hand_columns)
         available_width = play_area_width - max_columns * CARD_GAP
         available_height = play_area_height - board_rows * CARD_GAP
@@ -48,10 +48,10 @@ def create_demo_cards(window_width: int, window_height: int) -> tuple[list[CardS
         target_width_from_height = (available_height / board_rows) / CARD_ASPECT_RATIO
         target_width = min(target_width_from_width, target_width_from_height)
 
-        # Calculate effective window width for scaling
+        # Calculate effective window width for CardSprite.scale().
         effective_window_width = int(target_width / CARD_SCALE)
 
-        # Rescale cards
+        # Rescale cards so the board layout fits the background image.
         for card_sprite in deck:
             card_sprite.scale(effective_window_width)
 
