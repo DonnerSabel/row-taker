@@ -1,10 +1,6 @@
-import sys
+from __future__ import annotations
 
-# Standard: Lobby-GUI starten
-# Mit --demo: altes Spielfeld-Demo starten
-if "--demo" in sys.argv:
-    from row_taker.gui.main import run
-else:
-    from row_taker.gui.gui_main import run_lobby as run
+from row_taker.gui.gui_main import run
 
-raise SystemExit(run())
+if __name__ == "__main__":
+    raise SystemExit(run())
