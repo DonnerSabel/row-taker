@@ -168,29 +168,32 @@ def _board_layout(window_rect: pygame.Rect, state: ClientState) -> BoardLayout:
     row_count = len(public_state.rows) if public_state is not None else 4
 
     # Schülerlayout:
-    # - Das Boardbild ist der komplette Fensterhintergrund.
-    # - Die vier Reihen liegen von oben nach unten im oberen Spielfeldbereich.
-    # - Unten bleibt Platz für die Handkarten, von denen nur die obere Hälfte sichtbar ist.
-    margin_x = max(18, round(window_rect.width * 0.025))
-    top_margin = max(34, round(window_rect.height * 0.055))
-    hand_visible_height = max(112, round(window_rect.height * 0.22))
-    bottom_margin = max(8, round(window_rect.height * 0.015))
+    # - board.png ist der komplette Fensterhintergrund.
+    # - Die vier Reihen liegen nebeneinander als Spalten.
+    # - Jede Reihe wächst von oben nach unten.
+    # - Unten bleibt der Rahmen für die Handkarten.
+    margin_x = max(20, round(window_rect.width * 0.025))
+    top_margin = max(64, round(window_rect.height * 0.09))
+    hand_visible_height = max(120, round(window_rect.height * 0.22))
+    bottom_margin = max(8, round(window_rect.height * 0.012))
 
     row_area_top = top_margin
     row_area_bottom = window_rect.height - hand_visible_height - bottom_margin
     row_area_height = max(260, row_area_bottom - row_area_top)
+    row_area_width = window_rect.width - 2 * margin_x
 
-    row_gap = max(8, round(row_area_height * 0.018))
-    row_height = max(82, (row_area_height - (row_count - 1) * row_gap) // max(1, row_count))
+    column_gap = max(10, round(row_area_width * 0.018))
+    column_count = max(1, row_count)
+    column_width = max(90, (row_area_width - (column_count - 1) * column_gap) // column_count)
 
     row_rects = tuple(
         pygame.Rect(
-            margin_x,
-            row_area_top + index * (row_height + row_gap),
-            window_rect.width - 2 * margin_x,
-            row_height,
+            margin_x + index * (column_width + column_gap),
+            row_area_top,
+            column_width,
+            row_area_height,
         )
-        for index in range(max(1, row_count))
+        for index in range(column_count)
     )
 
     hand_rect = pygame.Rect(
@@ -203,8 +206,8 @@ def _board_layout(window_rect: pygame.Rect, state: ClientState) -> BoardLayout:
     overlay_rect = pygame.Rect(
         margin_x,
         10,
-        min(620, window_rect.width - 2 * margin_x),
-        max(46, top_margin + 12),
+        min(680, window_rect.width - 2 * margin_x),
+        max(44, top_margin - 20),
     )
 
     return BoardLayout(
@@ -225,13 +228,20 @@ def _build_card_targets(board_layout: BoardLayout, state: ClientState) -> tuple[
         return ()
 
     card_width, card_height = _hand_card_size(board_layout.hand_rect, card_count)
-    overlap = _hand_overlap(board_layout.hand_rect, card_width, card_count)
+    spacing = _hand_spacing(board_layout.hand_rect, card_width, card_count)
+
+    # Schülerlayout: Die Handkarten sitzen unten im Rahmen.
+    # Nur die obere Kartenhälfte ist sichtbar.
+    x_start = board_layout.hand_rect.centerx - (
+        (card_count - 1) * spacing + card_width
+    ) // 2
+    x_start = max(board_layout.hand_rect.left, x_start)
     visible_y = board_layout.window_rect.height - card_height // 2
 
     targets: list[CardTarget] = []
     for index, card in enumerate(player_state.hand):
         rect = pygame.Rect(
-            board_layout.hand_rect.left + index * overlap,
+            x_start + index * spacing,
             visible_y,
             card_width,
             card_height,
@@ -316,18 +326,18 @@ def _draw_row_lane(
     cards: tuple[Any, ...],
     selectable: bool,
 ) -> None:
-    # Nur ein sehr dezentes Overlay: Das Boardbild soll optisch dominieren.
+    # Vier Spalten nebeneinander; jede Spalte ist eine Reihe.
     lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(lane_surface, pygame.Color(0, 0, 0, 36), lane_surface.get_rect(), border_radius=10)
+    pygame.draw.rect(lane_surface, pygame.Color(0, 0, 0, 30), lane_surface.get_rect(), border_radius=10)
     screen.blit(lane_surface, rect)
 
-    border = ACCENT if selectable else pygame.Color(255, 255, 255, 42)
+    border = ACCENT if selectable else pygame.Color(255, 255, 255, 38)
     pygame.draw.rect(screen, border, rect, 3 if selectable else 1, border_radius=10)
 
     drawer.draw_text(
         screen,
         f"Reihe {row_id}",
-        (rect.left + 10, rect.top + 6),
+        (rect.left + 8, rect.top + 6),
         role="small",
         color=ACCENT if selectable else TEXT_MUTED,
     )
@@ -335,8 +345,8 @@ def _draw_row_lane(
     bullheads = sum(card.bullheads for card in cards)
     drawer.draw_text(
         screen,
-        f"{bullheads} Hornochsen",
-        (rect.right - 118, rect.top + 6),
+        f"{bullheads}",
+        (rect.right - 34, rect.top + 6),
         role="small",
         color=TEXT_MUTED,
     )
@@ -347,11 +357,11 @@ def _draw_row_lane(
     card_width = _row_card_width(rect, len(cards))
     card_height = round(card_width * 1.5)
 
-    # Schülerlayout: Eine Reihe wächst von oben nach unten.
-    # Die Karten dürfen sich überdecken; der obere Teil jeder Karte bleibt sichtbar.
-    x = rect.left + max(42, round(rect.width * 0.055))
-    y = rect.top + 28
-    visible_step = max(28, round(card_height * 0.34))
+    # Schülerlayout: Karten einer Reihe wachsen von oben nach unten.
+    # Die Karten überdecken sich; oben bleiben Zahl und Hornochsen sichtbar.
+    x = rect.centerx - card_width // 2
+    y = rect.top + 32
+    visible_step = _row_visible_step(rect, card_height, len(cards))
 
     for index, card in enumerate(cards):
         card_rect = pygame.Rect(
@@ -505,33 +515,42 @@ def _draw_card_image_or_fallback(
 
 
 def _row_card_width(row_rect: pygame.Rect, card_count: int) -> int:
-    # Karten sollen den verfügbaren Platz sichtbar ausnutzen.
-    # Weil die Reihen vertikal wachsen und sich überdecken dürfen, darf die Karte
-    # deutlich höher als die einzelne sichtbare Stufe sein.
-    by_height = max(84, round(row_rect.height * 0.78))
-    by_width = max(84, round(row_rect.width * 0.13))
-    return min(170, max(96, min(by_height, by_width)))
+    # Eine Reihe ist eine Spalte. Karten sollen dort möglichst groß sein,
+    # aber in die Spaltenbreite passen.
+    by_width = max(80, round(row_rect.width * 0.82))
+    by_height = max(80, round(row_rect.height * 0.34))
+    return min(190, max(100, min(by_width, by_height)))
+
+
+def _row_visible_step(row_rect: pygame.Rect, card_height: int, card_count: int) -> int:
+    if card_count <= 1:
+        return 0
+
+    available_step = (row_rect.height - 34 - card_height) // max(1, card_count - 1)
+    # Der obere Teil jeder Karte bleibt sichtbar; bei Platznot stärker überdecken.
+    return max(30, min(round(card_height * 0.38), available_step))
 
 
 def _hand_card_size(hand_rect: pygame.Rect, card_count: int) -> tuple[int, int]:
     if card_count <= 0:
         return (120, 180)
 
-    # Handkarten müssen gut lesbar sein. Sie dürfen sich horizontal überdecken;
-    # unten ist nur die obere Hälfte sichtbar.
-    by_height = max(110, round(hand_rect.height * 1.35))
-    by_width = max(110, round(hand_rect.width / max(6.8, min(card_count, 10))))
-    width = min(185, max(118, min(by_height, by_width)))
+    # Die Handkarten sollen den unteren Rahmen gut ausnutzen.
+    # Da nur die obere Hälfte sichtbar ist, darf die Karte höher sein als der Rahmen.
+    width_by_visible_height = max(105, round(hand_rect.height * 1.12))
+    width_by_available_space = max(105, round(hand_rect.width / max(5.8, card_count * 0.78)))
+    width = min(205, max(125, min(width_by_visible_height, width_by_available_space)))
     return (width, round(width * 1.5))
 
 
-def _hand_overlap(hand_rect: pygame.Rect, card_width: int, card_count: int) -> int:
+def _hand_spacing(hand_rect: pygame.Rect, card_width: int, card_count: int) -> int:
     if card_count <= 1:
         return card_width
 
-    available_step = (hand_rect.width - card_width) // max(1, card_count - 1)
-    # Bewusst überlappend, aber so, dass die Kartenwerte noch erreichbar bleiben.
-    return max(44, min(round(card_width * 0.78), available_step))
+    exact_spacing = (hand_rect.width - card_width) // max(1, card_count - 1)
+    # Möglichst gleichmäßig über den unteren Rahmen verteilen.
+    # Bei vielen Karten darf es überlappen, aber nicht zu stark.
+    return max(48, min(round(card_width * 0.95), exact_spacing))
 
 
 @lru_cache(maxsize=64)
