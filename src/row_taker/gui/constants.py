@@ -1,4 +1,3 @@
-from tkinter import OFF
 
 
 WINDOW_TITLE = "Row Taker"

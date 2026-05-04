@@ -14,8 +14,8 @@ from row_taker.gui.constants import (
     FPS,
     HANDCARD_GAP,
     HANDCARD_SCALE,
-    OFFSET_HANDCARD_x,
     WINDOW_TITLE,
+    OFFSET_HANDCARD_x,
 )
 from row_taker.gui.spielfeld import Spielfeld
 
