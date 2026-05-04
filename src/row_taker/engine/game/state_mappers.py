@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Serialization helpers for game state structures.
 
 Public protocol messages should only cross the wire using immutable API types:
@@ -9,6 +7,8 @@ Public protocol messages should only cross the wire using immutable API types:
 `DebugStateSnapshot`. The mutable engine helpers used for that path stay private
 inside this module.
 """
+
+from __future__ import annotations
 
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import EngineRow, Player, PlayerID, PublicPlayerInfo, Row, RowID

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Laufzeit-Hülle für den GUI-Demo-Client.
 
 Dieses Modul gehört bewusst zur Infrastruktur. Es verbindet Transport,
@@ -7,6 +5,8 @@ GameClientCore und einen kleinen Hintergrund-Receive-Loop. Für eigene
 GUI-Experimente der Schüler ist es normalerweise nicht der erste Ort für
 Änderungen.
 """
+
+from __future__ import annotations
 
 import queue
 import threading

@@ -4,7 +4,9 @@ from dataclasses import dataclass, field
 from row_taker.engine.game.cards import Card
 from row_taker.protocol.messages import (
     AssignSeatToClient,
+    CardsRevealed,
     ChooseCardRequested,
+    ChooseRowRequested,
     CreateLocalBotOnSeat,
     GameStarting,
     JoinLobby,
@@ -14,6 +16,7 @@ from row_taker.protocol.messages import (
     SessionEndReason,
     SetDisplayName,
     StateUpdated,
+    SubmitCard,
 )
 from row_taker.server.local_server import LocalServer
 
@@ -176,9 +179,6 @@ def test_leave_session_aborts_active_match_for_remaining_clients() -> None:
     assert session_ended[0].target_client_id == "client-1"
     assert session_ended[0].message.reason == SessionEndReason.QUIT
     assert "Alice" in session_ended[0].message.message
-
-
-from row_taker.protocol.messages import CardsRevealed, ChooseRowRequested, SubmitCard
 
 
 def test_game_messages_are_revisioned_when_routed() -> None:

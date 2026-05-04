@@ -1,6 +1,5 @@
 from row_taker.engine.game.models import PlayerID
 from row_taker.engine.lobby.state import LobbySeat, LobbyState
-from row_taker.participants import ParticipantKind
 from row_taker.server.client_registry import ClientRegistry
 from row_taker.server.lobby_view import build_lobby_view
 from row_taker.server.match_participants import build_match_participants
