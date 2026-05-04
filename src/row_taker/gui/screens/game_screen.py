@@ -15,6 +15,14 @@ from row_taker.client.actions import (
 from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
 from row_taker.engine.game.models import PlayerID
+from row_taker.gui.board_layout import (
+    BoardGeometry,
+    CardPlacement,
+    OpponentSlotGeometry,
+    compute_board_geometry,
+    hand_card_placements,
+    row_card_placements,
+)
 from row_taker.gui_demo.layout import DemoLayout
 from row_taker.gui_demo.primitives import (
     ACCENT,
@@ -32,7 +40,11 @@ from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 @dataclass(frozen=True, slots=True)
 class CardTarget:
     card_value: int
-    rect: pygame.Rect
+    placement: CardPlacement
+
+    @property
+    def rect(self) -> pygame.Rect:
+        return self.placement.rect
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,42 +59,17 @@ class ContinueTarget:
 
 
 @dataclass(frozen=True, slots=True)
+class OpponentSlot:
+    player_id: PlayerID
+    player_name: str
+    geometry: OpponentSlotGeometry
+
+
+@dataclass(frozen=True, slots=True)
 class GameScreenTargets:
     card_targets: tuple[CardTarget, ...] = ()
     row_targets: tuple[RowTarget, ...] = ()
     continue_target: ContinueTarget | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class OpponentSlot:
-    player_id: PlayerID
-    player_name: str
-    circle_rect: pygame.Rect
-    staged_card_rect: pygame.Rect
-
-
-@dataclass(frozen=True, slots=True)
-class BoardLayout:
-    window_rect: pygame.Rect
-
-    # The actual large board field in the upper left.
-    main_play_rect: pygame.Rect
-
-    # Left part of main_play_rect: four vertical row columns.
-    row_columns_rect: pygame.Rect
-    row_rects: tuple[pygame.Rect, ...]
-
-    # Right part of main_play_rect: opponent circles and played-card staging area.
-    opponent_slots_rect: pygame.Rect
-    opponent_slots: tuple[OpponentSlot, ...]
-
-    # Small upper right field.
-    stats_rect: pygame.Rect
-
-    # Bottom hand area.
-    hand_rect: pygame.Rect
-
-    overlay_rect: pygame.Rect
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,8 +79,8 @@ class GameScreen:
     last_action_summary: str
 
     def build_targets(self, layout: DemoLayout) -> GameScreenTargets:
-        board_layout = _board_layout(layout.window_rect, self.state)
-        return build_game_screen_targets(board_layout, self.state)
+        geometry = _compute_geometry(layout.window_rect, self.state)
+        return build_game_screen_targets(geometry, self.state)
 
     def handle_event(
         self,
@@ -110,22 +97,22 @@ class GameScreen:
         layout: DemoLayout,
         targets: GameScreenTargets,
     ) -> None:
-        board_layout = _board_layout(layout.window_rect, self.state)
+        geometry = _compute_geometry(layout.window_rect, self.state)
         render_game_screen(
             screen,
             drawer=drawer,
-            board_layout=board_layout,
+            geometry=geometry,
             client_state=self.state,
             game_targets=targets,
             last_action_summary=self.last_action_summary,
         )
 
 
-def build_game_screen_targets(board_layout: BoardLayout, state: ClientState) -> GameScreenTargets:
+def build_game_screen_targets(geometry: BoardGeometry, state: ClientState) -> GameScreenTargets:
     return GameScreenTargets(
-        card_targets=_build_card_targets(board_layout, state),
-        row_targets=_build_row_targets(board_layout, state),
-        continue_target=_build_continue_target(board_layout, state),
+        card_targets=_build_card_targets(geometry, state),
+        row_targets=_build_row_targets(geometry, state),
+        continue_target=_build_continue_target(geometry, state),
     )
 
 
@@ -157,17 +144,32 @@ def render_game_screen(
     screen: pygame.Surface,
     *,
     drawer: PrimitiveDrawer,
-    board_layout: BoardLayout,
+    geometry: BoardGeometry,
     client_state: ClientState,
     game_targets: GameScreenTargets,
     last_action_summary: str,
 ) -> None:
-    _draw_full_background(screen, board_layout.window_rect)
-    _draw_rows(screen, drawer, board_layout, client_state, game_targets)
-    _draw_opponent_slots(screen, drawer, board_layout, client_state)
+    _draw_full_background(screen, geometry.window_rect)
+    _draw_rows(screen, drawer, geometry, client_state, game_targets)
+    _draw_opponent_slots(screen, drawer, geometry, client_state)
     _draw_hand(screen, drawer, client_state, game_targets)
-    _draw_stats_field(screen, drawer, board_layout, client_state)
-    _draw_status_overlay(screen, drawer, board_layout, client_state, last_action_summary, game_targets)
+    _draw_stats_field(screen, drawer, geometry, client_state)
+    _draw_status_overlay(screen, drawer, geometry, client_state, last_action_summary, game_targets)
+
+
+def _compute_geometry(window_rect: pygame.Rect, state: ClientState) -> BoardGeometry:
+    public_state = state.public_state
+    player_state = state.player_state
+    row_count = len(public_state.rows) if public_state is not None else 4
+    hand_card_count = len(player_state.hand) if player_state is not None else 0
+    opponent_count = len(_opponent_players(state))
+
+    return compute_board_geometry(
+        window_rect.size,
+        row_count=row_count,
+        hand_card_count=hand_card_count,
+        opponent_count=opponent_count,
+    )
 
 
 def _handle_left_click(position: tuple[int, int], *, game_targets: GameScreenTargets) -> ScreenResult:
@@ -186,182 +188,19 @@ def _handle_left_click(position: tuple[int, int], *, game_targets: GameScreenTar
     return NO_SCREEN_RESULT
 
 
-def _board_layout(window_rect: pygame.Rect, state: ClientState) -> BoardLayout:
-    public_state = state.public_state
-    row_count = len(public_state.rows) if public_state is not None else 4
-
-    # Coordinates are relative to the board.png design:
-    # - large field: upper left
-    # - stats field: upper right
-    # - hand field: bottom
-    padding_x = max(18, round(window_rect.width * 0.018))
-    top_ui_height = max(52, round(window_rect.height * 0.075))
-    gap = max(14, round(window_rect.width * 0.012))
-    bottom_hand_height = max(118, round(window_rect.height * 0.22))
-    bottom_margin = max(10, round(window_rect.height * 0.018))
-
-    stats_width = max(150, round(window_rect.width * 0.16))
-    stats_rect = pygame.Rect(
-        window_rect.right - padding_x - stats_width,
-        top_ui_height,
-        stats_width,
-        window_rect.height - top_ui_height - bottom_hand_height - bottom_margin - gap,
-    )
-
-    main_play_rect = pygame.Rect(
-        padding_x,
-        top_ui_height,
-        stats_rect.left - padding_x - gap,
-        stats_rect.height,
-    )
-
-    opponent_width = _opponent_area_width(main_play_rect, state)
-    opponent_slots_rect = pygame.Rect(
-        main_play_rect.right - opponent_width,
-        main_play_rect.top,
-        opponent_width,
-        main_play_rect.height,
-    )
-
-    row_columns_rect = pygame.Rect(
-        main_play_rect.left,
-        main_play_rect.top,
-        main_play_rect.width - opponent_width - gap,
-        main_play_rect.height,
-    )
-
-    row_rects = _build_row_column_rects(row_columns_rect, max(1, row_count))
-
-    hand_rect = pygame.Rect(
-        padding_x,
-        window_rect.height - bottom_hand_height,
-        window_rect.width - 2 * padding_x,
-        bottom_hand_height - bottom_margin,
-    )
-
-    overlay_rect = pygame.Rect(
-        padding_x,
-        8,
-        min(680, window_rect.width - 2 * padding_x),
-        max(38, top_ui_height - 14),
-    )
-
-    opponent_slots = _build_opponent_slots(opponent_slots_rect, state)
-
-    return BoardLayout(
-        window_rect=window_rect,
-        main_play_rect=main_play_rect,
-        row_columns_rect=row_columns_rect,
-        row_rects=row_rects,
-        opponent_slots_rect=opponent_slots_rect,
-        opponent_slots=opponent_slots,
-        stats_rect=stats_rect,
-        hand_rect=hand_rect,
-        overlay_rect=overlay_rect,
-    )
-
-
-def _build_row_column_rects(row_columns_rect: pygame.Rect, row_count: int) -> tuple[pygame.Rect, ...]:
-    column_gap = max(8, round(row_columns_rect.width * 0.018))
-    column_width = max(72, (row_columns_rect.width - (row_count - 1) * column_gap) // row_count)
-
-    return tuple(
-        pygame.Rect(
-            row_columns_rect.left + index * (column_width + column_gap),
-            row_columns_rect.top,
-            column_width,
-            row_columns_rect.height,
-        )
-        for index in range(row_count)
-    )
-
-
-def _opponent_area_width(main_play_rect: pygame.Rect, state: ClientState) -> int:
-    opponent_count = len(_opponent_players(state))
-    if opponent_count == 0:
-        return max(96, round(main_play_rect.width * 0.11))
-
-    # Up to five opponents: enough space for a staged card plus one circle.
-    return max(128, min(round(main_play_rect.width * 0.19), 190))
-
-
-def _build_opponent_slots(rect: pygame.Rect, state: ClientState) -> tuple[OpponentSlot, ...]:
-    opponents = _opponent_players(state)
-    if not opponents:
-        return ()
-
-    count = len(opponents)
-    circle_size = _opponent_circle_size(rect, count)
-    staged_width, staged_height = _staged_card_size(rect, count)
-    top_padding = max(12, round(rect.height * 0.035))
-    bottom_padding = top_padding
-    usable_height = max(circle_size, rect.height - top_padding - bottom_padding)
-
-    if count == 1:
-        center_ys = [rect.top + rect.height // 2]
-    else:
-        step = usable_height / (count - 1)
-        center_ys = [round(rect.top + top_padding + index * step) for index in range(count)]
-
-    circle_x = rect.right - circle_size - max(10, round(rect.width * 0.07))
-    staged_x = max(rect.left, circle_x - staged_width - max(8, round(rect.width * 0.06)))
-
-    slots: list[OpponentSlot] = []
-    for player, center_y in zip(opponents, center_ys, strict=False):
-        circle_rect = pygame.Rect(circle_x, center_y - circle_size // 2, circle_size, circle_size)
-        staged_card_rect = pygame.Rect(staged_x, center_y - staged_height // 2, staged_width, staged_height)
-        slots.append(
-            OpponentSlot(
-                player_id=player.player_id,
-                player_name=player.name,
-                circle_rect=circle_rect,
-                staged_card_rect=staged_card_rect,
-            )
-        )
-
-    return tuple(slots)
-
-
-def _opponent_players(state: ClientState) -> tuple[Any, ...]:
-    public_state = state.public_state
-    if public_state is None:
-        return ()
-
-    return tuple(player for player in public_state.players if player.player_id != state.own_player_id)
-
-
-def _build_card_targets(board_layout: BoardLayout, state: ClientState) -> tuple[CardTarget, ...]:
+def _build_card_targets(geometry: BoardGeometry, state: ClientState) -> tuple[CardTarget, ...]:
     player_state = state.player_state
     if player_state is None:
         return ()
 
-    card_count = len(player_state.hand)
-    if card_count == 0:
-        return ()
-
-    card_width, card_height = _hand_card_size(board_layout.hand_rect, card_count)
-    spacing = _hand_spacing(board_layout.hand_rect, card_width, card_count)
-
-    x_start = board_layout.hand_rect.centerx - ((card_count - 1) * spacing + card_width) // 2
-    x_start = max(board_layout.hand_rect.left, x_start)
-
-    # Only the upper half is visible.
-    visible_y = board_layout.window_rect.height - card_height // 2
-
-    targets: list[CardTarget] = []
-    for index, card in enumerate(player_state.hand):
-        rect = pygame.Rect(
-            x_start + index * spacing,
-            visible_y,
-            card_width,
-            card_height,
-        )
-        targets.append(CardTarget(card_value=card.value, rect=rect))
-
-    return tuple(targets)
+    placements = hand_card_placements(geometry, card_count=len(player_state.hand))
+    return tuple(
+        CardTarget(card_value=card.value, placement=placement)
+        for card, placement in zip(player_state.hand, placements, strict=False)
+    )
 
 
-def _build_row_targets(board_layout: BoardLayout, state: ClientState) -> tuple[RowTarget, ...]:
+def _build_row_targets(geometry: BoardGeometry, state: ClientState) -> tuple[RowTarget, ...]:
     public_state = state.public_state
     player_state = state.player_state
     if public_state is None or player_state is None:
@@ -372,20 +211,20 @@ def _build_row_targets(board_layout: BoardLayout, state: ClientState) -> tuple[R
 
     selectable = set(player_state.get_selectable_row_ids_for_choose_row())
     targets: list[RowTarget] = []
-    for row, rect in zip(public_state.rows, board_layout.row_rects, strict=False):
+    for row, rect in zip(public_state.rows, geometry.row_columns, strict=False):
         if row.row_id in selectable:
             targets.append(RowTarget(row_id=row.row_id, rect=rect))
     return tuple(targets)
 
 
-def _build_continue_target(board_layout: BoardLayout, state: ClientState) -> ContinueTarget | None:
+def _build_continue_target(geometry: BoardGeometry, state: ClientState) -> ContinueTarget | None:
     if not state.pending_presentation_events:
         return None
 
     rect = pygame.Rect(
-        board_layout.stats_rect.left + 12,
-        board_layout.stats_rect.bottom - 46,
-        max(1, board_layout.stats_rect.width - 24),
+        geometry.stats_rect.left + 12,
+        geometry.stats_rect.bottom - 46,
+        max(1, geometry.stats_rect.width - 24),
         34,
     )
     return ContinueTarget(rect=rect)
@@ -404,7 +243,7 @@ def _draw_full_background(screen: pygame.Surface, window_rect: pygame.Rect) -> N
 def _draw_rows(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    board_layout: BoardLayout,
+    geometry: BoardGeometry,
     client_state: ClientState,
     game_targets: GameScreenTargets,
 ) -> None:
@@ -414,9 +253,18 @@ def _draw_rows(
 
     row_target_by_id = {target.row_id: target for target in game_targets.row_targets}
 
-    for row, row_rect in zip(public_state.rows, board_layout.row_rects, strict=False):
+    for row_index, (row, column_rect) in enumerate(zip(public_state.rows, geometry.row_columns, strict=False)):
         selectable = row.row_id in row_target_by_id
-        _draw_row_column(screen, drawer, row_rect, row_id=row.row_id, cards=row.cards, selectable=selectable)
+        placements = row_card_placements(geometry, row_index=row_index, card_count=len(row.cards))
+        _draw_row_column(
+            screen,
+            drawer,
+            column_rect,
+            row_id=row.row_id,
+            cards=row.cards,
+            placements=placements,
+            selectable=selectable,
+        )
 
 
 def _draw_row_column(
@@ -426,9 +274,9 @@ def _draw_row_column(
     *,
     row_id: object,
     cards: tuple[Any, ...],
+    placements: tuple[CardPlacement, ...],
     selectable: bool,
 ) -> None:
-    # Light debug tint only; the board artwork remains dominant.
     lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
     pygame.draw.rect(lane_surface, pygame.Color(0, 0, 0, 22), lane_surface.get_rect(), border_radius=8)
     screen.blit(lane_surface, rect)
@@ -444,49 +292,52 @@ def _draw_row_column(
         color=ACCENT if selectable else TEXT_MUTED,
     )
 
-    if not cards:
-        return
-
-    card_width, card_height = _row_card_size(rect, len(cards))
-    x = rect.centerx - card_width // 2
-    y = rect.top + max(28, round(rect.height * 0.055))
-    visible_step = _row_visible_step(rect, card_height, len(cards))
-
-    for index, card in enumerate(cards):
-        card_rect = pygame.Rect(
-            x,
-            y + index * visible_step,
-            card_width,
-            card_height,
-        )
-        _draw_card_image_or_fallback(screen, drawer, card_rect, card, selected=selectable)
+    for card, placement in zip(cards, placements, strict=False):
+        _draw_card_image_or_fallback(screen, drawer, placement.rect, card, selected=selectable)
 
 
 def _draw_opponent_slots(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    board_layout: BoardLayout,
+    geometry: BoardGeometry,
     client_state: ClientState,
 ) -> None:
     revealed_by_player = _revealed_card_values_by_player(client_state)
+    opponents = _opponent_slot_data(client_state, geometry)
 
-    for index, slot in enumerate(board_layout.opponent_slots):
+    for index, slot in enumerate(opponents):
         color = _player_color(index)
-        pygame.draw.ellipse(screen, color, slot.circle_rect)
-        pygame.draw.ellipse(screen, pygame.Color(255, 255, 255, 150), slot.circle_rect, 2)
+        circle_rect = slot.geometry.circle_rect
+        pygame.draw.ellipse(screen, color, circle_rect)
+        pygame.draw.ellipse(screen, pygame.Color(255, 255, 255, 150), circle_rect, 2)
 
         initials = _initials(slot.player_name)
-        text_pos = (
-            slot.circle_rect.centerx - 8,
-            slot.circle_rect.centery - 8,
+        drawer.draw_text(
+            screen,
+            initials,
+            (circle_rect.centerx - 8, circle_rect.centery - 8),
+            role="tiny",
+            color=TEXT_PRIMARY,
         )
-        drawer.draw_text(screen, initials, text_pos, role="tiny", color=TEXT_PRIMARY)
 
         card_value = revealed_by_player.get(slot.player_id)
+        staged_rect = slot.geometry.staged_card.rect
         if card_value is None:
-            _draw_staged_card_back(screen, slot.staged_card_rect)
+            _draw_staged_card_back(screen, staged_rect)
         else:
-            _draw_card_value_image_or_back(screen, drawer, slot.staged_card_rect, card_value)
+            _draw_card_value_image_or_back(screen, drawer, staged_rect, card_value)
+
+
+def _opponent_slot_data(client_state: ClientState, geometry: BoardGeometry) -> tuple[OpponentSlot, ...]:
+    players = _opponent_players(client_state)
+    return tuple(
+        OpponentSlot(
+            player_id=player.player_id,
+            player_name=player.name,
+            geometry=slot_geometry,
+        )
+        for player, slot_geometry in zip(players, geometry.opponent_slots, strict=False)
+    )
 
 
 def _draw_staged_card_back(screen: pygame.Surface, rect: pygame.Rect) -> None:
@@ -536,7 +387,11 @@ def _draw_hand(
             continue
         _draw_card_image_or_fallback(screen, drawer, target.rect, card)
 
-    if player_state.phase_info.phase == Phase.CHOOSE_ROW and player_state.pending_card_value() is not None:
+    if (
+        player_state.phase_info.phase == Phase.CHOOSE_ROW
+        and player_state.pending_card_value() is not None
+        and game_targets.card_targets
+    ):
         pending_rect = pygame.Rect(24, max(60, game_targets.card_targets[0].rect.top - 42), 270, 34)
         _draw_overlay_box(screen, pending_rect)
         drawer.draw_text(
@@ -551,10 +406,10 @@ def _draw_hand(
 def _draw_stats_field(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    board_layout: BoardLayout,
+    geometry: BoardGeometry,
     client_state: ClientState,
 ) -> None:
-    rect = board_layout.stats_rect
+    rect = geometry.stats_rect
     overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
     pygame.draw.rect(overlay, pygame.Color(0, 0, 0, 35), overlay.get_rect(), border_radius=12)
     screen.blit(overlay, rect)
@@ -591,12 +446,12 @@ def _draw_stats_field(
 def _draw_status_overlay(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    board_layout: BoardLayout,
+    geometry: BoardGeometry,
     client_state: ClientState,
     last_action_summary: str,
     game_targets: GameScreenTargets,
 ) -> None:
-    _draw_overlay_box(screen, board_layout.overlay_rect)
+    _draw_overlay_box(screen, geometry.overlay_rect)
 
     player_state = client_state.player_state
     phase = player_state.phase_info.phase.value if player_state is not None else "-"
@@ -606,7 +461,7 @@ def _draw_status_overlay(
     drawer.draw_text(
         screen,
         line_1,
-        (board_layout.overlay_rect.left + 10, board_layout.overlay_rect.top + 8),
+        (geometry.overlay_rect.left + 10, geometry.overlay_rect.top + 8),
         role="small",
     )
 
@@ -614,16 +469,16 @@ def _draw_status_overlay(
     drawer.draw_text(
         screen,
         line_2,
-        (board_layout.overlay_rect.left + 10, board_layout.overlay_rect.top + 30),
+        (geometry.overlay_rect.left + 10, geometry.overlay_rect.top + 30),
         role="tiny",
         color=TEXT_MUTED,
     )
 
     if client_state.pending_presentation_events:
         events_rect = pygame.Rect(
-            board_layout.stats_rect.left,
-            board_layout.stats_rect.bottom - 142,
-            board_layout.stats_rect.width,
+            geometry.stats_rect.left,
+            geometry.stats_rect.bottom - 142,
+            geometry.stats_rect.width,
             96,
         )
         _draw_overlay_box(screen, events_rect)
@@ -675,60 +530,11 @@ def _draw_card_image_or_fallback(
         pygame.draw.rect(screen, ACCENT, rect.inflate(4, 4), 2, border_radius=6)
 
 
-def _row_card_size(row_rect: pygame.Rect, card_count: int) -> tuple[int, int]:
-    if card_count <= 0:
-        return (110, 165)
-
-    # Target row cards: larger than staged opponent cards.
-    width_by_column = round(row_rect.width * 0.86)
-    width_by_height = round(row_rect.height * 0.38)
-    width = min(210, max(112, min(width_by_column, width_by_height)))
-    return (width, round(width * 1.5))
-
-
-def _row_visible_step(row_rect: pygame.Rect, card_height: int, card_count: int) -> int:
-    if card_count <= 1:
-        return 0
-
-    available_step = (row_rect.height - 36 - card_height) // max(1, card_count - 1)
-    return max(30, min(round(card_height * 0.38), available_step))
-
-
-def _staged_card_size(opponent_rect: pygame.Rect, opponent_count: int) -> tuple[int, int]:
-    if opponent_count <= 0:
-        return (66, 99)
-
-    available_height_per_player = opponent_rect.height / opponent_count
-    width_by_height = round(available_height_per_player * 0.42)
-    width_by_area = round(opponent_rect.width * 0.42)
-    width = min(92, max(48, min(width_by_height, width_by_area)))
-    return (width, round(width * 1.5))
-
-
-def _opponent_circle_size(opponent_rect: pygame.Rect, opponent_count: int) -> int:
-    if opponent_count <= 0:
-        return 32
-
-    available_height_per_player = opponent_rect.height / opponent_count
-    return min(58, max(30, round(available_height_per_player * 0.38)))
-
-
-def _hand_card_size(hand_rect: pygame.Rect, card_count: int) -> tuple[int, int]:
-    if card_count <= 0:
-        return (120, 180)
-
-    width_by_visible_height = round(hand_rect.height * 1.12)
-    width_by_available_space = round(hand_rect.width / max(5.8, card_count * 0.78))
-    width = min(205, max(118, min(width_by_visible_height, width_by_available_space)))
-    return (width, round(width * 1.5))
-
-
-def _hand_spacing(hand_rect: pygame.Rect, card_width: int, card_count: int) -> int:
-    if card_count <= 1:
-        return card_width
-
-    exact_spacing = (hand_rect.width - card_width) // max(1, card_count - 1)
-    return max(46, min(round(card_width * 0.96), exact_spacing))
+def _opponent_players(state: ClientState) -> tuple[Any, ...]:
+    public_state = state.public_state
+    if public_state is None:
+        return ()
+    return tuple(player for player in public_state.players if player.player_id != state.own_player_id)
 
 
 def _initials(name: str) -> str:
@@ -756,7 +562,6 @@ def _scaled_board_image_full(width: int, height: int) -> pygame.Surface | None:
     image = _load_board_image()
     if image is None:
         return None
-
     return pygame.transform.smoothscale(image, (width, height))
 
 
