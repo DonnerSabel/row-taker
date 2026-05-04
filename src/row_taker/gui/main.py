@@ -9,7 +9,9 @@ from row_taker.gui.constants import (
     BOARD_PLAY_AREA_Y_RATIO,
     CARD_ASPECT_RATIO,
     CARD_GAP,
+    HANDCARD_GAP,
     HANDCARD_SCALE,
+    OFFSET_HANDCARD_x,
     CARD_SCALE,
     FPS,
     WINDOW_TITLE,
@@ -31,7 +33,7 @@ def create_demo_cards(
     play_area_height = int(window_height * BOARD_PLAY_AREA_HEIGHT_RATIO)
 
     # Hand area below play area
-    hand_y = play_area_y + play_area_height + CARD_GAP
+    hand_y = play_area_y + play_area_height 
 
     deck = [Card(value) for value in range(1, board_rows * board_columns + hand_columns + 1)]
 
@@ -81,13 +83,13 @@ def create_demo_cards(
         else int(handcard_width * CARD_ASPECT_RATIO)
     )
     
-    hand_y_start = hand_y + CARD_GAP
+    
     for index, card in enumerate(hand_cards):
         if card.image is None:
             continue
 
-        card.x = play_area_x + CARD_GAP + index * (handcard_width + CARD_GAP)
-        card.y = hand_y_start
+        card.x = play_area_x + OFFSET_HANDCARD_x + index * (handcard_width + HANDCARD_GAP)
+        card.y = hand_y
 
     return board_cards, hand_cards, play_area_x, play_area_y, card_width, card_height, board_columns
 
