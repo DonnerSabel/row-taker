@@ -2,13 +2,20 @@
 
 WINDOW_TITLE = "Row Taker"
 
-# Diese Werte werden jetzt für das Fallback genutzt, Fullscreen überschreibt sie
-WINDOW_WIDTH = 1000
-WINDOW_HEIGHT = 700
+WINDOW_TITLE: str = "Row Taker - 6 Nimmt Edition"
+WINDOW_WIDTH: int = 1000
+WINDOW_HEIGHT: int = 700
+BACKGROUND_COLOR: tuple[int, int, int] = (0, 120, 0)
+FPS: int = 60
 
-BACKGROUND_COLOR = (0, 120, 0)
+CARD_SCALE: float = 0.1
+CARD_ASPECT_RATIO: float = 1.5
+CARD_GAP: int = 10
 
-FPS = 60
+BOARD_PLAY_AREA_X_RATIO: float = 0.02
+BOARD_PLAY_AREA_Y_RATIO: float = 0.05
+BOARD_PLAY_AREA_WIDTH_RATIO: float = 0.8
+BOARD_PLAY_AREA_HEIGHT_RATIO: float = 0.85
 
 CARD_SCALE = 0.1
 HANDCARD_SCALE = CARD_SCALE / 1.4

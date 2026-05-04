@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import time
+from typing import cast
+
 import pygame
 
 from row_taker.engine.game.cards import Card
@@ -36,8 +37,12 @@ class CardSprite:
             project_root = Path(__file__).resolve().parents[3]
             self.image_path = project_root / "images" / f"karte_{self.value:03}.png"
 
+        project_root: Path = Path(__file__).resolve().parents[3]
+        self.image_path: Path = project_root / "images" / f"karte_{number:03}.png"
         if self.image_path.exists():
-            self.image_orig = pygame.image.load(str(self.image_path)).convert_alpha()
+            img = pygame.image.load(str(self.image_path)).convert_alpha()
+            self.image_orig = cast(pygame.Surface, img)
+        self.rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
 
     def validate(self) -> None:
         self.card.validate()
@@ -73,12 +78,15 @@ class CardSprite:
         """Skaliert die Karte basierend auf CARD_SCALE und erzeugt die Hover-Version."""
         if self.image_orig is None:
             return
+        self.base_width = int(window_width * CARD_SCALE)
+        self.base_height = int(self.base_width * CARD_ASPECT_RATIO)
+        self.set_scale_factor(1.0)
 
         width = int(window_width * CARD_SCALE * self.scale_factor)
         height = int(width * CARD_ASPECT_RATIO)
 
-        self.image = pygame.transform.scale(self.image_orig, (width, height))
-        self.mask = pygame.mask.from_surface(self.image)
+    def is_at_target(self) -> bool:
+        return abs(self.x - self.target_x) < 15 and abs(self.y - self.target_y) < 15
 
         hover_width = int(width * self.HOVER_SCALE)
         hover_height = int(height * self.HOVER_SCALE)
@@ -107,6 +115,13 @@ class CardSprite:
         """Zeichnet die Karte; bei Hover wird sie vergrößert dargestellt."""
         if self.image is None or self.rect is None:
             return
+        if self.current_scale < 1.0:
+            self.set_scale_factor(min(1.0, self.current_scale + 0.03))
+        self.x += (self.target_x - self.x) * 0.05
+        self.y += (self.target_y - self.y) * 0.05
+        if self.phase == "DISCARDING" and abs(self.target_x - self.x) < 20:
+            self.visible = False
+        self.rect.topleft = (int(self.x), int(self.y))
 
         self.rect.topleft = (round(self.x), round(self.y))
 
