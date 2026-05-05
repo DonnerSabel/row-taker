@@ -14,8 +14,6 @@ from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
 from row_taker.engine.game.models import PlayerID
 from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
-from row_taker.gui.card import GuiCard, draw_card_back
-from row_taker.gui.presentation_visuals import PresentationVisuals, build_presentation_visuals
 from row_taker.gui.board_layout import (
     BoardGeometry,
     CardPlacement,
@@ -24,14 +22,16 @@ from row_taker.gui.board_layout import (
     hand_card_placements,
     row_card_placements,
 )
+from row_taker.gui.card import GuiCard, draw_card_back
+from row_taker.gui.presentation_visuals import PresentationVisuals, build_presentation_visuals
+from row_taker.gui.theme import DEFAULT_THEME
+from row_taker.gui.widgets import draw_badge, draw_overlay_panel
 from row_taker.gui_common.layout import DemoLayout
-from row_taker.gui_common.primitives import (
-    ACCENT,
-    TEXT_MUTED,
-    TEXT_PRIMARY,
-    PrimitiveDrawer,
-)
+from row_taker.gui_common.primitives import PrimitiveDrawer
 from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
+
+THEME = DEFAULT_THEME
+PALETTE = THEME.palette
 
 
 @dataclass(frozen=True, slots=True)
@@ -300,15 +300,15 @@ def _draw_row_column(
 ) -> None:
     lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
     emphasis = presentation_visuals.row_emphasis_for(row_id)
-    fill_alpha = 58 if emphasis != "none" else 22
-    pygame.draw.rect(lane_surface, pygame.Color(0, 0, 0, fill_alpha), lane_surface.get_rect(), border_radius=8)
+    lane_fill = PALETTE.lane_overlay_active if emphasis != "none" else PALETTE.lane_overlay
+    pygame.draw.rect(lane_surface, lane_fill, lane_surface.get_rect(), border_radius=8)
     screen.blit(lane_surface, rect)
 
     border = _row_border_color(selectable=selectable, emphasis=emphasis)
     border_width = 4 if emphasis != "none" else 3 if selectable else 1
     pygame.draw.rect(screen, border, rect, border_width, border_radius=8)
 
-    label_color = border if selectable or emphasis != "none" else TEXT_MUTED
+    label_color = border if selectable or emphasis != "none" else PALETTE.text_muted
     drawer.draw_text(screen, str(row_id), (rect.left + 8, rect.top + 6), role="small", color=label_color)
 
     if emphasis in {"taken", "overflow"}:
@@ -321,16 +321,16 @@ def _draw_row_column(
 
 def _row_border_color(*, selectable: bool, emphasis: str) -> pygame.Color:
     if emphasis == "placed":
-        return pygame.Color(255, 219, 92)
+        return PALETTE.row_placed
     if emphasis == "choice":
-        return pygame.Color(120, 196, 255)
+        return PALETTE.row_choice
     if emphasis == "taken":
-        return pygame.Color(255, 126, 82)
+        return PALETTE.row_taken
     if emphasis == "overflow":
-        return pygame.Color(255, 82, 82)
+        return PALETTE.row_overflow
     if selectable:
-        return ACCENT
-    return pygame.Color(255, 255, 255, 28)
+        return PALETTE.accent
+    return PALETTE.row_neutral
 
 
 def _draw_row_taken_badge(
@@ -344,16 +344,14 @@ def _draw_row_taken_badge(
         return
 
     badge_rect = pygame.Rect(rect.left + 8, rect.bottom - 34, max(1, rect.width - 16), 26)
-    overlay = pygame.Surface(badge_rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(overlay, pygame.Color(80, 20, 12, 170), overlay.get_rect(), border_radius=7)
-    screen.blit(overlay, badge_rect)
-    pygame.draw.rect(screen, pygame.Color(255, 200, 160, 120), badge_rect, 1, border_radius=7)
-    drawer.draw_text(
+    draw_badge(
         screen,
+        drawer,
+        badge_rect,
         f"nimmt: {cards}",
-        (badge_rect.left + 7, badge_rect.top + 6),
-        role="tiny",
-        color=TEXT_PRIMARY,
+        fill=PALETTE.taken_badge_fill,
+        border=PALETTE.taken_badge_border,
+        theme=THEME,
     )
 
 
@@ -375,7 +373,7 @@ def _draw_opponent_slots(
         pygame.draw.ellipse(screen, color, circle_rect)
         pygame.draw.ellipse(screen, pygame.Color(255, 255, 255, 150), circle_rect, 2)
         if active_player:
-            pygame.draw.ellipse(screen, ACCENT, circle_rect.inflate(8, 8), 3)
+            pygame.draw.ellipse(screen, PALETTE.accent, circle_rect.inflate(8, 8), 3)
 
         initials = _initials(slot.player_name)
         drawer.draw_text(
@@ -383,7 +381,7 @@ def _draw_opponent_slots(
             initials,
             (circle_rect.centerx - 8, circle_rect.centery - 8),
             role="tiny",
-            color=TEXT_PRIMARY,
+            color=PALETTE.text_primary,
         )
 
         card_value = presentation_visuals.card_value_for_player(slot.player_id)
@@ -455,7 +453,7 @@ def _draw_hand(
             f"Reihe für Karte {player_state.pending_card_value()} wählen",
             (pending_rect.left + 10, pending_rect.top + 8),
             role="small",
-            color=ACCENT,
+            color=PALETTE.accent,
         )
 
 
@@ -466,9 +464,7 @@ def _draw_stats_field(
     client_state: ClientState,
 ) -> None:
     rect = geometry.stats_rect
-    overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(overlay, pygame.Color(0, 0, 0, 35), overlay.get_rect(), border_radius=12)
-    screen.blit(overlay, rect)
+    draw_overlay_panel(screen, rect, radius=12, alpha=35, theme=THEME)
 
     player_state = client_state.player_state
     public_state = client_state.public_state
@@ -479,9 +475,9 @@ def _draw_stats_field(
         own_score = str(own_player.score)
         own_name = own_player.name
 
-    drawer.draw_text(screen, own_name, (rect.left + 12, rect.top + 14), role="small", color=TEXT_MUTED)
-    drawer.draw_text(screen, "Hornochsen", (rect.left + 12, rect.top + 42), role="small", color=TEXT_MUTED)
-    drawer.draw_text(screen, own_score, (rect.left + 12, rect.top + 66), role="title", color=ACCENT)
+    drawer.draw_text(screen, own_name, (rect.left + 12, rect.top + 14), role="small", color=PALETTE.text_muted)
+    drawer.draw_text(screen, "Hornochsen", (rect.left + 12, rect.top + 42), role="small", color=PALETTE.text_muted)
+    drawer.draw_text(screen, own_score, (rect.left + 12, rect.top + 66), role="title", color=PALETTE.accent)
 
     if public_state is not None:
         y = rect.top + 112
@@ -492,7 +488,7 @@ def _draw_stats_field(
                 f"{marker}{player.name}: {player.score}",
                 (rect.left + 12, y),
                 role="tiny",
-                color=TEXT_PRIMARY if marker else TEXT_MUTED,
+                color=PALETTE.text_primary if marker else PALETTE.text_muted,
             )
             y += 20
             if y > rect.bottom - 54:
@@ -529,7 +525,7 @@ def _draw_status_overlay(
         line_2,
         (geometry.overlay_rect.left + 10, geometry.overlay_rect.top + 30),
         role="tiny",
-        color=TEXT_MUTED,
+        color=PALETTE.text_muted,
     )
 
     if presentation_visuals.has_event:
@@ -542,7 +538,7 @@ def _draw_status_overlay(
             "Weiter [Leertaste]",
             (game_targets.continue_target.rect.left + 10, game_targets.continue_target.rect.top + 8),
             role="small",
-            color=ACCENT,
+            color=PALETTE.accent,
         )
 
 
@@ -566,7 +562,7 @@ def _draw_presentation_panel(
         presentation_visuals.headline,
         (events_rect.left + 12, events_rect.top + 10),
         role="small",
-        color=ACCENT,
+        color=PALETTE.accent,
     )
 
     if presentation_visuals.focus_card_values:
@@ -584,7 +580,7 @@ def _draw_presentation_panel(
     lines = list(presentation_visuals.details[:2])
     if lines:
         text_rect = pygame.Rect(events_rect.left + 12, text_top, events_rect.width - 24, events_rect.bottom - text_top - 6)
-        drawer.draw_wrapped_lines(screen, lines, text_rect, role="tiny", color=TEXT_PRIMARY)
+        drawer.draw_wrapped_lines(screen, lines, text_rect, role="tiny", color=PALETTE.text_primary)
 
 
 def _draw_presentation_card_strip(
@@ -607,14 +603,11 @@ def _draw_presentation_card_strip(
 
     remaining = len(card_values) - max_cards
     if remaining > 0:
-        drawer.draw_text(screen, f"+{remaining}", (x + 2, y + 18), role="small", color=TEXT_MUTED)
+        drawer.draw_text(screen, f"+{remaining}", (x + 2, y + 18), role="small", color=PALETTE.text_muted)
 
 
 def _draw_overlay_box(screen: pygame.Surface, rect: pygame.Rect) -> None:
-    overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(overlay, pygame.Color(0, 0, 0, 120), overlay.get_rect(), border_radius=8)
-    screen.blit(overlay, rect)
-    pygame.draw.rect(screen, pygame.Color(255, 255, 255, 45), rect, 1, border_radius=8)
+    draw_overlay_panel(screen, rect, theme=THEME)
 
 
 def _opponent_players(state: ClientState) -> tuple[Any, ...]:

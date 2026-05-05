@@ -12,37 +12,22 @@ from row_taker.client.actions import (
 )
 from row_taker.client.state import ClientState, enter_lobby_submenu
 from row_taker.gui_common.layout import DemoLayout
-from row_taker.gui_common.primitives import (
-    ACCENT,
-    TEXT_MUTED,
-    TEXT_PRIMARY,
-    WINDOW_BACKGROUND,
-    PrimitiveDrawer,
+from row_taker.gui.theme import DEFAULT_THEME
+from row_taker.gui.widgets import (
+    centered_text_position,
+    draw_badge,
+    draw_button,
+    draw_panel,
+    draw_vertical_gradient,
 )
+from row_taker.gui_common.primitives import PrimitiveDrawer
 from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import LobbySeatView
 
-BACKGROUND_TOP = pygame.Color(17, 24, 39)
-BACKGROUND_BOTTOM = pygame.Color(10, 14, 23)
-PANEL_FILL = pygame.Color(24, 31, 44)
-PANEL_FILL_SOFT = pygame.Color(31, 41, 57)
-PANEL_BORDER = pygame.Color(75, 91, 118)
-PANEL_BORDER_ACTIVE = pygame.Color(125, 190, 255)
-BUTTON_FILL = pygame.Color(45, 109, 184)
-BUTTON_FILL_HOVER = pygame.Color(68, 139, 220)
-BUTTON_FILL_START = pygame.Color(46, 145, 86)
-BUTTON_FILL_START_HOVER = pygame.Color(61, 174, 106)
-BUTTON_FILL_DANGER = pygame.Color(167, 65, 74)
-BUTTON_FILL_DANGER_HOVER = pygame.Color(201, 84, 94)
-SEAT_EMPTY = pygame.Color(36, 45, 60)
-SEAT_HUMAN = pygame.Color(36, 84, 120)
-SEAT_SELF = pygame.Color(49, 120, 156)
-SEAT_BOT = pygame.Color(116, 82, 40)
-SEAT_SELECTED = pygame.Color(78, 110, 148)
-GOLD = pygame.Color(232, 190, 90)
-GREEN = pygame.Color(95, 205, 132)
-DANGER = pygame.Color(255, 120, 128)
+THEME = DEFAULT_THEME
+PALETTE = THEME.palette
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,24 +226,19 @@ def _build_lobby_button_targets(layout: DemoLayout, state: ClientState) -> tuple
 
 
 def _draw_background(screen: pygame.Surface) -> None:
-    screen.fill(WINDOW_BACKGROUND)
-    height = max(1, screen.get_height())
-    for y in range(height):
-        t = y / height
-        color = BACKGROUND_TOP.lerp(BACKGROUND_BOTTOM, t)
-        pygame.draw.line(screen, color, (0, y), (screen.get_width(), y))
+    draw_vertical_gradient(screen, theme=THEME)
 
 
 def _draw_title_bar(screen: pygame.Surface, drawer: PrimitiveDrawer, layout: DemoLayout, state: ClientState) -> None:
     rect = layout.header_rect
-    _draw_panel(screen, rect, radius=18)
+    draw_panel(screen, rect, radius=18, theme=THEME)
     drawer.draw_text(screen, "Row-Taker Lobby", (rect.left + 24, rect.top + 16), role="title")
 
     lobby_view = state.lobby_view
     endpoint = "-" if lobby_view is None else lobby_view.server_endpoint or "-"
     own_id = state.own_client_id or "-"
-    drawer.draw_text(screen, f"Server: {endpoint}", (rect.left + 24, rect.top + 48), role="small", color=TEXT_MUTED)
-    drawer.draw_text(screen, f"client_id: {own_id}", (rect.right - 255, rect.top + 24), role="small", color=TEXT_MUTED)
+    drawer.draw_text(screen, f"Server: {endpoint}", (rect.left + 24, rect.top + 48), role="small", color=PALETTE.text_muted)
+    drawer.draw_text(screen, f"client_id: {own_id}", (rect.right - 255, rect.top + 24), role="small", color=PALETTE.text_muted)
 
 
 def _draw_seat_area(
@@ -269,14 +249,14 @@ def _draw_seat_area(
     targets: LobbyScreenTargets,
 ) -> None:
     panel_rect = _main_lobby_rect(layout)
-    _draw_panel(screen, panel_rect, radius=22)
+    draw_panel(screen, panel_rect, radius=22, theme=THEME)
     drawer.draw_text(screen, "Sitzplätze", (panel_rect.left + 24, panel_rect.top + 20), role="title")
     drawer.draw_text(
         screen,
         "Klicken: Platz auswählen · Danach Aktion unten wählen",
         (panel_rect.left + 24, panel_rect.top + 52),
         role="small",
-        color=TEXT_MUTED,
+        color=PALETTE.text_muted,
     )
 
     lobby_view = state.lobby_view
@@ -306,19 +286,19 @@ def _draw_seat_card(
     is_self = seat.occupant_client_id is not None and seat.occupant_client_id == state.own_client_id
     fill = _seat_fill_color(seat, is_self=is_self)
     if selected:
-        fill = SEAT_SELECTED
+        fill = PALETTE.seat_selected
     if hovered:
         fill = fill.lerp(pygame.Color(255, 255, 255), 0.10)
 
     pygame.draw.rect(screen, fill, rect, border_radius=16)
-    border = PANEL_BORDER_ACTIVE if selected or hovered else PANEL_BORDER
+    border = PALETTE.panel_border_active if selected or hovered else PALETTE.panel_border
     pygame.draw.rect(screen, border, rect, width=2 if selected else 1, border_radius=16)
 
     header = f"Platz {seat.seat_index + 1}"
     drawer.draw_text(screen, header, (rect.left + 16, rect.top + 12), role="body")
 
     occupant = seat.occupant_display_name or "frei"
-    name_color = TEXT_PRIMARY if seat.occupant_display_name is not None else TEXT_MUTED
+    name_color = PALETTE.text_primary if seat.occupant_display_name is not None else PALETTE.text_muted
     drawer.draw_text(screen, occupant, (rect.left + 16, rect.top + 42), role="title", color=name_color)
 
     kind_label = _seat_kind_label(seat, is_self=is_self)
@@ -326,11 +306,11 @@ def _draw_seat_card(
     _draw_badge(screen, drawer, badge_rect, kind_label, selected=selected or is_self)
 
     if selected:
-        drawer.draw_text(screen, "ausgewählt", (rect.left + 16, rect.bottom - 28), role="small", color=GOLD)
+        drawer.draw_text(screen, "ausgewählt", (rect.left + 16, rect.bottom - 28), role="small", color=PALETTE.gold)
     elif seat.occupant_display_name is None:
-        drawer.draw_text(screen, "bereit für Mensch oder Bot", (rect.left + 16, rect.bottom - 28), role="small", color=TEXT_MUTED)
+        drawer.draw_text(screen, "bereit für Mensch oder Bot", (rect.left + 16, rect.bottom - 28), role="small", color=PALETTE.text_muted)
     else:
-        drawer.draw_text(screen, "belegt", (rect.left + 16, rect.bottom - 28), role="small", color=TEXT_MUTED)
+        drawer.draw_text(screen, "belegt", (rect.left + 16, rect.bottom - 28), role="small", color=PALETTE.text_muted)
 
 
 def _draw_side_panel(
@@ -342,7 +322,7 @@ def _draw_side_panel(
     last_action_summary: str,
 ) -> None:
     rect = _side_lobby_rect(layout)
-    _draw_panel(screen, rect, radius=22)
+    draw_panel(screen, rect, radius=22, theme=THEME)
     content_left = rect.left + 20
     y = rect.top + 20
     drawer.draw_text(screen, "Teilnehmer", (content_left, y), role="title")
@@ -350,33 +330,33 @@ def _draw_side_panel(
 
     lobby_view = state.lobby_view
     if lobby_view is None:
-        drawer.draw_text(screen, "Keine Daten", (content_left, y), role="small", color=TEXT_MUTED)
+        drawer.draw_text(screen, "Keine Daten", (content_left, y), role="small", color=PALETTE.text_muted)
         return
 
     for participant in lobby_view.participants:
         seat_label = "-" if participant.seat_index is None else str(participant.seat_index + 1)
         is_self = participant.client_id == state.own_client_id
         icon = "●" if participant.participant_kind == ParticipantKind.HUMAN else "◆"
-        color = GREEN if is_self else TEXT_PRIMARY
+        color = PALETTE.green if is_self else PALETTE.text_primary
         drawer.draw_text(screen, f"{icon} {participant.display_name}", (content_left, y), role="body", color=color)
         drawer.draw_text(
             screen,
             f"{participant.participant_kind.value} · Platz {seat_label}",
             (content_left + 22, y + 24),
             role="small",
-            color=TEXT_MUTED,
+            color=PALETTE.text_muted,
         )
         y += 58
         if y > rect.bottom - 170:
             break
 
     info_top = max(y + 12, rect.bottom - 152)
-    drawer.draw_text(screen, "Status", (content_left, info_top), role="small", color=TEXT_MUTED)
+    drawer.draw_text(screen, "Status", (content_left, info_top), role="small", color=PALETTE.text_muted)
     drawer.draw_text(screen, state.pending_action.value, (content_left, info_top + 24), role="body")
-    drawer.draw_text(screen, f"Frame {frame_count}", (content_left, info_top + 52), role="small", color=TEXT_MUTED)
+    drawer.draw_text(screen, f"Frame {frame_count}", (content_left, info_top + 52), role="small", color=PALETTE.text_muted)
 
     action_rect = pygame.Rect(content_left, info_top + 80, rect.width - 40, 58)
-    drawer.draw_wrapped_lines(screen, [last_action_summary], action_rect, role="small", color=TEXT_MUTED)
+    drawer.draw_wrapped_lines(screen, [last_action_summary], action_rect, role="small", color=PALETTE.text_muted)
 
 
 def _draw_bottom_bar(
@@ -387,15 +367,15 @@ def _draw_bottom_bar(
     targets: LobbyScreenTargets,
 ) -> None:
     rect = _bottom_bar_rect(layout)
-    _draw_panel(screen, rect, radius=18)
+    draw_panel(screen, rect, radius=18, theme=THEME)
 
     selected = state.navigation_state.selected_seat_index
     hint = "Kein Platz ausgewählt." if selected is None else f"Platz {selected + 1} ausgewählt."
-    drawer.draw_text(screen, hint, (rect.left + 24, rect.top + 10), role="small", color=TEXT_MUTED)
+    drawer.draw_text(screen, hint, (rect.left + 24, rect.top + 10), role="small", color=PALETTE.text_muted)
 
     flash = state.flash_message.text if state.flash_message is not None else None
     if flash:
-        drawer.draw_text(screen, flash, (rect.left + 24, rect.bottom - 26), role="small", color=DANGER)
+        drawer.draw_text(screen, flash, (rect.left + 24, rect.bottom - 26), role="small", color=PALETTE.danger)
 
     mouse_pos = pygame.mouse.get_pos()
     for target in targets.button_targets:
@@ -404,22 +384,14 @@ def _draw_bottom_bar(
 
 
 def _draw_button(screen: pygame.Surface, drawer: PrimitiveDrawer, target: LobbyButtonTarget, *, hovered: bool) -> None:
-    if target.button_id == "start_game":
-        fill = BUTTON_FILL_START_HOVER if hovered else BUTTON_FILL_START
-    elif target.button_id == "clear_seat":
-        fill = BUTTON_FILL_DANGER_HOVER if hovered else BUTTON_FILL_DANGER
-    else:
-        fill = BUTTON_FILL_HOVER if hovered else BUTTON_FILL
-
-    pygame.draw.rect(screen, fill, target.rect, border_radius=12)
-    pygame.draw.rect(screen, pygame.Color(210, 225, 245), target.rect, width=1, border_radius=12)
-    text_pos = _centered_text_position(drawer, target.label, target.rect, role="small")
-    drawer.draw_text(screen, target.label, text_pos, role="small")
-
-
-def _draw_panel(screen: pygame.Surface, rect: pygame.Rect, *, radius: int) -> None:
-    pygame.draw.rect(screen, PANEL_FILL, rect, border_radius=radius)
-    pygame.draw.rect(screen, PANEL_BORDER, rect, width=1, border_radius=radius)
+    variant = (
+        "success"
+        if target.button_id == "start_game"
+        else "danger"
+        if target.button_id == "clear_seat"
+        else "primary"
+    )
+    draw_button(screen, drawer, target.rect, target.label, variant=variant, hovered=hovered, theme=THEME)
 
 
 def _draw_badge(
@@ -430,16 +402,12 @@ def _draw_badge(
     *,
     selected: bool,
 ) -> None:
-    fill = ACCENT if selected else PANEL_FILL_SOFT
-    pygame.draw.rect(screen, fill, rect, border_radius=10)
-    pygame.draw.rect(screen, PANEL_BORDER_ACTIVE if selected else PANEL_BORDER, rect, width=1, border_radius=10)
-    drawer.draw_text(screen, text, _centered_text_position(drawer, text, rect, role="tiny"), role="tiny")
+    draw_badge(screen, drawer, rect, text, active=selected, theme=THEME)
 
 
-def _centered_text_position(drawer: PrimitiveDrawer, text: str, rect: pygame.Rect, *, role: str) -> tuple[int, int]:
-    font = drawer._font_for_role(role)
-    width, height = font.size(text)
-    return (rect.centerx - width // 2, rect.centery - height // 2)
+# Keep the old private helper name inside this module while the drawing code is
+# moved to row_taker.gui.widgets.
+_centered_text_position = centered_text_position
 
 
 def _seat_kind_label(seat: LobbySeatView, *, is_self: bool) -> str:
@@ -454,12 +422,12 @@ def _seat_kind_label(seat: LobbySeatView, *, is_self: bool) -> str:
 
 def _seat_fill_color(seat: LobbySeatView, *, is_self: bool) -> pygame.Color:
     if is_self:
-        return SEAT_SELF
+        return PALETTE.seat_self
     if seat.occupant_kind == ParticipantKind.BOT:
-        return SEAT_BOT
+        return PALETTE.seat_bot
     if seat.occupant_kind == ParticipantKind.HUMAN:
-        return SEAT_HUMAN
-    return SEAT_EMPTY
+        return PALETTE.seat_human
+    return PALETTE.seat_empty
 
 
 def _main_lobby_rect(layout: DemoLayout) -> pygame.Rect:

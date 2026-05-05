@@ -6,14 +6,8 @@ from typing import Any
 import pygame
 
 from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
-from row_taker.gui_common.primitives import (
-    ACCENT,
-    CARD_FILL,
-    CARD_SELECTED,
-    PANEL_BORDER,
-    TEXT_MUTED,
-    PrimitiveDrawer,
-)
+from row_taker.gui.theme import DEFAULT_THEME, GuiTheme
+from row_taker.gui_common.primitives import PrimitiveDrawer
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,22 +71,31 @@ class GuiCard:
         *,
         drawer: PrimitiveDrawer,
         assets: GuiAssets = DEFAULT_GUI_ASSETS,
+        theme: GuiTheme = DEFAULT_THEME,
     ) -> None:
         image = assets.scaled_card_image(self.card_value, self.rect.width, self.rect.height)
         if image is None:
-            self._draw_fallback(surface, drawer=drawer)
+            self._draw_fallback(surface, drawer=drawer, theme=theme)
             return
 
         surface.blit(image, self.rect)
-        self._draw_highlight(surface)
+        self._draw_highlight(surface, theme=theme)
 
-    def _draw_fallback(self, surface: pygame.Surface, *, drawer: PrimitiveDrawer) -> None:
-        fill = CARD_SELECTED if self.selected else CARD_FILL
-        border = ACCENT if self.selected or self.hovered else PANEL_BORDER
+    def _draw_fallback(
+        self,
+        surface: pygame.Surface,
+        *,
+        drawer: PrimitiveDrawer,
+        theme: GuiTheme,
+    ) -> None:
+        palette = theme.palette
+        spacing = theme.spacing
+        fill = palette.card_selected if self.selected else palette.card_fill
+        border = palette.accent if self.selected or self.hovered else palette.panel_border
         border_width = 2 if self.selected or self.hovered else 1
 
-        pygame.draw.rect(surface, fill, self.rect, border_radius=6)
-        pygame.draw.rect(surface, border, self.rect, border_width, border_radius=6)
+        pygame.draw.rect(surface, fill, self.rect, border_radius=spacing.card_radius)
+        pygame.draw.rect(surface, border, self.rect, border_width, border_radius=spacing.card_radius)
         drawer.draw_text(surface, str(self.card_value), (self.rect.left + 8, self.rect.top + 6), role="body")
         if self.bullheads is not None:
             drawer.draw_text(
@@ -100,24 +103,37 @@ class GuiCard:
                 f"{self.bullheads} bh",
                 (self.rect.left + 8, self.rect.top + 30),
                 role="small",
-                color=TEXT_MUTED,
+                color=palette.text_muted,
             )
 
-    def _draw_highlight(self, surface: pygame.Surface) -> None:
+    def _draw_highlight(self, surface: pygame.Surface, *, theme: GuiTheme) -> None:
         if not self.selected and not self.hovered:
             return
         border_width = 2 if self.selected else 1
-        pygame.draw.rect(surface, ACCENT, self.rect.inflate(4, 4), border_width, border_radius=6)
+        pygame.draw.rect(
+            surface,
+            theme.palette.accent,
+            self.rect.inflate(4, 4),
+            border_width,
+            border_radius=theme.spacing.card_radius,
+        )
 
 
 # Compatibility name for older imports while the GUI is being refactored.
 CardSprite = GuiCard
 
 
-def draw_card_back(surface: pygame.Surface, rect: pygame.Rect) -> None:
+def draw_card_back(
+    surface: pygame.Surface,
+    rect: pygame.Rect,
+    *,
+    theme: GuiTheme = DEFAULT_THEME,
+) -> None:
     """Draw a neutral face-down card placeholder."""
 
+    palette = theme.palette
+    spacing = theme.spacing
     back = pygame.Surface(rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(back, pygame.Color(18, 28, 40, 130), back.get_rect(), border_radius=6)
+    pygame.draw.rect(back, palette.card_back_fill, back.get_rect(), border_radius=spacing.card_radius)
     surface.blit(back, rect)
-    pygame.draw.rect(surface, pygame.Color(255, 255, 255, 65), rect, 1, border_radius=6)
+    pygame.draw.rect(surface, palette.card_back_border, rect, 1, border_radius=spacing.card_radius)
