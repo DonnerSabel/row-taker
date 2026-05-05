@@ -1,71 +1,123 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from typing import Any
 
 import pygame
 
-from row_taker.engine.game.cards import Card
+from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
+from row_taker.gui_common.primitives import (
+    ACCENT,
+    CARD_FILL,
+    CARD_SELECTED,
+    PANEL_BORDER,
+    TEXT_MUTED,
+    PrimitiveDrawer,
+)
 
 
-@dataclass(slots=True)
-class CardSprite:
-    """Visual representation of a game card.
+@dataclass(frozen=True, slots=True)
+class GuiCard:
+    """Presentation-only card object for hit testing and drawing.
 
-    This class is intentionally presentation-only. It does not own game logic and
-    does not mutate engine state.
+    The engine owns card rules and state. ``GuiCard`` only knows where a card is
+    on screen and how that card should currently look.
     """
 
-    card: Card
-    image: pygame.Surface | None = None
-    rect: pygame.Rect | None = None
+    card_value: int
+    bullheads: int | None
+    rect: pygame.Rect
     selected: bool = False
     hovered: bool = False
 
     @classmethod
-    def from_card(cls, card: Card) -> CardSprite:
-        sprite = cls(card=card)
-        sprite.load_image()
-        return sprite
+    def from_card(
+        cls,
+        card: Any,
+        rect: pygame.Rect,
+        *,
+        selected: bool = False,
+        hovered: bool = False,
+    ) -> GuiCard:
+        return cls(
+            card_value=int(card.value),
+            bullheads=int(card.bullheads),
+            rect=rect,
+            selected=selected,
+            hovered=hovered,
+        )
+
+    @classmethod
+    def from_card_value(
+        cls,
+        card_value: int,
+        rect: pygame.Rect,
+        *,
+        selected: bool = False,
+        hovered: bool = False,
+    ) -> GuiCard:
+        return cls(
+            card_value=card_value,
+            bullheads=None,
+            rect=rect,
+            selected=selected,
+            hovered=hovered,
+        )
 
     @property
     def value(self) -> int:
-        return self.card.value
+        return self.card_value
 
-    def load_image(self) -> None:
-        project_root = Path(__file__).resolve().parents[3]
-        image_path = project_root / "images" / f"karte_{self.card.value:03}.png"
-        if not image_path.exists():
-            self.image = None
-            self.rect = None
+    def contains_point(self, position: tuple[int, int]) -> bool:
+        return self.rect.collidepoint(position)
+
+    def draw(
+        self,
+        surface: pygame.Surface,
+        *,
+        drawer: PrimitiveDrawer,
+        assets: GuiAssets = DEFAULT_GUI_ASSETS,
+    ) -> None:
+        image = assets.scaled_card_image(self.card_value, self.rect.width, self.rect.height)
+        if image is None:
+            self._draw_fallback(surface, drawer=drawer)
             return
 
-        self.image = pygame.image.load(str(image_path)).convert_alpha()
-        self.rect = self.image.get_rect()
+        surface.blit(image, self.rect)
+        self._draw_highlight(surface)
 
-    def scale_to_width(self, width: int) -> None:
-        if self.image is None:
+    def _draw_fallback(self, surface: pygame.Surface, *, drawer: PrimitiveDrawer) -> None:
+        fill = CARD_SELECTED if self.selected else CARD_FILL
+        border = ACCENT if self.selected or self.hovered else PANEL_BORDER
+        border_width = 2 if self.selected or self.hovered else 1
+
+        pygame.draw.rect(surface, fill, self.rect, border_radius=6)
+        pygame.draw.rect(surface, border, self.rect, border_width, border_radius=6)
+        drawer.draw_text(surface, str(self.card_value), (self.rect.left + 8, self.rect.top + 6), role="body")
+        if self.bullheads is not None:
+            drawer.draw_text(
+                surface,
+                f"{self.bullheads} bh",
+                (self.rect.left + 8, self.rect.top + 30),
+                role="small",
+                color=TEXT_MUTED,
+            )
+
+    def _draw_highlight(self, surface: pygame.Surface) -> None:
+        if not self.selected and not self.hovered:
             return
+        border_width = 2 if self.selected else 1
+        pygame.draw.rect(surface, ACCENT, self.rect.inflate(4, 4), border_width, border_radius=6)
 
-        current_width, current_height = self.image.get_size()
-        if current_width <= 0:
-            return
 
-        height = max(1, round(current_height * width / current_width))
-        self.image = pygame.transform.smoothscale(self.image, (width, height))
-        old_topleft = self.rect.topleft if self.rect is not None else (0, 0)
-        self.rect = self.image.get_rect(topleft=old_topleft)
+# Compatibility name for older imports while the GUI is being refactored.
+CardSprite = GuiCard
 
-    def move_to(self, x: int, y: int) -> None:
-        if self.rect is None:
-            self.rect = pygame.Rect(x, y, 0, 0)
-            return
-        self.rect.topleft = (x, y)
 
-    def contains(self, position: tuple[int, int]) -> bool:
-        return self.rect is not None and self.rect.collidepoint(position)
+def draw_card_back(surface: pygame.Surface, rect: pygame.Rect) -> None:
+    """Draw a neutral face-down card placeholder."""
 
-    def draw(self, surface: pygame.Surface) -> None:
-        if self.image is None or self.rect is None:
-            return
-        surface.blit(self.image, self.rect)
+    back = pygame.Surface(rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(back, pygame.Color(18, 28, 40, 130), back.get_rect(), border_radius=6)
+    surface.blit(back, rect)
+    pygame.draw.rect(surface, pygame.Color(255, 255, 255, 65), rect, 1, border_radius=6)

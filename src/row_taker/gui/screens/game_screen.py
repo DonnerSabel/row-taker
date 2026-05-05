@@ -14,6 +14,7 @@ from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
 from row_taker.engine.game.models import PlayerID
 from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
+from row_taker.gui.card import GuiCard, draw_card_back
 from row_taker.gui.board_layout import (
     BoardGeometry,
     CardPlacement,
@@ -25,9 +26,6 @@ from row_taker.gui.board_layout import (
 from row_taker.gui_common.layout import DemoLayout
 from row_taker.gui_common.primitives import (
     ACCENT,
-    CARD_FILL,
-    CARD_SELECTED,
-    PANEL_BORDER,
     TEXT_MUTED,
     TEXT_PRIMARY,
     PrimitiveDrawer,
@@ -38,12 +36,18 @@ from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 @dataclass(frozen=True, slots=True)
 class CardTarget:
-    card_value: int
-    placement: CardPlacement
+    card: GuiCard
+
+    @property
+    def card_value(self) -> int:
+        return self.card.card_value
 
     @property
     def rect(self) -> pygame.Rect:
-        return self.placement.rect
+        return self.card.rect
+
+    def contains_point(self, position: tuple[int, int]) -> bool:
+        return self.card.contains_point(position)
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,7 +179,7 @@ def _compute_geometry(window_rect: pygame.Rect, state: ClientState) -> BoardGeom
 def _handle_left_click(position: tuple[int, int], *, game_targets: GameScreenTargets) -> ScreenResult:
     # Hand cards overlap. Check front-to-back.
     for target in reversed(game_targets.card_targets):
-        if target.rect.collidepoint(position):
+        if target.contains_point(position):
             return ScreenResult(client_action=ClientActionChooseCard(card_value=target.card_value))
 
     for target in game_targets.row_targets:
@@ -195,7 +199,7 @@ def _build_card_targets(geometry: BoardGeometry, state: ClientState) -> tuple[Ca
 
     placements = hand_card_placements(geometry, card_count=len(player_state.hand))
     return tuple(
-        CardTarget(card_value=card.value, placement=placement)
+        CardTarget(card=GuiCard.from_card(card, placement.rect))
         for card, placement in zip(player_state.hand, placements, strict=False)
     )
 
@@ -296,7 +300,7 @@ def _draw_row_column(
     )
 
     for card, placement in zip(cards, placements, strict=False):
-        _draw_card_image_or_fallback(screen, drawer, placement.rect, card, selected=selectable, assets=assets)
+        GuiCard.from_card(card, placement.rect, selected=selectable).draw(screen, drawer=drawer, assets=assets)
 
 
 def _draw_opponent_slots(
@@ -327,9 +331,9 @@ def _draw_opponent_slots(
         card_value = revealed_by_player.get(slot.player_id)
         staged_rect = slot.geometry.staged_card.rect
         if card_value is None:
-            _draw_staged_card_back(screen, staged_rect)
+            draw_card_back(screen, staged_rect)
         else:
-            _draw_card_value_image_or_back(screen, drawer, staged_rect, card_value, assets)
+            GuiCard.from_card_value(card_value, staged_rect).draw(screen, drawer=drawer, assets=assets)
 
 
 def _opponent_slot_data(client_state: ClientState, geometry: BoardGeometry) -> tuple[OpponentSlot, ...]:
@@ -342,30 +346,6 @@ def _opponent_slot_data(client_state: ClientState, geometry: BoardGeometry) -> t
         )
         for player, slot_geometry in zip(players, geometry.opponent_slots, strict=False)
     )
-
-
-def _draw_staged_card_back(screen: pygame.Surface, rect: pygame.Rect) -> None:
-    back = pygame.Surface(rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(back, pygame.Color(18, 28, 40, 130), back.get_rect(), border_radius=6)
-    screen.blit(back, rect)
-    pygame.draw.rect(screen, pygame.Color(255, 255, 255, 65), rect, 1, border_radius=6)
-
-
-def _draw_card_value_image_or_back(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    rect: pygame.Rect,
-    card_value: int,
-    assets: GuiAssets,
-) -> None:
-    image = assets.scaled_card_image(card_value, rect.width, rect.height)
-    if image is None:
-        pygame.draw.rect(screen, CARD_FILL, rect, border_radius=6)
-        pygame.draw.rect(screen, PANEL_BORDER, rect, 1, border_radius=6)
-        drawer.draw_text(screen, str(card_value), (rect.left + 6, rect.top + 4), role="small")
-        return
-
-    screen.blit(image, rect)
 
 
 def _revealed_card_values_by_player(client_state: ClientState) -> dict[PlayerID, int]:
@@ -391,7 +371,7 @@ def _draw_hand(
         target = target_by_value.get(card.value)
         if target is None:
             continue
-        _draw_card_image_or_fallback(screen, drawer, target.rect, card, assets=assets)
+        target.card.draw(screen, drawer=drawer, assets=assets)
 
     if (
         player_state.phase_info.phase == Phase.CHOOSE_ROW
@@ -513,28 +493,6 @@ def _draw_overlay_box(screen: pygame.Surface, rect: pygame.Rect) -> None:
     pygame.draw.rect(overlay, pygame.Color(0, 0, 0, 120), overlay.get_rect(), border_radius=8)
     screen.blit(overlay, rect)
     pygame.draw.rect(screen, pygame.Color(255, 255, 255, 45), rect, 1, border_radius=8)
-
-
-def _draw_card_image_or_fallback(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    rect: pygame.Rect,
-    card: Any,
-    *,
-    selected: bool = False,
-    assets: GuiAssets,
-) -> None:
-    image = assets.scaled_card_image(card.value, rect.width, rect.height)
-    if image is None:
-        pygame.draw.rect(screen, CARD_SELECTED if selected else CARD_FILL, rect, border_radius=6)
-        pygame.draw.rect(screen, ACCENT if selected else PANEL_BORDER, rect, 2 if selected else 1, border_radius=6)
-        drawer.draw_text(screen, str(card.value), (rect.left + 8, rect.top + 6), role="body")
-        drawer.draw_text(screen, f"{card.bullheads} bh", (rect.left + 8, rect.top + 30), role="small", color=TEXT_MUTED)
-        return
-
-    screen.blit(image, rect)
-    if selected:
-        pygame.draw.rect(screen, ACCENT, rect.inflate(4, 4), 2, border_radius=6)
 
 
 def _opponent_players(state: ClientState) -> tuple[Any, ...]:
