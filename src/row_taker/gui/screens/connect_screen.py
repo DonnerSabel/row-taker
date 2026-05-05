@@ -4,15 +4,16 @@ from dataclasses import dataclass, replace
 
 import pygame
 
-from row_taker.gui.assets import DEFAULT_GUI_ASSETS
-from row_taker.gui.theme import DEFAULT_THEME
-from row_taker.gui.widgets import (
-    centered_text_position,
-    draw_button,
-    draw_overlay_panel,
-    draw_panel,
-    draw_vertical_gradient,
+from row_taker.gui.menu_layout import DEFAULT_MENU_LAYOUT, compute_connect_panel_layout
+from row_taker.gui.menu_shell import (
+    draw_menu_background,
+    draw_menu_footer,
+    draw_menu_header,
+    draw_menu_panel,
+    draw_text_input,
 )
+from row_taker.gui.theme import DEFAULT_THEME
+from row_taker.gui.widgets import draw_button, draw_overlay_panel
 from row_taker.gui_common.layout import DemoLayout
 from row_taker.gui_common.primitives import PrimitiveDrawer
 from row_taker.gui_common.ui.connect_form_state import ConnectFormState
@@ -21,6 +22,7 @@ from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 CONNECT_FIELD_ORDER = ("host", "port", "display_name")
 THEME = DEFAULT_THEME
 PALETTE = THEME.palette
+MENU_LAYOUT = DEFAULT_MENU_LAYOUT
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,17 +43,14 @@ class ConnectButtonTarget:
 @dataclass(frozen=True, slots=True)
 class ConnectScreenTargets:
     panel_rect: pygame.Rect
+    error_rect: pygame.Rect
     field_targets: tuple[ConnectFieldTarget, ...]
     button_targets: tuple[ConnectButtonTarget, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class ConnectScreen:
-    """Polished connect screen for the nicer GUI client.
-
-    The demo GUI keeps its own deliberately simple screen. This implementation
-    shares only the stable form/result data structures with ``gui_demo``.
-    """
+    """Polished connect screen for the nicer GUI client."""
 
     connect_form: ConnectFormState
 
@@ -90,48 +89,19 @@ class ConnectScreen:
 
 
 def build_connect_screen_targets(layout: DemoLayout) -> ConnectScreenTargets:
-    content_rect = layout.main_rect.union(layout.sidebar_rect)
-    panel_width = min(780, max(600, content_rect.width - 160))
-    panel_height = min(510, max(450, content_rect.height - 48))
-    panel_rect = pygame.Rect(0, 0, panel_width, panel_height)
-    panel_rect.center = content_rect.center
-    panel_rect.y -= 6
-
-    inner_left = panel_rect.left + 48
-    inner_top = panel_rect.top + 140
-    field_width = panel_rect.width - 96
-    field_height = 54
-    field_gap = 34
-
+    panel_layout = compute_connect_panel_layout(layout, field_count=3, button_count=2)
     field_targets = (
-        ConnectFieldTarget(
-            "host",
-            "Server IP",
-            "z. B. 127.0.0.1",
-            pygame.Rect(inner_left, inner_top, field_width, field_height),
-        ),
-        ConnectFieldTarget(
-            "port",
-            "Port",
-            "z. B. 8765",
-            pygame.Rect(inner_left, inner_top + field_height + field_gap, field_width, field_height),
-        ),
-        ConnectFieldTarget(
-            "display_name",
-            "Anzeigename",
-            "Name im Spiel",
-            pygame.Rect(inner_left, inner_top + 2 * (field_height + field_gap), field_width, field_height),
-        ),
+        ConnectFieldTarget("host", "Server IP", "z. B. 127.0.0.1", panel_layout.field_rects[0]),
+        ConnectFieldTarget("port", "Port", "z. B. 8765", panel_layout.field_rects[1]),
+        ConnectFieldTarget("display_name", "Anzeigename", "Name im Spiel", panel_layout.field_rects[2]),
     )
-
-    button_y = panel_rect.bottom - 72
     button_targets = (
-        ConnectButtonTarget("connect", "Verbinden", pygame.Rect(inner_left, button_y, 184, 46)),
-        ConnectButtonTarget("quit", "Beenden", pygame.Rect(inner_left + 200, button_y, 152, 46)),
+        ConnectButtonTarget("connect", "Verbinden", panel_layout.button_rects[0]),
+        ConnectButtonTarget("quit", "Beenden", panel_layout.button_rects[1]),
     )
-
     return ConnectScreenTargets(
-        panel_rect=panel_rect,
+        panel_rect=panel_layout.panel_rect,
+        error_rect=panel_layout.error_rect,
         field_targets=field_targets,
         button_targets=button_targets,
     )
@@ -255,43 +225,22 @@ def render_connect_screen(
     connect_form: ConnectFormState,
     connect_targets: ConnectScreenTargets,
 ) -> None:
-    _draw_background(screen)
+    draw_menu_background(screen)
     hovered_button_id = _hovered_button_id(connect_targets)
-    _draw_header(screen, drawer, layout)
-    _draw_connect_panel(screen, drawer, connect_form, connect_targets)
-    _draw_footer(screen, drawer, layout, connect_form=connect_form, hovered_button_id=hovered_button_id)
-
-
-def _draw_background(screen: pygame.Surface) -> None:
-    background = DEFAULT_GUI_ASSETS.scaled_connect_background(screen.get_width(), screen.get_height())
-    if background is None:
-        draw_vertical_gradient(screen, theme=THEME)
-    else:
-        screen.blit(background, (0, 0))
-
-    overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
-    overlay.fill(pygame.Color(0, 0, 0, 146))
-    screen.blit(overlay, (0, 0))
-
-    top_overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
-    pygame.draw.rect(
-        top_overlay,
-        pygame.Color(4, 10, 20, 92),
-        pygame.Rect(0, 0, screen.get_width(), screen.get_height() // 3),
-    )
-    screen.blit(top_overlay, (0, 0))
-
-
-def _draw_header(screen: pygame.Surface, drawer: PrimitiveDrawer, layout: DemoLayout) -> None:
-    rect = layout.header_rect.inflate(-4, -10)
-    draw_overlay_panel(screen, rect, radius=20, alpha=58, theme=THEME)
-    drawer.draw_text(screen, "Row-Taker", (rect.left + 24, rect.top + 10), role="title")
-    drawer.draw_text(
+    draw_menu_header(
         screen,
-        "Mit Server verbinden und direkt in die Lobby wechseln.",
-        (rect.left + 24, rect.top + 42),
-        role="body",
-        color=PALETTE.text_muted,
+        drawer,
+        layout,
+        title="Row-Taker",
+        subtitle="Mit Server verbinden und direkt in die Lobby wechseln.",
+    )
+    _draw_connect_panel(screen, drawer, connect_form, connect_targets)
+    draw_menu_footer(
+        screen,
+        drawer,
+        layout,
+        text=_footer_hint_text(connect_form, hovered_button_id),
+        is_error=connect_form.error_message is not None,
     )
 
 
@@ -302,17 +251,9 @@ def _draw_connect_panel(
     targets: ConnectScreenTargets,
 ) -> None:
     panel = targets.panel_rect
-    draw_panel(
-        screen,
-        panel,
-        radius=THEME.spacing.large_panel_radius,
-        fill=PALETTE.panel_fill_strong,
-        border=PALETTE.panel_border_soft,
-        alpha=228,
-        theme=THEME,
-    )
+    draw_menu_panel(screen, panel)
 
-    title_x = panel.left + 48
+    title_x = panel.left + MENU_LAYOUT.panel_padding_x
     drawer.draw_text(screen, "Verbinden", (title_x, panel.top + 28), role="title")
     drawer.draw_text(
         screen,
@@ -328,23 +269,26 @@ def _draw_connect_panel(
         hovered = target.rect.collidepoint(mouse_pos)
         selected = connect_form.selected_field == target.field_name
         value = getattr(connect_form, target.field_name)
-        _draw_input_field(
+        label_pos = (target.rect.left, target.rect.top - MENU_LAYOUT.field_label_gap)
+        label_color = PALETTE.accent_hover if active else PALETTE.text_muted
+        drawer.draw_text(screen, target.label, label_pos, role="body", color=label_color)
+        draw_text_input(
             screen,
             drawer,
-            target,
+            target.rect,
             value=value,
+            placeholder=target.placeholder,
             active=active,
             hovered=hovered,
             selected=selected,
         )
 
     if connect_form.error_message:
-        error_rect = pygame.Rect(panel.left + 48, panel.bottom - 130, panel.width - 96, 38)
-        draw_overlay_panel(screen, error_rect, radius=12, alpha=85, theme=THEME)
+        draw_overlay_panel(screen, targets.error_rect, radius=12, alpha=85, theme=THEME)
         drawer.draw_wrapped_lines(
             screen,
             [connect_form.error_message],
-            error_rect.inflate(-12, -8),
+            targets.error_rect.inflate(-12, -8),
             role="small",
             color=PALETTE.danger,
             line_gap=4,
@@ -361,90 +305,6 @@ def _draw_connect_panel(
             hovered=hovered,
             theme=THEME,
         )
-
-
-def _draw_input_field(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    target: ConnectFieldTarget,
-    *,
-    value: str,
-    active: bool,
-    hovered: bool,
-    selected: bool,
-) -> None:
-    label_pos = (target.rect.left, target.rect.top - 28)
-    label_color = PALETTE.accent_hover if active else PALETTE.text_muted
-    drawer.draw_text(screen, target.label, label_pos, role="body", color=label_color)
-
-    fill = PALETTE.panel_fill
-    if hovered:
-        fill = fill.lerp(PALETTE.text_primary, 0.04)
-    border = PALETTE.accent_hover if active else PALETTE.panel_border
-    border_width = 2 if active else 1
-
-    pygame.draw.rect(screen, fill, target.rect, border_radius=14)
-    pygame.draw.rect(screen, border, target.rect, width=border_width, border_radius=14)
-
-    display_value = value if value else target.placeholder
-    text_color = PALETTE.text_primary if value else PALETTE.text_muted
-    text_pos = (target.rect.left + 16, target.rect.top + 14)
-
-    if selected and value:
-        _draw_text_selection(screen, drawer, target.rect, value)
-
-    drawer.draw_text(screen, display_value, text_pos, role="body", color=text_color)
-
-    if active and not selected:
-        _draw_text_cursor(screen, drawer, target.rect, display_value)
-
-
-def _draw_text_selection(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    rect: pygame.Rect,
-    text: str,
-) -> None:
-    font = drawer._font_for_role("body")
-    text_width, text_height = font.size(text)
-    selection_rect = pygame.Rect(rect.left + 12, rect.top + 8, text_width + 10, max(30, text_height + 8))
-    selection_surface = pygame.Surface(selection_rect.size, pygame.SRCALPHA)
-    selection_surface.fill(pygame.Color(80, 132, 212, 120))
-    screen.blit(selection_surface, selection_rect)
-
-
-def _draw_text_cursor(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    rect: pygame.Rect,
-    text: str,
-) -> None:
-    font = drawer._font_for_role("body")
-    text_width = font.size(text)[0]
-    cursor_x = min(rect.right - 16, rect.left + 16 + text_width + 2)
-    cursor_rect = pygame.Rect(cursor_x, rect.top + 10, 2, rect.height - 20)
-    pygame.draw.rect(screen, PALETTE.accent_hover, cursor_rect)
-
-
-def _draw_footer(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    layout: DemoLayout,
-    *,
-    connect_form: ConnectFormState,
-    hovered_button_id: str | None,
-) -> None:
-    rect = layout.footer_rect.inflate(-4, -14)
-    draw_overlay_panel(screen, rect, radius=20, alpha=52, theme=THEME)
-    hints = _footer_hint_text(connect_form, hovered_button_id)
-    color = PALETTE.danger if connect_form.error_message else PALETTE.text_muted
-    drawer.draw_text(
-        screen,
-        hints,
-        centered_text_position(drawer, hints, rect, role="body"),
-        role="body",
-        color=color,
-    )
 
 
 def _footer_hint_text(connect_form: ConnectFormState, hovered_button_id: str | None) -> str:
