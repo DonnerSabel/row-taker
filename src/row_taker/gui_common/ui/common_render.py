@@ -12,8 +12,8 @@ from row_taker.client.presentation_events import (
     PresentationTrickFinished,
 )
 from row_taker.client.state import ClientState
-from row_taker.gui_demo.layout import DemoLayout
-from row_taker.gui_demo.primitives import TEXT_MUTED, PrimitiveDrawer
+from row_taker.gui_common.layout import DemoLayout
+from row_taker.gui_common.primitives import TEXT_MUTED, PrimitiveDrawer
 
 
 def render_standard_header(

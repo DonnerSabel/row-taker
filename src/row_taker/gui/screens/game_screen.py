@@ -23,8 +23,8 @@ from row_taker.gui.board_layout import (
     hand_card_placements,
     row_card_placements,
 )
-from row_taker.gui_demo.layout import DemoLayout
-from row_taker.gui_demo.primitives import (
+from row_taker.gui_common.layout import DemoLayout
+from row_taker.gui_common.primitives import (
     ACCENT,
     CARD_FILL,
     CARD_SELECTED,
@@ -33,8 +33,8 @@ from row_taker.gui_demo.primitives import (
     TEXT_PRIMARY,
     PrimitiveDrawer,
 )
-from row_taker.gui_demo.ui.common_render import format_presentation_event
-from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
+from row_taker.gui_common.ui.common_render import format_presentation_event
+from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 
 @dataclass(frozen=True, slots=True)

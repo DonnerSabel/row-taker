@@ -4,8 +4,8 @@ from dataclasses import dataclass, replace
 
 import pygame
 
-from row_taker.gui_demo.layout import DemoLayout
-from row_taker.gui_demo.primitives import (
+from row_taker.gui_common.layout import DemoLayout
+from row_taker.gui_common.primitives import (
     ACCENT,
     PANEL_BORDER,
     PANEL_FILL,
@@ -13,8 +13,8 @@ from row_taker.gui_demo.primitives import (
     WINDOW_BACKGROUND,
     PrimitiveDrawer,
 )
-from row_taker.gui_demo.ui.connect_form_state import ConnectFormState
-from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
+from row_taker.gui_common.ui.connect_form_state import ConnectFormState
+from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 CONNECT_FIELD_ORDER = ('host', 'port', 'display_name')
 

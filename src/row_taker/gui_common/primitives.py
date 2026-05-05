@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pygame
 
-from row_taker.gui_demo.layout import PANEL_PADDING
+from row_taker.gui_common.layout import PANEL_PADDING
 
 PANEL_FILL = pygame.Color(32, 36, 41)
 PANEL_BORDER = pygame.Color(135, 145, 156)

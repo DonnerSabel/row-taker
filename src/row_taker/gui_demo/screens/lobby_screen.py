@@ -11,14 +11,14 @@ from row_taker.client.actions import (
     ClientActionStartGame,
 )
 from row_taker.client.state import ClientState, enter_lobby_submenu
-from row_taker.gui_demo.layout import DemoLayout
-from row_taker.gui_demo.primitives import TEXT_MUTED, WINDOW_BACKGROUND, PrimitiveDrawer
-from row_taker.gui_demo.ui.common_render import (
+from row_taker.gui_common.layout import DemoLayout
+from row_taker.gui_common.primitives import TEXT_MUTED, WINDOW_BACKGROUND, PrimitiveDrawer
+from row_taker.gui_common.ui.common_render import (
     format_presentation_event,
     render_standard_footer,
     render_standard_header,
 )
-from row_taker.gui_demo.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
+from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,4 +1,4 @@
-"""Laufzeit-Hülle für den GUI-Demo-Client.
+"""Laufzeit-Hülle für pygame-GUI-Clients.
 
 Dieses Modul gehört bewusst zur Infrastruktur. Es verbindet Transport,
 GameClientCore und einen kleinen Hintergrund-Receive-Loop. Für eigene
@@ -30,7 +30,7 @@ class LiveGuiClient:
 
     Die GUI spricht mit dieser Klasse nur über wenige Operationen:
     start(), poll(), apply_local_state(), apply_action() und close().
-    Dadurch kann der Rest der Demo-UI den Netzwerkteil weitgehend als
+    Dadurch kann der Rest der GUI den Netzwerkteil weitgehend als
     Black Box behandeln.
     """
 
@@ -56,7 +56,7 @@ class LiveGuiClient:
         self.transport.send(JoinLobby(display_name=self.display_name, requested_client_id=self.core.state.own_client_id))
         self._receiver_thread = threading.Thread(
             target=self._receive_loop,
-            name="row_taker_gui_demo_receive",
+            name="row_taker_gui_receive",
             daemon=True,
         )
         self._receiver_thread.start()

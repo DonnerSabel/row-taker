@@ -4,14 +4,14 @@ import pygame
 
 from row_taker.client.actions import ClientAction
 from row_taker.client.state import ClientState
-from row_taker.gui_demo.layout import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, compute_layout
-from row_taker.gui_demo.live_client import LiveGuiClient
-from row_taker.gui_demo.primitives import PrimitiveDrawer
+from row_taker.gui_common.layout import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, compute_layout
+from row_taker.gui_common.live_client import LiveGuiClient
+from row_taker.gui_common.primitives import PrimitiveDrawer
 from row_taker.gui_demo.screens.connect_screen import ConnectScreen
 from row_taker.gui_demo.screens.game_screen import GameScreen
 from row_taker.gui_demo.screens.lobby_screen import LobbyScreen
-from row_taker.gui_demo.ui.connect_form_state import ConnectFormState
-from row_taker.gui_demo.ui.screen_result import ScreenResult
+from row_taker.gui_common.ui.connect_form_state import ConnectFormState
+from row_taker.gui_common.ui.screen_result import ScreenResult
 from row_taker.protocol.transport import ClientTransport
 
 WINDOW_TITLE = 'Row-Taker GUI Demo'
