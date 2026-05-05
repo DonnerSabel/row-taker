@@ -63,3 +63,35 @@ class AnimationClock:
             high=strength_high,
         )
         return base.lerp(highlight, strength)
+
+    def progress(self, *, duration_frames: int = 36) -> float:
+        """Return a one-shot progress value from 0.0 to 1.0.
+
+        Unlike ``pulse``, this deliberately does not loop. The polished GUI uses
+        it together with an event-local frame counter so a newly visible
+        presentation event starts its motion at the beginning.
+        """
+
+        duration = max(1, duration_frames)
+        return max(0.0, min(1.0, self.frame_count / duration))
+
+    def ease_out_cubic(self, *, duration_frames: int = 36) -> float:
+        progress = self.progress(duration_frames=duration_frames)
+        return 1.0 - (1.0 - progress) ** 3
+
+
+def lerp_rect(start: pygame.Rect, end: pygame.Rect, progress: float) -> pygame.Rect:
+    """Interpolate between two rectangles.
+
+    The helper keeps card-motion code readable and intentionally works on
+    center/size values so cards move and scale smoothly at the same time.
+    """
+
+    t = max(0.0, min(1.0, progress))
+    width = round(start.width + (end.width - start.width) * t)
+    height = round(start.height + (end.height - start.height) * t)
+    center_x = round(start.centerx + (end.centerx - start.centerx) * t)
+    center_y = round(start.centery + (end.centery - start.centery) * t)
+    rect = pygame.Rect(0, 0, max(1, width), max(1, height))
+    rect.center = (center_x, center_y)
+    return rect

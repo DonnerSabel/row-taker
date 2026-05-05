@@ -13,7 +13,7 @@ from row_taker.client.actions import (
 from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
 from row_taker.engine.game.models import PlayerID
-from row_taker.gui.animation import AnimationClock
+from row_taker.gui.animation import AnimationClock, lerp_rect
 from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
 from row_taker.gui.board_layout import (
     BoardGeometry,
@@ -82,6 +82,7 @@ class GameScreenTargets:
 class GameScreen:
     state: ClientState
     frame_count: int
+    presentation_frame_count: int
     last_action_summary: str
 
     def build_targets(self, layout: DemoLayout) -> GameScreenTargets:
@@ -111,6 +112,7 @@ class GameScreen:
             client_state=self.state,
             game_targets=targets,
             frame_count=self.frame_count,
+            presentation_frame_count=self.presentation_frame_count,
             last_action_summary=self.last_action_summary,
         )
 
@@ -156,16 +158,28 @@ def render_game_screen(
     client_state: ClientState,
     game_targets: GameScreenTargets,
     frame_count: int,
+    presentation_frame_count: int,
     last_action_summary: str,
     assets: GuiAssets = DEFAULT_GUI_ASSETS,
 ) -> None:
     presentation_visuals = build_presentation_visuals(client_state)
-    animation_clock = AnimationClock(frame_count)
+    frame_clock = AnimationClock(frame_count)
+    presentation_clock = AnimationClock(presentation_frame_count)
 
     _draw_full_background(screen, geometry.window_rect, assets)
-    _draw_rows(screen, drawer, geometry, client_state, game_targets, assets, presentation_visuals, animation_clock)
-    _draw_opponent_slots(screen, drawer, geometry, client_state, assets, presentation_visuals, animation_clock)
+    _draw_rows(screen, drawer, geometry, client_state, game_targets, assets, presentation_visuals, presentation_clock)
+    _draw_opponent_slots(screen, drawer, geometry, client_state, assets, presentation_visuals, presentation_clock)
     _draw_hand(screen, drawer, client_state, game_targets, assets, presentation_visuals)
+    _draw_presentation_card_motion(
+        screen,
+        drawer,
+        geometry,
+        client_state,
+        game_targets,
+        presentation_visuals,
+        assets,
+        presentation_clock,
+    )
     _draw_stats_field(screen, drawer, geometry, client_state)
     _draw_status_overlay(
         screen,
@@ -176,7 +190,7 @@ def render_game_screen(
         game_targets,
         presentation_visuals,
         assets,
-        animation_clock,
+        presentation_clock,
     )
 
 
@@ -514,6 +528,117 @@ def _draw_hand(
             role="small",
             color=PALETTE.accent,
         )
+
+
+def _draw_presentation_card_motion(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
+    geometry: BoardGeometry,
+    client_state: ClientState,
+    game_targets: GameScreenTargets,
+    presentation_visuals: PresentationVisuals,
+    assets: GuiAssets,
+    animation_clock: AnimationClock,
+) -> None:
+    if not presentation_visuals.has_event:
+        return
+    if presentation_visuals.active_row_id is None:
+        return
+    if not presentation_visuals.focus_card_values:
+        return
+
+    card_value = presentation_visuals.replacement_card_value or presentation_visuals.focus_card_values[0]
+    source_rect = _presentation_motion_source_rect(
+        geometry,
+        client_state,
+        game_targets,
+        presentation_visuals,
+        card_value=card_value,
+    )
+    target_rect = _presentation_motion_target_rect(geometry, client_state, presentation_visuals)
+    if source_rect is None or target_rect is None:
+        return
+
+    progress = animation_clock.ease_out_cubic(duration_frames=32)
+    current_rect = lerp_rect(source_rect, target_rect, progress)
+    shadow_rect = current_rect.inflate(12, 12).move(4, 5)
+    shadow = pygame.Surface(shadow_rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(shadow, pygame.Color(0, 0, 0, 80), shadow.get_rect(), border_radius=THEME.spacing.card_radius + 4)
+    screen.blit(shadow, shadow_rect)
+
+    path_color = pygame.Color(PALETTE.accent_hover)
+    path_color.a = max(35, 120 - round(progress * 70))
+    _draw_motion_path(screen, source_rect.center, target_rect.center, path_color)
+
+    GuiCard.from_card_value(card_value, current_rect, selected=True).draw(screen, drawer=drawer, assets=assets)
+
+
+def _presentation_motion_source_rect(
+    geometry: BoardGeometry,
+    client_state: ClientState,
+    game_targets: GameScreenTargets,
+    presentation_visuals: PresentationVisuals,
+    *,
+    card_value: int,
+) -> pygame.Rect | None:
+    if presentation_visuals.active_player_id == client_state.own_player_id:
+        for target in game_targets.card_targets:
+            if target.card_value == card_value:
+                return target.rect
+        fallback = pygame.Rect(0, 0, *geometry.staged_card_size)
+        fallback.center = geometry.hand_rect.center
+        return fallback
+
+    for slot in _opponent_slot_data(client_state, geometry):
+        if slot.player_id == presentation_visuals.active_player_id:
+            return slot.geometry.staged_card.rect
+
+    return None
+
+
+def _presentation_motion_target_rect(
+    geometry: BoardGeometry,
+    client_state: ClientState,
+    presentation_visuals: PresentationVisuals,
+) -> pygame.Rect | None:
+    public_state = client_state.public_state
+    if public_state is None or presentation_visuals.active_row_id is None:
+        return None
+
+    for row_index, row in enumerate(public_state.rows):
+        if row.row_id != presentation_visuals.active_row_id:
+            continue
+
+        placements = row_card_placements(
+            geometry,
+            row_index=row_index,
+            card_count=max(1, len(row.cards)),
+        )
+        if placements:
+            return placements[-1].rect
+
+        target = pygame.Rect(0, 0, *geometry.row_card_size)
+        target.center = geometry.row_columns[row_index].center
+        return target
+
+    return None
+
+
+def _draw_motion_path(
+    screen: pygame.Surface,
+    start: tuple[int, int],
+    end: tuple[int, int],
+    color: pygame.Color,
+) -> None:
+    left = min(start[0], end[0])
+    top = min(start[1], end[1])
+    width = max(1, abs(end[0] - start[0]))
+    height = max(1, abs(end[1] - start[1]))
+    surface = pygame.Surface((width + 8, height + 8), pygame.SRCALPHA)
+    local_start = (start[0] - left + 4, start[1] - top + 4)
+    local_end = (end[0] - left + 4, end[1] - top + 4)
+    pygame.draw.line(surface, color, local_start, local_end, width=2)
+    screen.blit(surface, (left - 4, top - 4))
 
 
 def _draw_stats_field(

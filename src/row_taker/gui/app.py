@@ -38,6 +38,8 @@ class GuiApp:
         self._last_action_summary = "Noch keine GUI-Aktion."
         self._live_client: LiveGuiClient | None = None
         self._client_state: ClientState | None = None
+        self._presentation_event_key: str | None = None
+        self._presentation_start_frame = 0
         self._connect_form = ConnectFormState()
 
     def run(self) -> int:
@@ -68,6 +70,7 @@ class GuiApp:
             return
         self._live_client.poll()
         self._client_state = self._live_client.state
+        self._sync_presentation_clock()
 
     def _process_current_screen(self) -> None:
         if self._screen is None or self._drawer is None:
@@ -112,6 +115,7 @@ class GuiApp:
         return GameScreen(
             state=self._client_state,
             frame_count=self._frame_count,
+            presentation_frame_count=max(0, self._frame_count - self._presentation_start_frame),
             last_action_summary=self._last_action_summary,
         )
 
@@ -171,6 +175,7 @@ class GuiApp:
 
     def _apply_local_state(self, next_state: ClientState) -> None:
         self._client_state = next_state
+        self._sync_presentation_clock()
         if self._live_client is not None:
             self._live_client.apply_local_state(next_state)
 
@@ -179,6 +184,20 @@ class GuiApp:
             return
         self._last_action_summary = self._live_client.apply_action(action)
         self._client_state = self._live_client.state
+        self._sync_presentation_clock()
+
+    def _sync_presentation_clock(self) -> None:
+        key = self._front_presentation_event_key(self._client_state)
+        if key == self._presentation_event_key:
+            return
+        self._presentation_event_key = key
+        self._presentation_start_frame = self._frame_count
+
+    @staticmethod
+    def _front_presentation_event_key(state: ClientState | None) -> str | None:
+        if state is None or not state.pending_presentation_events:
+            return None
+        return repr(state.pending_presentation_events[0])
 
     def _current_layout(self):
         if self._screen is None:
