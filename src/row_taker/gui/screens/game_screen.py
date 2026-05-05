@@ -13,6 +13,7 @@ from row_taker.client.actions import (
 from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
 from row_taker.engine.game.models import PlayerID
+from row_taker.gui.animation import AnimationClock
 from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
 from row_taker.gui.board_layout import (
     BoardGeometry,
@@ -109,6 +110,7 @@ class GameScreen:
             geometry=geometry,
             client_state=self.state,
             game_targets=targets,
+            frame_count=self.frame_count,
             last_action_summary=self.last_action_summary,
         )
 
@@ -153,14 +155,16 @@ def render_game_screen(
     geometry: BoardGeometry,
     client_state: ClientState,
     game_targets: GameScreenTargets,
+    frame_count: int,
     last_action_summary: str,
     assets: GuiAssets = DEFAULT_GUI_ASSETS,
 ) -> None:
     presentation_visuals = build_presentation_visuals(client_state)
+    animation_clock = AnimationClock(frame_count)
 
     _draw_full_background(screen, geometry.window_rect, assets)
-    _draw_rows(screen, drawer, geometry, client_state, game_targets, assets, presentation_visuals)
-    _draw_opponent_slots(screen, drawer, geometry, client_state, assets, presentation_visuals)
+    _draw_rows(screen, drawer, geometry, client_state, game_targets, assets, presentation_visuals, animation_clock)
+    _draw_opponent_slots(screen, drawer, geometry, client_state, assets, presentation_visuals, animation_clock)
     _draw_hand(screen, drawer, client_state, game_targets, assets, presentation_visuals)
     _draw_stats_field(screen, drawer, geometry, client_state)
     _draw_status_overlay(
@@ -172,6 +176,7 @@ def render_game_screen(
         game_targets,
         presentation_visuals,
         assets,
+        animation_clock,
     )
 
 
@@ -299,6 +304,7 @@ def _draw_rows(
     game_targets: GameScreenTargets,
     assets: GuiAssets,
     presentation_visuals: PresentationVisuals,
+    animation_clock: AnimationClock,
 ) -> None:
     public_state = client_state.public_state
     if public_state is None:
@@ -322,6 +328,7 @@ def _draw_rows(
             hovered=hovered,
             assets=assets,
             presentation_visuals=presentation_visuals,
+            animation_clock=animation_clock,
         )
 
 
@@ -337,6 +344,7 @@ def _draw_row_column(
     hovered: bool,
     assets: GuiAssets,
     presentation_visuals: PresentationVisuals,
+    animation_clock: AnimationClock,
 ) -> None:
     lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
     emphasis = presentation_visuals.row_emphasis_for(row_id)
@@ -345,6 +353,8 @@ def _draw_row_column(
     screen.blit(lane_surface, rect)
 
     border = _row_border_color(selectable=selectable, hovered=hovered, emphasis=emphasis)
+    if emphasis != "none":
+        _draw_pulsing_outline(screen, rect, border, animation_clock, max_inflate=12)
     border_width = 4 if emphasis != "none" or hovered else 3 if selectable else 1
     pygame.draw.rect(screen, border, rect, border_width, border_radius=8)
 
@@ -404,6 +414,7 @@ def _draw_opponent_slots(
     client_state: ClientState,
     assets: GuiAssets,
     presentation_visuals: PresentationVisuals,
+    animation_clock: AnimationClock,
 ) -> None:
     revealed_by_player = _revealed_card_values_by_player(client_state)
     opponents = _opponent_slot_data(client_state, geometry)
@@ -415,7 +426,13 @@ def _draw_opponent_slots(
         pygame.draw.ellipse(screen, color, circle_rect)
         pygame.draw.ellipse(screen, pygame.Color(255, 255, 255, 150), circle_rect, 2)
         if active_player:
-            pygame.draw.ellipse(screen, PALETTE.accent, circle_rect.inflate(8, 8), 3)
+            inflate = 8 + animation_clock.pulse_inflate(period_frames=54, max_pixels=8)
+            ring_color = animation_clock.pulsed_color(
+                PALETTE.accent,
+                PALETTE.accent_hover,
+                period_frames=54,
+            )
+            pygame.draw.ellipse(screen, ring_color, circle_rect.inflate(inflate, inflate), 3)
 
         initials = _initials(slot.player_name)
         drawer.draw_text(
@@ -546,6 +563,7 @@ def _draw_status_overlay(
     game_targets: GameScreenTargets,
     presentation_visuals: PresentationVisuals,
     assets: GuiAssets,
+    animation_clock: AnimationClock,
 ) -> None:
     _draw_overlay_box(screen, geometry.overlay_rect)
 
@@ -571,7 +589,7 @@ def _draw_status_overlay(
     )
 
     if presentation_visuals.has_event:
-        _draw_presentation_panel(screen, drawer, geometry, presentation_visuals, assets)
+        _draw_presentation_panel(screen, drawer, geometry, presentation_visuals, assets, animation_clock)
 
     if game_targets.continue_target is not None:
         draw_button(
@@ -591,6 +609,7 @@ def _draw_presentation_panel(
     geometry: BoardGeometry,
     presentation_visuals: PresentationVisuals,
     assets: GuiAssets,
+    animation_clock: AnimationClock,
 ) -> None:
     events_rect = pygame.Rect(
         geometry.stats_rect.left,
@@ -599,13 +618,14 @@ def _draw_presentation_panel(
         128,
     )
     _draw_overlay_box(screen, events_rect)
+    _draw_presentation_accent(screen, events_rect, animation_clock)
 
     drawer.draw_text(
         screen,
         presentation_visuals.headline,
         (events_rect.left + 12, events_rect.top + 10),
         role="small",
-        color=PALETTE.accent,
+        color=animation_clock.pulsed_color(PALETTE.accent, PALETTE.accent_hover, period_frames=72),
     )
 
     if presentation_visuals.focus_card_values:
@@ -624,6 +644,41 @@ def _draw_presentation_panel(
     if lines:
         text_rect = pygame.Rect(events_rect.left + 12, text_top, events_rect.width - 24, events_rect.bottom - text_top - 6)
         drawer.draw_wrapped_lines(screen, lines, text_rect, role="tiny", color=PALETTE.text_primary)
+
+
+def _draw_presentation_accent(
+    screen: pygame.Surface,
+    rect: pygame.Rect,
+    animation_clock: AnimationClock,
+) -> None:
+    accent_rect = pygame.Rect(rect.left + 10, rect.top + 7, 4, rect.height - 14)
+    accent_color = animation_clock.pulsed_color(
+        PALETTE.accent,
+        PALETTE.accent_hover,
+        period_frames=72,
+    )
+    accent_color.a = animation_clock.pulse_alpha(period_frames=72, low=120, high=235)
+    accent_surface = pygame.Surface(accent_rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(accent_surface, accent_color, accent_surface.get_rect(), border_radius=3)
+    screen.blit(accent_surface, accent_rect)
+
+
+def _draw_pulsing_outline(
+    screen: pygame.Surface,
+    rect: pygame.Rect,
+    color: pygame.Color,
+    animation_clock: AnimationClock,
+    *,
+    max_inflate: int,
+) -> None:
+    inflate = animation_clock.pulse_inflate(period_frames=54, max_pixels=max_inflate)
+    glow_rect = rect.inflate(inflate, inflate)
+    alpha = animation_clock.pulse_alpha(period_frames=54, low=42, high=115)
+    overlay = pygame.Surface(glow_rect.size, pygame.SRCALPHA)
+    glow_color = pygame.Color(color)
+    glow_color.a = alpha
+    pygame.draw.rect(overlay, glow_color, overlay.get_rect(), width=3, border_radius=10)
+    screen.blit(overlay, glow_rect)
 
 
 def _draw_presentation_card_strip(
