@@ -25,7 +25,7 @@ from row_taker.gui.board_layout import (
 from row_taker.gui.card import GuiCard, draw_card_back
 from row_taker.gui.presentation_visuals import PresentationVisuals, build_presentation_visuals
 from row_taker.gui.theme import DEFAULT_THEME
-from row_taker.gui.widgets import draw_badge, draw_overlay_panel
+from row_taker.gui.widgets import draw_badge, draw_button, draw_overlay_panel
 from row_taker.gui_common.layout import DemoLayout
 from row_taker.gui_common.primitives import PrimitiveDrawer
 from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
@@ -54,11 +54,13 @@ class CardTarget:
 class RowTarget:
     row_id: object
     rect: pygame.Rect
+    hovered: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class ContinueTarget:
     rect: pygame.Rect
+    hovered: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,10 +114,11 @@ class GameScreen:
 
 
 def build_game_screen_targets(geometry: BoardGeometry, state: ClientState) -> GameScreenTargets:
+    mouse_pos = pygame.mouse.get_pos()
     return GameScreenTargets(
-        card_targets=_build_card_targets(geometry, state),
-        row_targets=_build_row_targets(geometry, state),
-        continue_target=_build_continue_target(geometry, state),
+        card_targets=_build_card_targets(geometry, state, mouse_pos=mouse_pos),
+        row_targets=_build_row_targets(geometry, state, mouse_pos=mouse_pos),
+        continue_target=_build_continue_target(geometry, state, mouse_pos=mouse_pos),
     )
 
 
@@ -203,19 +206,47 @@ def _handle_left_click(position: tuple[int, int], *, game_targets: GameScreenTar
     return NO_SCREEN_RESULT
 
 
-def _build_card_targets(geometry: BoardGeometry, state: ClientState) -> tuple[CardTarget, ...]:
+def _build_card_targets(
+    geometry: BoardGeometry,
+    state: ClientState,
+    *,
+    mouse_pos: tuple[int, int],
+) -> tuple[CardTarget, ...]:
     player_state = state.player_state
     if player_state is None:
         return ()
 
     placements = hand_card_placements(geometry, card_count=len(player_state.hand))
+    hovered_value = _hovered_hand_card_value(tuple(zip(player_state.hand, placements, strict=False)), mouse_pos)
     return tuple(
-        CardTarget(card=GuiCard.from_card(card, placement.rect))
+        CardTarget(
+            card=GuiCard.from_card(
+                card,
+                placement.rect,
+                hovered=int(card.value) == hovered_value,
+            )
+        )
         for card, placement in zip(player_state.hand, placements, strict=False)
     )
 
 
-def _build_row_targets(geometry: BoardGeometry, state: ClientState) -> tuple[RowTarget, ...]:
+def _hovered_hand_card_value(
+    cards_with_placements: tuple[tuple[Any, CardPlacement], ...],
+    mouse_pos: tuple[int, int],
+) -> int | None:
+    # Hand cards overlap. Only the visually front-most card should react.
+    for card, placement in reversed(cards_with_placements):
+        if placement.rect.collidepoint(mouse_pos):
+            return int(card.value)
+    return None
+
+
+def _build_row_targets(
+    geometry: BoardGeometry,
+    state: ClientState,
+    *,
+    mouse_pos: tuple[int, int],
+) -> tuple[RowTarget, ...]:
     public_state = state.public_state
     player_state = state.player_state
     if public_state is None or player_state is None:
@@ -228,11 +259,16 @@ def _build_row_targets(geometry: BoardGeometry, state: ClientState) -> tuple[Row
     targets: list[RowTarget] = []
     for row, rect in zip(public_state.rows, geometry.row_columns, strict=False):
         if row.row_id in selectable:
-            targets.append(RowTarget(row_id=row.row_id, rect=rect))
+            targets.append(RowTarget(row_id=row.row_id, rect=rect, hovered=rect.collidepoint(mouse_pos)))
     return tuple(targets)
 
 
-def _build_continue_target(geometry: BoardGeometry, state: ClientState) -> ContinueTarget | None:
+def _build_continue_target(
+    geometry: BoardGeometry,
+    state: ClientState,
+    *,
+    mouse_pos: tuple[int, int],
+) -> ContinueTarget | None:
     if not state.pending_presentation_events:
         return None
 
@@ -242,7 +278,7 @@ def _build_continue_target(geometry: BoardGeometry, state: ClientState) -> Conti
         max(1, geometry.stats_rect.width - 24),
         34,
     )
-    return ContinueTarget(rect=rect)
+    return ContinueTarget(rect=rect, hovered=rect.collidepoint(mouse_pos))
 
 
 def _draw_full_background(screen: pygame.Surface, window_rect: pygame.Rect, assets: GuiAssets) -> None:
@@ -271,7 +307,9 @@ def _draw_rows(
     row_target_by_id = {target.row_id: target for target in game_targets.row_targets}
 
     for row_index, (row, column_rect) in enumerate(zip(public_state.rows, geometry.row_columns, strict=False)):
-        selectable = row.row_id in row_target_by_id
+        target = row_target_by_id.get(row.row_id)
+        selectable = target is not None
+        hovered = bool(target.hovered) if target is not None else False
         placements = row_card_placements(geometry, row_index=row_index, card_count=len(row.cards))
         _draw_row_column(
             screen,
@@ -281,6 +319,7 @@ def _draw_rows(
             cards=row.cards,
             placements=placements,
             selectable=selectable,
+            hovered=hovered,
             assets=assets,
             presentation_visuals=presentation_visuals,
         )
@@ -295,31 +334,32 @@ def _draw_row_column(
     cards: tuple[Any, ...],
     placements: tuple[CardPlacement, ...],
     selectable: bool,
+    hovered: bool,
     assets: GuiAssets,
     presentation_visuals: PresentationVisuals,
 ) -> None:
     lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
     emphasis = presentation_visuals.row_emphasis_for(row_id)
-    lane_fill = PALETTE.lane_overlay_active if emphasis != "none" else PALETTE.lane_overlay
+    lane_fill = PALETTE.lane_overlay_active if emphasis != "none" or hovered else PALETTE.lane_overlay
     pygame.draw.rect(lane_surface, lane_fill, lane_surface.get_rect(), border_radius=8)
     screen.blit(lane_surface, rect)
 
-    border = _row_border_color(selectable=selectable, emphasis=emphasis)
-    border_width = 4 if emphasis != "none" else 3 if selectable else 1
+    border = _row_border_color(selectable=selectable, hovered=hovered, emphasis=emphasis)
+    border_width = 4 if emphasis != "none" or hovered else 3 if selectable else 1
     pygame.draw.rect(screen, border, rect, border_width, border_radius=8)
 
-    label_color = border if selectable or emphasis != "none" else PALETTE.text_muted
+    label_color = border if selectable or hovered or emphasis != "none" else PALETTE.text_muted
     drawer.draw_text(screen, str(row_id), (rect.left + 8, rect.top + 6), role="small", color=label_color)
 
     if emphasis in {"taken", "overflow"}:
         _draw_row_taken_badge(screen, drawer, rect, presentation_visuals)
 
     for card, placement in zip(cards, placements, strict=False):
-        selected = selectable or emphasis != "none"
+        selected = selectable or hovered or emphasis != "none"
         GuiCard.from_card(card, placement.rect, selected=selected).draw(screen, drawer=drawer, assets=assets)
 
 
-def _row_border_color(*, selectable: bool, emphasis: str) -> pygame.Color:
+def _row_border_color(*, selectable: bool, hovered: bool, emphasis: str) -> pygame.Color:
     if emphasis == "placed":
         return PALETTE.row_placed
     if emphasis == "choice":
@@ -328,6 +368,8 @@ def _row_border_color(*, selectable: bool, emphasis: str) -> pygame.Color:
         return PALETTE.row_taken
     if emphasis == "overflow":
         return PALETTE.row_overflow
+    if hovered:
+        return PALETTE.accent_hover
     if selectable:
         return PALETTE.accent
     return PALETTE.row_neutral
@@ -532,13 +574,14 @@ def _draw_status_overlay(
         _draw_presentation_panel(screen, drawer, geometry, presentation_visuals, assets)
 
     if game_targets.continue_target is not None:
-        _draw_overlay_box(screen, game_targets.continue_target.rect)
-        drawer.draw_text(
+        draw_button(
             screen,
+            drawer,
+            game_targets.continue_target.rect,
             "Weiter [Leertaste]",
-            (game_targets.continue_target.rect.left + 10, game_targets.continue_target.rect.top + 8),
-            role="small",
-            color=PALETTE.accent,
+            variant="primary",
+            hovered=game_targets.continue_target.hovered,
+            theme=THEME,
         )
 
 

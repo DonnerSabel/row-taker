@@ -91,7 +91,7 @@ class GuiCard:
         palette = theme.palette
         spacing = theme.spacing
         fill = palette.card_selected if self.selected else palette.card_fill
-        border = palette.accent if self.selected or self.hovered else palette.panel_border
+        border = _card_border_color(selected=self.selected, hovered=self.hovered, theme=theme)
         border_width = 2 if self.selected or self.hovered else 1
 
         pygame.draw.rect(surface, fill, self.rect, border_radius=spacing.card_radius)
@@ -109,14 +109,23 @@ class GuiCard:
     def _draw_highlight(self, surface: pygame.Surface, *, theme: GuiTheme) -> None:
         if not self.selected and not self.hovered:
             return
-        border_width = 2 if self.selected else 1
+        border_width = 3 if self.selected else 2
         pygame.draw.rect(
             surface,
-            theme.palette.accent,
+            _card_border_color(selected=self.selected, hovered=self.hovered, theme=theme),
             self.rect.inflate(4, 4),
             border_width,
             border_radius=theme.spacing.card_radius,
         )
+
+
+
+def _card_border_color(*, selected: bool, hovered: bool, theme: GuiTheme) -> pygame.Color:
+    if selected:
+        return theme.palette.accent
+    if hovered:
+        return theme.palette.accent_hover
+    return theme.palette.panel_border
 
 
 # Compatibility name for older imports while the GUI is being refactored.
