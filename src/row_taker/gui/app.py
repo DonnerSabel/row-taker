@@ -9,7 +9,7 @@ from row_taker.gui_common.layout import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, com
 from row_taker.gui_common.live_client import LiveGuiClient
 from row_taker.gui_common.primitives import PrimitiveDrawer
 from row_taker.gui_demo.screens.connect_screen import ConnectScreen
-from row_taker.gui_demo.screens.lobby_screen import LobbyScreen
+from row_taker.gui.screens.lobby_screen import LobbyScreen
 from row_taker.gui_common.ui.connect_form_state import ConnectFormState
 from row_taker.gui_common.ui.screen_result import ScreenResult
 from row_taker.protocol.transport import ClientTransport
