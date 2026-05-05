@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 import pygame
@@ -15,6 +13,7 @@ from row_taker.client.actions import (
 from row_taker.client.state import ClientState
 from row_taker.engine.game import Phase
 from row_taker.engine.game.models import PlayerID
+from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
 from row_taker.gui.board_layout import (
     BoardGeometry,
     CardPlacement,
@@ -148,11 +147,12 @@ def render_game_screen(
     client_state: ClientState,
     game_targets: GameScreenTargets,
     last_action_summary: str,
+    assets: GuiAssets = DEFAULT_GUI_ASSETS,
 ) -> None:
-    _draw_full_background(screen, geometry.window_rect)
-    _draw_rows(screen, drawer, geometry, client_state, game_targets)
-    _draw_opponent_slots(screen, drawer, geometry, client_state)
-    _draw_hand(screen, drawer, client_state, game_targets)
+    _draw_full_background(screen, geometry.window_rect, assets)
+    _draw_rows(screen, drawer, geometry, client_state, game_targets, assets)
+    _draw_opponent_slots(screen, drawer, geometry, client_state, assets)
+    _draw_hand(screen, drawer, client_state, game_targets, assets)
     _draw_stats_field(screen, drawer, geometry, client_state)
     _draw_status_overlay(screen, drawer, geometry, client_state, last_action_summary, game_targets)
 
@@ -230,8 +230,8 @@ def _build_continue_target(geometry: BoardGeometry, state: ClientState) -> Conti
     return ContinueTarget(rect=rect)
 
 
-def _draw_full_background(screen: pygame.Surface, window_rect: pygame.Rect) -> None:
-    board = _scaled_board_image_full(window_rect.width, window_rect.height)
+def _draw_full_background(screen: pygame.Surface, window_rect: pygame.Rect, assets: GuiAssets) -> None:
+    board = assets.scaled_board_image_full(window_rect.width, window_rect.height)
     if board is None:
         screen.fill((18, 84, 38))
         return
@@ -246,6 +246,7 @@ def _draw_rows(
     geometry: BoardGeometry,
     client_state: ClientState,
     game_targets: GameScreenTargets,
+    assets: GuiAssets,
 ) -> None:
     public_state = client_state.public_state
     if public_state is None:
@@ -264,6 +265,7 @@ def _draw_rows(
             cards=row.cards,
             placements=placements,
             selectable=selectable,
+            assets=assets,
         )
 
 
@@ -276,6 +278,7 @@ def _draw_row_column(
     cards: tuple[Any, ...],
     placements: tuple[CardPlacement, ...],
     selectable: bool,
+    assets: GuiAssets,
 ) -> None:
     lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
     pygame.draw.rect(lane_surface, pygame.Color(0, 0, 0, 22), lane_surface.get_rect(), border_radius=8)
@@ -293,7 +296,7 @@ def _draw_row_column(
     )
 
     for card, placement in zip(cards, placements, strict=False):
-        _draw_card_image_or_fallback(screen, drawer, placement.rect, card, selected=selectable)
+        _draw_card_image_or_fallback(screen, drawer, placement.rect, card, selected=selectable, assets=assets)
 
 
 def _draw_opponent_slots(
@@ -301,6 +304,7 @@ def _draw_opponent_slots(
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
     client_state: ClientState,
+    assets: GuiAssets,
 ) -> None:
     revealed_by_player = _revealed_card_values_by_player(client_state)
     opponents = _opponent_slot_data(client_state, geometry)
@@ -325,7 +329,7 @@ def _draw_opponent_slots(
         if card_value is None:
             _draw_staged_card_back(screen, staged_rect)
         else:
-            _draw_card_value_image_or_back(screen, drawer, staged_rect, card_value)
+            _draw_card_value_image_or_back(screen, drawer, staged_rect, card_value, assets)
 
 
 def _opponent_slot_data(client_state: ClientState, geometry: BoardGeometry) -> tuple[OpponentSlot, ...]:
@@ -352,8 +356,9 @@ def _draw_card_value_image_or_back(
     drawer: PrimitiveDrawer,
     rect: pygame.Rect,
     card_value: int,
+    assets: GuiAssets,
 ) -> None:
-    image = _scaled_card_image(card_value, rect.width, rect.height)
+    image = assets.scaled_card_image(card_value, rect.width, rect.height)
     if image is None:
         pygame.draw.rect(screen, CARD_FILL, rect, border_radius=6)
         pygame.draw.rect(screen, PANEL_BORDER, rect, 1, border_radius=6)
@@ -375,6 +380,7 @@ def _draw_hand(
     drawer: PrimitiveDrawer,
     client_state: ClientState,
     game_targets: GameScreenTargets,
+    assets: GuiAssets,
 ) -> None:
     player_state = client_state.player_state
     if player_state is None:
@@ -385,7 +391,7 @@ def _draw_hand(
         target = target_by_value.get(card.value)
         if target is None:
             continue
-        _draw_card_image_or_fallback(screen, drawer, target.rect, card)
+        _draw_card_image_or_fallback(screen, drawer, target.rect, card, assets=assets)
 
     if (
         player_state.phase_info.phase == Phase.CHOOSE_ROW
@@ -516,8 +522,9 @@ def _draw_card_image_or_fallback(
     card: Any,
     *,
     selected: bool = False,
+    assets: GuiAssets,
 ) -> None:
-    image = _scaled_card_image(card.value, rect.width, rect.height)
+    image = assets.scaled_card_image(card.value, rect.width, rect.height)
     if image is None:
         pygame.draw.rect(screen, CARD_SELECTED if selected else CARD_FILL, rect, border_radius=6)
         pygame.draw.rect(screen, ACCENT if selected else PANEL_BORDER, rect, 2 if selected else 1, border_radius=6)
@@ -555,39 +562,3 @@ def _player_color(index: int) -> pygame.Color:
         pygame.Color(177, 113, 219),
     )
     return colors[index % len(colors)]
-
-
-@lru_cache(maxsize=64)
-def _scaled_board_image_full(width: int, height: int) -> pygame.Surface | None:
-    image = _load_board_image()
-    if image is None:
-        return None
-    return pygame.transform.smoothscale(image, (width, height))
-
-
-@lru_cache(maxsize=1)
-def _load_board_image() -> pygame.Surface | None:
-    image_path = _project_root() / "images" / "board.png"
-    if not image_path.exists():
-        return None
-    return pygame.image.load(str(image_path)).convert_alpha()
-
-
-@lru_cache(maxsize=256)
-def _scaled_card_image(card_value: int, width: int, height: int) -> pygame.Surface | None:
-    image = _load_card_image(card_value)
-    if image is None:
-        return None
-    return pygame.transform.smoothscale(image, (width, height))
-
-
-@lru_cache(maxsize=128)
-def _load_card_image(card_value: int) -> pygame.Surface | None:
-    image_path = _project_root() / "images" / f"karte_{card_value:03}.png"
-    if not image_path.exists():
-        return None
-    return pygame.image.load(str(image_path)).convert_alpha()
-
-
-def _project_root() -> Path:
-    return Path(__file__).resolve().parents[4]
