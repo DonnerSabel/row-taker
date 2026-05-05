@@ -28,6 +28,8 @@ LobbySubmenu = Literal["main", "rename", "seat_edit", "bot_name"]
 class ClientNavigationState:
     lobby_submenu: LobbySubmenu = "main"
     selected_seat_index: int | None = None
+    bot_name_text: str = ""
+    bot_name_selected: bool = False
 
 
 @dataclass(frozen=True, slots=True)
