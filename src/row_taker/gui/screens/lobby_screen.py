@@ -167,19 +167,18 @@ def _build_lobby_seat_targets(layout: DemoLayout, state: ClientState) -> tuple[S
         return ()
 
     board_rect = _seat_board_rect(layout, lobby_view.seat_count)
-    columns = 2 if lobby_view.seat_count > 1 else 1
-    rows = max(1, (lobby_view.seat_count + columns - 1) // columns)
-    gap = 16
-    card_width = (board_rect.width - (columns - 1) * gap) // columns
-    card_height = min(124, max(88, (board_rect.height - (rows - 1) * gap) // rows))
+    row_height = _seat_row_height()
+    gap = _seat_row_gap()
 
     targets: list[SeatTarget] = []
-    for seat in lobby_view.seats:
-        col = seat.seat_index % columns
-        row = seat.seat_index // columns
-        x = board_rect.left + col * (card_width + gap)
-        y = board_rect.top + row * (card_height + gap)
-        targets.append(SeatTarget(seat_index=seat.seat_index, rect=pygame.Rect(x, y, card_width, card_height)))
+    for index, seat in enumerate(lobby_view.seats):
+        y = board_rect.top + index * (row_height + gap)
+        targets.append(
+            SeatTarget(
+                seat_index=seat.seat_index,
+                rect=pygame.Rect(board_rect.left, y, board_rect.width, row_height),
+            )
+        )
     return tuple(targets)
 
 
@@ -311,22 +310,30 @@ def _draw_seat_card(
     card_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
     card_rect = card_surface.get_rect()
     fill_with_alpha = pygame.Color(fill)
-    fill_with_alpha.a = 210 if selected or hovered else 156
-    pygame.draw.rect(card_surface, fill_with_alpha, card_rect, border_radius=18)
+    fill_with_alpha.a = 196 if selected or hovered else 142
+    pygame.draw.rect(card_surface, fill_with_alpha, card_rect, border_radius=14)
     screen.blit(card_surface, rect)
 
     border = _seat_border_color(seat, selected=selected, hovered=hovered, is_self=is_self)
-    pygame.draw.rect(screen, border, rect, width=2 if selected or hovered else 1, border_radius=18)
+    pygame.draw.rect(screen, border, rect, width=2 if selected or hovered else 1, border_radius=14)
 
+    baseline_y = rect.top + rect.height // 2
     number_text = f"{seat.seat_index + 1}."
-    drawer.draw_text(screen, number_text, (rect.left + 18, rect.top + 14), role="subtitle", color=PALETTE.text_muted)
+    drawer.draw_text(
+        screen,
+        number_text,
+        (rect.left + 16, baseline_y - 13),
+        role="body",
+        color=PALETTE.text_muted,
+    )
 
-    icon_rect = pygame.Rect(rect.left + 18, rect.top + 52, 36, 36)
+    icon_size = 24
+    icon_rect = pygame.Rect(rect.left + 56, baseline_y - icon_size // 2, icon_size, icon_size)
     _draw_seat_icon(screen, icon_rect, seat=seat, is_self=is_self)
 
     occupant = seat.occupant_display_name or "frei"
     name_color = PALETTE.text_primary if not is_empty else PALETTE.text_muted
-    drawer.draw_text(screen, occupant, (rect.left + 66, rect.top + 57), role="subtitle", color=name_color)
+    drawer.draw_text(screen, occupant, (rect.left + 92, baseline_y - 13), role="body", color=name_color)
 
     if selected:
         _draw_selected_marker(screen, rect)
@@ -336,28 +343,28 @@ def _draw_seat_icon(screen: pygame.Surface, rect: pygame.Rect, *, seat: LobbySea
     center = rect.center
     if seat.occupant_display_name is None:
         color = PALETTE.panel_border_active
-        pygame.draw.circle(screen, pygame.Color(color.r, color.g, color.b, 38), center, 17)
-        pygame.draw.circle(screen, color, center, 16, width=2)
-        pygame.draw.line(screen, color, (center[0] - 8, center[1]), (center[0] + 8, center[1]), width=2)
-        pygame.draw.line(screen, color, (center[0], center[1] - 8), (center[0], center[1] + 8), width=2)
+        pygame.draw.circle(screen, pygame.Color(color.r, color.g, color.b, 42), center, 10)
+        pygame.draw.circle(screen, color, center, 9, width=2)
+        pygame.draw.line(screen, color, (center[0] - 5, center[1]), (center[0] + 5, center[1]), width=2)
+        pygame.draw.line(screen, color, (center[0], center[1] - 5), (center[0], center[1] + 5), width=2)
         return
 
     if seat.occupant_kind == ParticipantKind.BOT:
         color = PALETTE.gold
-        head = pygame.Rect(rect.left + 5, rect.top + 6, rect.width - 10, rect.height - 12)
-        pygame.draw.rect(screen, pygame.Color(color.r, color.g, color.b, 46), head, border_radius=8)
-        pygame.draw.rect(screen, color, head, width=2, border_radius=8)
-        pygame.draw.circle(screen, color, (head.left + 9, head.top + 12), 3)
-        pygame.draw.circle(screen, color, (head.right - 9, head.top + 12), 3)
-        pygame.draw.line(screen, color, (head.left + 9, head.bottom - 9), (head.right - 9, head.bottom - 9), width=2)
+        head = pygame.Rect(rect.left + 2, rect.top + 3, rect.width - 4, rect.height - 6)
+        pygame.draw.rect(screen, pygame.Color(color.r, color.g, color.b, 52), head, border_radius=5)
+        pygame.draw.rect(screen, color, head, width=2, border_radius=5)
+        pygame.draw.circle(screen, color, (head.left + 6, head.top + 7), 2)
+        pygame.draw.circle(screen, color, (head.right - 6, head.top + 7), 2)
+        pygame.draw.line(screen, color, (head.left + 6, head.bottom - 6), (head.right - 6, head.bottom - 6), width=2)
         return
 
     color = PALETTE.green if is_self else PALETTE.accent_hover
-    pygame.draw.circle(screen, pygame.Color(color.r, color.g, color.b, 42), (center[0], center[1] - 7), 9)
-    pygame.draw.circle(screen, color, (center[0], center[1] - 7), 9, width=2)
-    body_rect = pygame.Rect(center[0] - 13, center[1] + 4, 26, 17)
-    pygame.draw.rect(screen, pygame.Color(color.r, color.g, color.b, 42), body_rect, border_radius=8)
-    pygame.draw.rect(screen, color, body_rect, width=2, border_radius=8)
+    pygame.draw.circle(screen, pygame.Color(color.r, color.g, color.b, 46), (center[0], center[1] - 5), 6)
+    pygame.draw.circle(screen, color, (center[0], center[1] - 5), 6, width=2)
+    body_rect = pygame.Rect(center[0] - 9, center[1] + 3, 18, 11)
+    pygame.draw.rect(screen, pygame.Color(color.r, color.g, color.b, 46), body_rect, border_radius=6)
+    pygame.draw.rect(screen, color, body_rect, width=2, border_radius=6)
 
 
 def _draw_selected_marker(screen: pygame.Surface, rect: pygame.Rect) -> None:
@@ -559,25 +566,16 @@ def _seat_fill_color(seat: LobbySeatView, *, is_self: bool) -> pygame.Color:
 def _main_lobby_rect(layout: DemoLayout, state: ClientState) -> pygame.Rect:
     lobby_view = state.lobby_view
     seat_count = 4 if lobby_view is None else max(1, lobby_view.seat_count)
-    rows = (seat_count + 1) // 2
-    needed_height = 88 + rows * 124 + max(0, rows - 1) * 16 + 30
-    height = min(max(330, needed_height), max(330, layout.main_rect.height - 120))
-    return pygame.Rect(
-        layout.main_rect.left,
-        layout.main_rect.top,
-        layout.main_rect.width,
-        height,
-    )
+    group_rect, seats_rect, _participants = _lobby_group_layout(layout, seat_count)
+    return seats_rect
 
 
 def _participants_rect(layout: DemoLayout) -> pygame.Rect:
-    height = min(270, max(190, layout.sidebar_rect.height // 3))
-    return pygame.Rect(
-        layout.sidebar_rect.left,
-        layout.sidebar_rect.top,
-        layout.sidebar_rect.width,
-        height,
-    )
+    # Use a conservative default for standalone calls. During normal lobby
+    # rendering the seat count is also four or more, so this stays aligned
+    # with the seat panel height.
+    _group_rect, _seats, participants = _lobby_group_layout(layout, 4)
+    return participants
 
 
 def _bottom_bar_rect(layout: DemoLayout) -> pygame.Rect:
@@ -586,21 +584,56 @@ def _bottom_bar_rect(layout: DemoLayout) -> pygame.Rect:
 
 def _seat_board_rect(layout: DemoLayout, seat_count: int) -> pygame.Rect:
     panel = _main_lobby_rect_for_seat_count(layout, seat_count)
+    row_height = _seat_row_height()
+    gap = _seat_row_gap()
+    board_height = max(1, seat_count) * row_height + max(0, seat_count - 1) * gap
     return pygame.Rect(
-        panel.left + 28,
-        panel.top + 76,
-        panel.width - 56,
-        panel.height - 104,
+        panel.left + 24,
+        panel.top + 70,
+        panel.width - 48,
+        board_height,
     )
 
 
 def _main_lobby_rect_for_seat_count(layout: DemoLayout, seat_count: int) -> pygame.Rect:
-    rows = (max(1, seat_count) + 1) // 2
-    needed_height = 88 + rows * 124 + max(0, rows - 1) * 16 + 30
-    height = min(max(330, needed_height), max(330, layout.main_rect.height - 120))
-    return pygame.Rect(
-        layout.main_rect.left,
-        layout.main_rect.top,
-        layout.main_rect.width,
-        height,
-    )
+    _group_rect, seats_rect, _participants = _lobby_group_layout(layout, seat_count)
+    return seats_rect
+
+
+def _lobby_group_layout(layout: DemoLayout, seat_count: int) -> tuple[pygame.Rect, pygame.Rect, pygame.Rect]:
+    content_rect = layout.main_rect.union(layout.sidebar_rect)
+    gap = 18
+    participant_width = min(270, max(230, content_rect.width // 5))
+    group_width = min(1040, max(760, content_rect.width - 160))
+    group_width = min(group_width, content_rect.width - 40)
+    seats_width = max(460, group_width - participant_width - gap)
+
+    height = _lobby_group_height(max(1, seat_count))
+    max_height = max(260, content_rect.height - 80)
+    height = min(height, max_height)
+
+    group_rect = pygame.Rect(0, 0, seats_width + gap + participant_width, height)
+    group_rect.centerx = content_rect.centerx
+    group_rect.centery = content_rect.centery - 18
+    group_rect.clamp_ip(content_rect.inflate(-36, -36))
+
+    seats_rect = pygame.Rect(group_rect.left, group_rect.top, seats_width, height)
+    participants_rect = pygame.Rect(seats_rect.right + gap, group_rect.top, participant_width, height)
+    return group_rect, seats_rect, participants_rect
+
+
+def _lobby_group_height(seat_count: int) -> int:
+    header_height = 70
+    content_height = seat_count * _seat_row_height() + max(0, seat_count - 1) * _seat_row_gap()
+    bottom_padding = 26
+    return header_height + content_height + bottom_padding
+
+
+def _seat_row_height() -> int:
+    return 54
+
+
+def _seat_row_gap() -> int:
+    return 10
+
+
