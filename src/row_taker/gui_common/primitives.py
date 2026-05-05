@@ -16,7 +16,8 @@ CARD_SELECTED = pygame.Color(72, 88, 108)
 
 class PrimitiveDrawer:
     def __init__(self) -> None:
-        self._title_font = pygame.font.SysFont(None, 30)
+        self._title_font = pygame.font.SysFont(None, 34)
+        self._subtitle_font = pygame.font.SysFont(None, 28)
         self._body_font = pygame.font.SysFont(None, 24)
         self._small_font = pygame.font.SysFont(None, 20)
         self._tiny_font = pygame.font.SysFont(None, 17)
@@ -138,6 +139,8 @@ class PrimitiveDrawer:
     def _font_for_role(self, role: str) -> pygame.font.Font:
         if role == "title":
             return self._title_font
+        if role == "subtitle":
+            return self._subtitle_font
         if role == "small":
             return self._small_font
         if role == "tiny":
