@@ -16,9 +16,9 @@ class BoardRegionRatios:
     adjusted without touching rendering or game logic.
     """
 
-    main_play: tuple[float, float, float, float] = (0.018, 0.066, 0.780, 0.790)
-    stats: tuple[float, float, float, float] = (0.823, 0.046, 0.160, 0.760)
-    hand: tuple[float, float, float, float] = (0.014, 0.904, 0.970, 0.085)
+    main_play: tuple[float, float, float, float] = (0.018, 0.066, 0.780, 0.784)
+    stats: tuple[float, float, float, float] = (0.819, 0.046, 0.155, 0.782)
+    hand: tuple[float, float, float, float] = (0.014, 0.904, 0.975, 0.096)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +51,7 @@ class BoardLayoutTuning:
     row_card_normal_row_count_width_ratio: float = 0.94
     row_card_many_row_count_width_ratio: float = 0.84
     row_card_min_width_px: int = 112
-    row_card_max_width_px: int = 220
+    row_card_max_width_px: int = 440
     row_first_card_center_y_ratio: float = 0.115
     row_card_overlap_step_ratio: float = 0.36
     row_card_min_step_px: int = 30
