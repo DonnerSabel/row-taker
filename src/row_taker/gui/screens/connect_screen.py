@@ -14,10 +14,10 @@ from row_taker.gui.menu_shell import (
 )
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_button, draw_overlay_panel
-from row_taker.gui_common.layout import DemoLayout
-from row_taker.gui_common.primitives import PrimitiveDrawer
-from row_taker.gui_common.ui.connect_form_state import ConnectFormState
-from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
+from row_taker.gui.layout import GuiLayout
+from row_taker.gui.primitives import PrimitiveDrawer
+from row_taker.gui.connect_form_state import ConnectFormState
+from row_taker.gui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 CONNECT_FIELD_ORDER = ("host", "port", "display_name")
 THEME = DEFAULT_THEME
@@ -54,7 +54,7 @@ class ConnectScreen:
 
     connect_form: ConnectFormState
 
-    def build_targets(self, layout: DemoLayout) -> ConnectScreenTargets:
+    def build_targets(self, layout: GuiLayout) -> ConnectScreenTargets:
         return build_connect_screen_targets(layout)
 
     def handle_event(
@@ -73,7 +73,7 @@ class ConnectScreen:
         screen: pygame.Surface,
         *,
         drawer: PrimitiveDrawer,
-        layout: DemoLayout,
+        layout: GuiLayout,
         targets: ConnectScreenTargets,
     ) -> None:
         render_connect_screen(
@@ -88,7 +88,7 @@ class ConnectScreen:
         return normalized_connection_values(self.connect_form)
 
 
-def build_connect_screen_targets(layout: DemoLayout) -> ConnectScreenTargets:
+def build_connect_screen_targets(layout: GuiLayout) -> ConnectScreenTargets:
     panel_layout = compute_connect_panel_layout(layout, field_count=3, button_count=2)
     field_targets = (
         ConnectFieldTarget("host", "Server IP", "z. B. 127.0.0.1", panel_layout.field_rects[0]),
@@ -221,7 +221,7 @@ def render_connect_screen(
     screen: pygame.Surface,
     *,
     drawer: PrimitiveDrawer,
-    layout: DemoLayout,
+    layout: GuiLayout,
     connect_form: ConnectFormState,
     connect_targets: ConnectScreenTargets,
 ) -> None:

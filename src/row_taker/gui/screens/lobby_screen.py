@@ -27,9 +27,9 @@ from row_taker.gui.menu_shell import (
 )
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_button, draw_panel
-from row_taker.gui_common.layout import DemoLayout
-from row_taker.gui_common.primitives import PrimitiveDrawer
-from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
+from row_taker.gui.layout import GuiLayout
+from row_taker.gui.primitives import PrimitiveDrawer
+from row_taker.gui.screen_result import NO_SCREEN_RESULT, ScreenResult
 from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import LobbySeatView
 
@@ -64,7 +64,7 @@ class LobbyScreen:
     frame_count: int
     last_action_summary: str
 
-    def build_targets(self, layout: DemoLayout) -> LobbyScreenTargets:
+    def build_targets(self, layout: GuiLayout) -> LobbyScreenTargets:
         return build_lobby_screen_targets(layout, self.state)
 
     def handle_event(
@@ -79,7 +79,7 @@ class LobbyScreen:
         screen: pygame.Surface,
         *,
         drawer: PrimitiveDrawer,
-        layout: DemoLayout,
+        layout: GuiLayout,
         targets: LobbyScreenTargets,
     ) -> None:
         render_lobby_screen(
@@ -91,7 +91,7 @@ class LobbyScreen:
         )
 
 
-def build_lobby_screen_targets(layout: DemoLayout, state: ClientState) -> LobbyScreenTargets:
+def build_lobby_screen_targets(layout: GuiLayout, state: ClientState) -> LobbyScreenTargets:
     seat_targets = _build_lobby_seat_targets(layout, state)
     edited_seat_index = state.navigation_state.selected_seat_index if _is_editing_bot_name(state) else None
     input_rect = next((target.rect.inflate(-72, -8).move(58, 0) for target in seat_targets if target.seat_index == edited_seat_index), None)
@@ -127,7 +127,7 @@ def render_lobby_screen(
     screen: pygame.Surface,
     *,
     drawer: PrimitiveDrawer,
-    layout: DemoLayout,
+    layout: GuiLayout,
     client_state: ClientState,
     lobby_targets: LobbyScreenTargets,
 ) -> None:
@@ -200,7 +200,7 @@ def _handle_bot_name_event(
     return NO_SCREEN_RESULT
 
 
-def _build_lobby_seat_targets(layout: DemoLayout, state: ClientState) -> tuple[SeatTarget, ...]:
+def _build_lobby_seat_targets(layout: GuiLayout, state: ClientState) -> tuple[SeatTarget, ...]:
     lobby_view = state.lobby_view
     if lobby_view is None:
         return ()
@@ -214,7 +214,7 @@ def _build_lobby_seat_targets(layout: DemoLayout, state: ClientState) -> tuple[S
     )
 
 
-def _build_lobby_button_targets(layout: DemoLayout, state: ClientState) -> tuple[LobbyButtonTarget, ...]:
+def _build_lobby_button_targets(layout: GuiLayout, state: ClientState) -> tuple[LobbyButtonTarget, ...]:
     lobby_view = state.lobby_view
     seat_count = 4 if lobby_view is None else max(1, lobby_view.seat_count)
     action_rect = compute_lobby_panel_layout(layout, seat_count).action_rect
@@ -256,7 +256,7 @@ def _build_lobby_button_targets(layout: DemoLayout, state: ClientState) -> tuple
 def _draw_lobby_panels(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    layout: DemoLayout,
+    layout: GuiLayout,
     state: ClientState,
     targets: LobbyScreenTargets,
 ) -> None:

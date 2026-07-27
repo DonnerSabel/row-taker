@@ -35,9 +35,9 @@ from row_taker.gui.presentation_renderer import (
 )
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_badge, draw_button, draw_overlay_panel
-from row_taker.gui_common.layout import DemoLayout
-from row_taker.gui_common.primitives import PrimitiveDrawer
-from row_taker.gui_common.ui.screen_result import ScreenResult
+from row_taker.gui.layout import GuiLayout
+from row_taker.gui.primitives import PrimitiveDrawer
+from row_taker.gui.screen_result import ScreenResult
 
 THEME = DEFAULT_THEME
 PALETTE = THEME.palette
@@ -69,7 +69,7 @@ class GameFrame:
     def from_layout(
         cls,
         *,
-        layout: DemoLayout,
+        layout: GuiLayout,
         state: ClientState,
         frame_count: int,
         presentation_frame_count: int,
@@ -95,7 +95,7 @@ class GameFrame:
             targets=targets,
         )
 
-    def build_targets(self, layout: DemoLayout | None = None) -> GameScreenTargets:
+    def build_targets(self, layout: GuiLayout | None = None) -> GameScreenTargets:
         """Return the targets prepared together with this frame."""
 
         self._require_matching_layout(layout)
@@ -120,7 +120,7 @@ class GameFrame:
         screen: pygame.Surface,
         *,
         drawer: PrimitiveDrawer,
-        layout: DemoLayout | None = None,
+        layout: GuiLayout | None = None,
         targets: GameScreenTargets | None = None,
     ) -> None:
         """Render this complete frame through the production game renderer."""
@@ -137,7 +137,7 @@ class GameFrame:
             presentation_frame_count=self.presentation_frame_count,
         )
 
-    def _require_matching_layout(self, layout: DemoLayout | None) -> None:
+    def _require_matching_layout(self, layout: GuiLayout | None) -> None:
         if layout is not None and layout.window_rect != self.geometry.window_rect:
             raise ValueError(
                 "GameFrame was prepared for a different window layout; "

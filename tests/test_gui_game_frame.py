@@ -9,8 +9,8 @@ pytest.importorskip("pygame")
 from row_taker.gui.game_interaction import GameScreenTargets
 from row_taker.gui.screens import game_screen
 from row_taker.gui.screens.game_screen import GameFrame
-from row_taker.gui_common.layout import compute_layout
-from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT
+from row_taker.gui.layout import compute_layout
+from row_taker.gui.screen_result import NO_SCREEN_RESULT
 
 
 def _frame(

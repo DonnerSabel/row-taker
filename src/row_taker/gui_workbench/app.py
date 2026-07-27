@@ -10,8 +10,8 @@ from pathlib import Path
 import pygame
 
 from row_taker.gui.screens.game_screen import GameFrame
-from row_taker.gui_common.layout import compute_layout
-from row_taker.gui_common.primitives import PrimitiveDrawer
+from row_taker.gui.layout import compute_layout
+from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui_workbench.scenarios import WorkbenchScenario
 from row_taker.gui_workbench.timeline import WorkbenchTimeline
 

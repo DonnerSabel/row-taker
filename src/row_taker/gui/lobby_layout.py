@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from row_taker.gui_common.layout import DemoLayout
+from row_taker.gui.layout import GuiLayout
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +53,7 @@ class BotNameDialogLayout:
 
 
 def compute_lobby_panel_layout(
-    layout: DemoLayout,
+    layout: GuiLayout,
     seat_count: int,
     *,
     config: LobbyLayoutConfig = DEFAULT_LOBBY_LAYOUT,
@@ -91,7 +91,7 @@ def compute_lobby_panel_layout(
 
 
 def compute_bot_name_dialog_layout(
-    layout: DemoLayout,
+    layout: GuiLayout,
     *,
     config: LobbyLayoutConfig = DEFAULT_LOBBY_LAYOUT,
 ) -> BotNameDialogLayout:
@@ -127,7 +127,7 @@ def compute_bot_name_dialog_layout(
 
 
 def bottom_bar_inner_rect(
-    layout: DemoLayout,
+    layout: GuiLayout,
     *,
     config: LobbyLayoutConfig = DEFAULT_LOBBY_LAYOUT,
 ) -> pygame.Rect:

@@ -7,7 +7,7 @@ import pygame
 
 from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
 from row_taker.gui.theme import DEFAULT_THEME, GuiTheme
-from row_taker.gui_common.primitives import PrimitiveDrawer
+from row_taker.gui.primitives import PrimitiveDrawer
 
 
 @dataclass(frozen=True, slots=True)

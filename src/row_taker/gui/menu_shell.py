@@ -6,8 +6,8 @@ from row_taker.gui.assets import DEFAULT_GUI_ASSETS
 from row_taker.gui.menu_layout import DEFAULT_MENU_LAYOUT, MenuLayoutConfig, header_footer_layout
 from row_taker.gui.theme import DEFAULT_THEME, GuiTheme
 from row_taker.gui.widgets import centered_text_position, draw_overlay_panel, draw_panel, draw_vertical_gradient
-from row_taker.gui_common.layout import DemoLayout
-from row_taker.gui_common.primitives import PrimitiveDrawer
+from row_taker.gui.layout import GuiLayout
+from row_taker.gui.primitives import PrimitiveDrawer
 
 THEME = DEFAULT_THEME
 PALETTE = THEME.palette
@@ -36,7 +36,7 @@ def draw_menu_background(screen: pygame.Surface, *, theme: GuiTheme = THEME) -> 
 def draw_menu_header(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    layout: DemoLayout,
+    layout: GuiLayout,
     *,
     title: str,
     subtitle: str,
@@ -52,7 +52,7 @@ def draw_menu_header(
 def draw_menu_footer(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    layout: DemoLayout,
+    layout: GuiLayout,
     *,
     text: str,
     is_error: bool = False,

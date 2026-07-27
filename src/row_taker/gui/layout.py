@@ -14,7 +14,7 @@ PANEL_PADDING = 12
 
 
 @dataclass(frozen=True, slots=True)
-class DemoLayout:
+class GuiLayout:
     window_rect: pygame.Rect
     header_rect: pygame.Rect
     main_rect: pygame.Rect
@@ -24,7 +24,7 @@ class DemoLayout:
     main_bottom_rect: pygame.Rect
 
 
-def compute_layout(window_width: int, window_height: int) -> DemoLayout:
+def compute_layout(window_width: int, window_height: int) -> GuiLayout:
     width = max(window_width, MIN_WINDOW_WIDTH)
     height = max(window_height, MIN_WINDOW_HEIGHT)
 
@@ -57,7 +57,7 @@ def compute_layout(window_width: int, window_height: int) -> DemoLayout:
         main_bottom_height,
     )
 
-    return DemoLayout(
+    return GuiLayout(
         window_rect=window_rect,
         header_rect=header_rect,
         main_rect=main_rect,

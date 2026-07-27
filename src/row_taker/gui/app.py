@@ -8,16 +8,16 @@ from row_taker.client.state import ClientState
 from row_taker.gui.screens.connect_screen import ConnectScreen
 from row_taker.gui.screens.game_screen import GameFrame
 from row_taker.gui.screens.lobby_screen import LobbyScreen
-from row_taker.gui_common.layout import (
+from row_taker.gui.layout import (
     MIN_WINDOW_HEIGHT,
     MIN_WINDOW_WIDTH,
-    DemoLayout,
+    GuiLayout,
     compute_layout,
 )
-from row_taker.gui_common.live_client import LiveGuiClient
-from row_taker.gui_common.primitives import PrimitiveDrawer
-from row_taker.gui_common.ui.connect_form_state import ConnectFormState
-from row_taker.gui_common.ui.screen_result import ScreenResult
+from row_taker.gui.live_client import LiveGuiClient
+from row_taker.gui.primitives import PrimitiveDrawer
+from row_taker.gui.connect_form_state import ConnectFormState
+from row_taker.gui.screen_result import ScreenResult
 from row_taker.protocol.transport import ClientTransport
 
 WINDOW_TITLE = "Row-Taker"
@@ -102,7 +102,7 @@ class GuiApp:
 
     def _build_current_screen(
         self,
-        layout: DemoLayout,
+        layout: GuiLayout,
     ) -> ConnectScreen | LobbyScreen | GameFrame:
         if self._live_client is None:
             return ConnectScreen(connect_form=self._connect_form)

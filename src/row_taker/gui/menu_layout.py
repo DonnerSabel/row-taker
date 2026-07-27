@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from row_taker.gui_common.layout import DemoLayout
+from row_taker.gui.layout import GuiLayout
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,12 +71,12 @@ class LobbyPanelLayout:
     action_rect: pygame.Rect
 
 
-def content_rect(layout: DemoLayout) -> pygame.Rect:
+def content_rect(layout: GuiLayout) -> pygame.Rect:
     return layout.main_rect.union(layout.sidebar_rect)
 
 
 def header_footer_layout(
-    layout: DemoLayout,
+    layout: GuiLayout,
     *,
     config: MenuLayoutConfig = DEFAULT_MENU_LAYOUT,
 ) -> MenuHeaderFooterLayout:
@@ -87,7 +87,7 @@ def header_footer_layout(
 
 
 def compute_connect_panel_layout(
-    layout: DemoLayout,
+    layout: GuiLayout,
     *,
     field_count: int,
     button_count: int,
@@ -128,7 +128,7 @@ def compute_connect_panel_layout(
 
 
 def compute_lobby_panel_layout(
-    layout: DemoLayout,
+    layout: GuiLayout,
     seat_count: int,
     *,
     config: MenuLayoutConfig = DEFAULT_MENU_LAYOUT,

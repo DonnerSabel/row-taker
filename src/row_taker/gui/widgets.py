@@ -5,7 +5,7 @@ from typing import Literal
 import pygame
 
 from row_taker.gui.theme import DEFAULT_THEME, GuiTheme
-from row_taker.gui_common.primitives import PrimitiveDrawer
+from row_taker.gui.primitives import PrimitiveDrawer
 
 ButtonVariant = Literal["primary", "success", "danger", "neutral"]
 

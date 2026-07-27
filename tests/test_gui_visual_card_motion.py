@@ -8,7 +8,7 @@ from row_taker.client.core_reducer import advance_presentation_queue
 from row_taker.gui.board_layout import hand_card_placements, row_card_placements
 from row_taker.gui.presentation_renderer import resolve_visual_card_motion_rects
 from row_taker.gui.screens.game_screen import GameFrame, _opponent_slot_data
-from row_taker.gui_common.layout import compute_layout
+from row_taker.gui.layout import compute_layout
 from row_taker.gui_workbench.scenarios import get_scenario
 from row_taker.gui_workbench.timeline import get_timeline
 

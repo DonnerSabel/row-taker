@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from row_taker.gui.gui_main import run
+from row_taker.gui.main import main
 
 if __name__ == "__main__":
-    raise SystemExit(run())
+    main()
