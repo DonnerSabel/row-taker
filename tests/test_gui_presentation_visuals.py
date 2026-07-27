@@ -43,8 +43,17 @@ def test_row_chosen_no_longer_uses_legacy_presentation_visuals() -> None:
     assert visuals.focus_card_values == ()
 
 
-def test_unmigrated_presentation_event_still_exposes_legacy_panel() -> None:
+def test_row_taken_no_longer_uses_legacy_presentation_visuals() -> None:
     visuals = build_presentation_visuals(get_scenario("row-taken").state)
+
+    assert visuals.has_event is False
+    assert visuals.panel is None
+    assert visuals.played_card_values_by_player is None
+    assert visuals.focus_card_values == ()
+
+
+def test_unmigrated_presentation_event_still_exposes_legacy_panel() -> None:
+    visuals = build_presentation_visuals(get_scenario("overflow-resolved").state)
 
     assert visuals.has_event is True
     assert visuals.panel is not None

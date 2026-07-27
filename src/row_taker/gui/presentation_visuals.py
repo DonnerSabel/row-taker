@@ -8,7 +8,6 @@ from row_taker.client.presentation_events import (
     PresentationGameFinished,
     PresentationOverflowResolved,
     PresentationRoundFinished,
-    PresentationRowTaken,
     PresentationTrickFinished,
 )
 from row_taker.client.state import ClientState
@@ -69,20 +68,6 @@ def build_presentation_visuals(state: ClientState) -> PresentationVisuals:
 
     event = state.pending_presentation_events[0]
     details = tuple(format_presentation_event(item) for item in state.pending_presentation_events[:3])
-
-    if isinstance(event, PresentationRowTaken):
-        return PresentationVisuals(
-            current_event=event,
-            active_row_id=event.row_id,
-            active_player_id=event.player_id,
-            played_card_values_by_player={event.player_id: event.replacement_card_value},
-            focus_card_values=(event.replacement_card_value,),
-            taken_card_values=event.taken_cards,
-            replacement_card_value=event.replacement_card_value,
-            row_emphasis="taken",
-            headline=f"{event.player_name} nimmt Reihe {event.row_id}",
-            details=details,
-        )
 
     if isinstance(event, PresentationOverflowResolved):
         return PresentationVisuals(

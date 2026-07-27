@@ -34,6 +34,7 @@ from row_taker.gui.game_visual_transition import resolve_visual_step
 from row_taker.gui_common.ui.common_render import format_presentation_event
 
 CARD_PLACEMENT_DURATION_FRAMES = 32
+ROW_REPLACEMENT_DURATION_FRAMES = 32
 
 
 def build_game_visual_state(
@@ -52,6 +53,18 @@ def build_game_visual_state(
             PresentationCardPlaced,
         ):
             visual_step = _build_card_placed_visual_step(
+                state,
+                last_action_summary=last_action_summary,
+            )
+            return resolve_visual_step(
+                visual_step,
+                presentation_frame_count=presentation_frame_count,
+            )
+        if current_step is not None and isinstance(
+            current_step.event,
+            PresentationRowTaken,
+        ):
+            visual_step = _build_row_taken_visual_step(
                 state,
                 last_action_summary=last_action_summary,
             )
@@ -115,6 +128,116 @@ def _build_row_choice_visual_state(
             details=_presentation_details(state),
             card_values=(event.card_value,),
         ),
+    )
+
+
+def _build_row_taken_visual_step(
+    state: ClientState,
+    *,
+    last_action_summary: str,
+) -> GameVisualStep:
+    presentation_step = state.current_presentation_step
+    if presentation_step is None or not isinstance(
+        presentation_step.event,
+        PresentationRowTaken,
+    ):
+        raise ValueError("current presentation step is not PresentationRowTaken")
+
+    event = presentation_step.event
+    completed_cards = _completed_card_values_by_player(state)
+    hidden_player_ids = frozenset((*completed_cards, event.player_id))
+    hidden_hand_card_values = frozenset(
+        card_value
+        for player_id, card_value in (
+            *completed_cards.items(),
+            (event.player_id, event.replacement_card_value),
+        )
+        if player_id == state.own_player_id
+    )
+    panel = VisualPresentationPanel(
+        headline=f"{event.player_name} nimmt Reihe {event.row_id}",
+        details=_presentation_details(state),
+        card_values=(event.replacement_card_value,),
+    )
+    row_emphasis = {event.row_id: "taken"}
+    taken_cards = _visual_cards_for_row(
+        presentation_step.public_state_before,
+        event.row_id,
+    )
+    if tuple(card.card_value for card in taken_cards) != event.taken_cards:
+        raise ValueError(
+            "row-taken snapshot does not match the presented cards: "
+            f"row={event.row_id!r}, cards={event.taken_cards!r}"
+        )
+    taken_cards_by_row_id = {event.row_id: taken_cards}
+
+    after = _build_stable_game_visual_state(
+        state,
+        public_state=presentation_step.public_state_after,
+        last_action_summary=last_action_summary,
+        hidden_staged_player_ids=hidden_player_ids,
+        hidden_hand_card_values=hidden_hand_card_values,
+        active_player_id=event.player_id,
+        row_emphasis_by_id=row_emphasis,
+        taken_cards_by_row_id=taken_cards_by_row_id,
+        presentation_panel=panel,
+    )
+    visual_row_order = tuple(row.row_id for row in after.rows)
+    before = _build_stable_game_visual_state(
+        state,
+        public_state=presentation_step.public_state_before,
+        last_action_summary=last_action_summary,
+        hidden_staged_player_ids=hidden_player_ids,
+        hidden_hand_card_values=hidden_hand_card_values,
+        active_player_id=event.player_id,
+        row_emphasis_by_id=row_emphasis,
+        taken_cards_by_row_id=taken_cards_by_row_id,
+        visual_row_order=visual_row_order,
+        presentation_panel=panel,
+    )
+
+    target_row = after.row_by_id(event.row_id)
+    if target_row is None or target_row.card_values != event.row_cards_after:
+        raise ValueError(
+            "row-taken after snapshot does not match the replacement row: "
+            f"row={event.row_id!r}, cards={event.row_cards_after!r}"
+        )
+    if target_row.card_values != (event.replacement_card_value,):
+        raise ValueError(
+            "row-taken replacement row must contain only the replacement card: "
+            f"row={event.row_id!r}, card={event.replacement_card_value}"
+        )
+
+    return GameVisualStep(
+        before=before,
+        after=after,
+        transition=VisualTransition(
+            card_motions=(
+                VisualCardMotion(
+                    card_value=event.replacement_card_value,
+                    source=PlayerPlayAnchor(
+                        player_id=event.player_id,
+                        card_value=event.replacement_card_value,
+                    ),
+                    target=RowCardAnchor(
+                        row_id=event.row_id,
+                        card_index=0,
+                    ),
+                ),
+            ),
+            duration_frames=ROW_REPLACEMENT_DURATION_FRAMES,
+        ),
+    )
+
+
+def _visual_cards_for_row(
+    public_state: PublicState,
+    row_id: RowID,
+) -> tuple[VisualCard, ...]:
+    row = public_state.rows[public_state.get_row_index(row_id)]
+    return tuple(
+        VisualCard(card_value=card.value, bullheads=card.bullheads)
+        for card in row.cards
     )
 
 
@@ -213,6 +336,7 @@ def _build_stable_game_visual_state(
     staged_card_values_override: Mapping[PlayerID, int] | None = None,
     selected_hand_card_value: int | None = None,
     row_emphasis_by_id: Mapping[RowID, RowEmphasis] | None = None,
+    taken_cards_by_row_id: Mapping[RowID, tuple[VisualCard, ...]] | None = None,
     visual_row_order: tuple[RowID, ...] | None = None,
     presentation_panel: VisualPresentationPanel | None = None,
 ) -> GameVisualState:
@@ -227,6 +351,7 @@ def _build_stable_game_visual_state(
     rows = _build_rows(
         public_state,
         emphasis_by_id=row_emphasis_by_id or {},
+        taken_cards_by_id=taken_cards_by_row_id or {},
         visual_row_order=visual_row_order,
     )
     players = _build_players(
@@ -265,6 +390,7 @@ def _build_rows(
     public_state: PublicState | None,
     *,
     emphasis_by_id: Mapping[RowID, RowEmphasis],
+    taken_cards_by_id: Mapping[RowID, tuple[VisualCard, ...]],
     visual_row_order: tuple[RowID, ...] | None,
 ) -> tuple[VisualRow, ...]:
     if public_state is None:
@@ -278,6 +404,7 @@ def _build_rows(
                 for card in row.cards
             ),
             emphasis=emphasis_by_id.get(row.row_id, "none"),
+            taken_cards=taken_cards_by_id.get(row.row_id, ()),
         )
         for row in public_state.rows
     )

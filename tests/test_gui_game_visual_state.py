@@ -8,6 +8,7 @@ from row_taker.client.presentation_events import (
     PresentationCardPlaced,
     PresentationRowChoiceRequired,
     PresentationRowChosen,
+    PresentationRowTaken,
 )
 from row_taker.client.state import UiMessage
 from row_taker.engine.game.cards import Card
@@ -391,3 +392,112 @@ def test_row_chosen_lives_in_visual_state_and_marks_stable_row_id() -> None:
     )
     assert active_player.emphasis == "active"
     assert active_player.staged_card_value == event.card_value
+def test_row_taken_uses_snapshot_scores_row_replacement_and_one_motion() -> None:
+    state = get_scenario("row-taken").state
+    step = state.current_presentation_step
+    assert step is not None
+    assert isinstance(step.event, PresentationRowTaken)
+    event = step.event
+
+    before = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=0,
+    )
+    middle = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=16,
+    )
+    after = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=32,
+    )
+
+    before_row = before.row_by_id(event.row_id)
+    middle_row = middle.row_by_id(event.row_id)
+    after_row = after.row_by_id(event.row_id)
+    assert before_row is not None
+    assert middle_row is not None
+    assert after_row is not None
+    assert before_row.card_values == event.taken_cards
+    assert middle_row.card_values == event.taken_cards
+    assert after_row.card_values == event.row_cards_after
+    assert before_row.emphasis == "taken"
+    assert middle_row.emphasis == "taken"
+    assert after_row.emphasis == "taken"
+    assert tuple(card.card_value for card in before_row.taken_cards) == event.taken_cards
+    assert tuple(card.card_value for card in after_row.taken_cards) == event.taken_cards
+
+    before_player = next(
+        player for player in before.players if player.player_id == event.player_id
+    )
+    after_player = next(
+        player for player in after.players if player.player_id == event.player_id
+    )
+    before_snapshot_player = next(
+        player
+        for player in step.public_state_before.players
+        if player.player_id == event.player_id
+    )
+    after_snapshot_player = next(
+        player
+        for player in step.public_state_after.players
+        if player.player_id == event.player_id
+    )
+    assert before_player.score == before_snapshot_player.score
+    assert after_player.score == after_snapshot_player.score
+    assert after_player.score == before_player.score + event.bullheads
+
+    assert len(before.moving_cards) == 1
+    assert len(middle.moving_cards) == 1
+    motion = middle.moving_cards[0]
+    assert motion.card_value == event.replacement_card_value
+    assert motion.source == PlayerPlayAnchor(
+        event.player_id,
+        event.replacement_card_value,
+    )
+    assert motion.target == RowCardAnchor(event.row_id, 0)
+    assert motion.progress == 0.875
+    assert after.moving_cards == ()
+
+    assert before_player.emphasis == "active"
+    assert before_player.staged_card_value is None
+    if event.player_id == state.own_player_id:
+        own_card = next(
+            card
+            for card in middle.hand
+            if card.card_value == event.replacement_card_value
+        )
+        assert own_card.visible is False
+
+    assert middle.presentation_panel is not None
+    assert (
+        middle.presentation_panel.headline
+        == f"{event.player_name} nimmt Reihe {event.row_id}"
+    )
+    assert middle.presentation_panel.card_values == (event.replacement_card_value,)
+
+
+def test_row_taken_keeps_replaced_row_in_one_visual_column() -> None:
+    state = get_scenario("row-taken").state
+    step = state.current_presentation_step
+    assert step is not None
+    assert isinstance(step.event, PresentationRowTaken)
+
+    before = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=0,
+    )
+    after = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=32,
+    )
+
+    assert tuple(row.row_id for row in before.rows) == tuple(
+        row.row_id for row in after.rows
+    )
+    assert before.moving_cards[0].target == RowCardAnchor(step.event.row_id, 0)

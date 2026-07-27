@@ -12,9 +12,13 @@ from row_taker.gui_common.layout import compute_layout
 from row_taker.gui_workbench.scenarios import get_scenario
 
 
+@pytest.mark.parametrize("scenario_name", ["card-placed", "row-taken"])
 @pytest.mark.parametrize("size", [(1280, 720), (1600, 900)])
-def test_card_placed_semantic_anchors_resolve_to_real_layout(size) -> None:
-    state = get_scenario("card-placed").state
+def test_semantic_card_motion_anchors_resolve_to_real_layout(
+    scenario_name: str,
+    size: tuple[int, int],
+) -> None:
+    state = get_scenario(scenario_name).state
     frame = GameFrame.from_layout(
         layout=compute_layout(*size),
         state=state,
@@ -54,7 +58,10 @@ def test_card_placed_semantic_anchors_resolve_to_real_layout(size) -> None:
     expected_target = row_card_placements(
         frame.geometry,
         row_index=row_index,
-        card_count=moving_card.target.card_index + 1,
+        card_count=max(
+            len(frame.visual_state.rows[row_index].cards),
+            moving_card.target.card_index + 1,
+        ),
     )[moving_card.target.card_index].rect
     assert target_rect == expected_target
 
