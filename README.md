@@ -32,6 +32,17 @@ python -m row_taker.server
 python -m row_taker.cli
 ```
 
+Die echte Pygame-Spieloberfläche kann ohne Server in reproduzierbaren Szenen
+über die GUI-Workbench untersucht werden:
+
+```bash
+python -m row_taker.gui_workbench --list
+python -m row_taker.gui_workbench card-placed
+python -m row_taker.gui_workbench row-taken --save-dir screenshots/row-taken
+```
+
+Weitere Bedienung und Architekturregeln stehen in `docs/GUI_WORKBENCH.md`.
+
 ## Arbeiten am Projekt (VS Code + Git-Setup)
 
 1) **Git-Projektkonfiguration einbinden** (aus dem Repo-Root):

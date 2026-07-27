@@ -174,11 +174,16 @@ Geometrie und Interaktionsziele werden einmal gemeinsam vorbereitet und danach
 nicht unabhängig voneinander ausgetauscht. Bei einer Größenänderung wird ein
 neuer `GameFrame` erzeugt.
 
-Die geplante GUI-Workbench darf Fenstergröße, Mausposition, Zustände und
-Frame-Zähler kontrollieren. Sie muss aber denselben `GameFrame`, dieselbe
-Target-Erzeugung und denselben Produktionsrenderer wie die echte GUI benutzen.
-Eigene Karten-, Reihen- oder Animationsdarstellung in der Workbench wäre ein
-Architekturfehler.
+Die GUI-Workbench kontrolliert Fenstergröße, Mausposition, Zustände und
+Frame-Zähler. Sie benutzt denselben `GameFrame`, dieselbe Target-Erzeugung und
+denselben Produktionsrenderer wie die echte GUI. Sie besitzt keine eigene
+Karten-, Reihen- oder Animationsdarstellung.
+
+Die festen Workbench-Szenarien erzeugen echte `ClientState`-Objekte. Für
+Präsentationsabläufe werden die vorhandenen Reducer und der echte lokale
+Trick-Resolver verwendet, sodass nicht parallel eine zweite Darstellungslogik
+entsteht. Der Workbench-Code darf nur die Eingaben des Produktionsframes und das
+Ausgabeziel kontrollieren.
 
 ---
 

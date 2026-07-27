@@ -1,0 +1,82 @@
+# GUI-Workbench
+
+Die GUI-Workbench ist ein deterministischer Host für die echte Pygame-Spieloberfläche.
+Sie besitzt keinen eigenen Karten-, Reihen- oder Animationsrenderer. Jede Szene wird
+als echter `ClientState` aufgebaut und anschließend über denselben `GameFrame` wie
+im Netzwerkspiel gerendert.
+
+## Szenen auflisten
+
+```bash
+python -m row_taker.gui_workbench --list
+```
+
+## Interaktiv untersuchen
+
+```bash
+python -m row_taker.gui_workbench card-placed
+```
+
+Steuerung:
+
+- `P`: Animation starten oder pausieren
+- `Links` / `Rechts`: Präsentationsframe um eins ändern
+- `Shift` + `Links` / `Rechts`: Präsentationsframe um zehn ändern
+- `Oben` / `Unten`: allgemeinen Animationsframe ändern
+- `Home`: beide Frame-Zähler auf null setzen
+- `S`: aktuellen Produktionsframe als PNG speichern
+- `Esc`: Workbench schließen
+
+Die Fenstergröße kann normal verändert werden. Für jede Größe wird ein neuer
+`GameFrame` mit der echten Produktionsgeometrie und den echten Interaktionszielen
+erzeugt.
+
+## Einzelnen Frame speichern
+
+```bash
+python -m row_taker.gui_workbench card-placed \
+  --size 1600x900 \
+  --frame 16 \
+  --presentation-frame 16 \
+  --save screenshots/card-placed-016.png
+```
+
+Gespeicherte Frames verwenden standardmäßig die Mausposition `(-1, -1)`, damit
+kein zufälliger Hover-Zustand entsteht. Ein Hover kann gezielt reproduziert werden:
+
+```bash
+python -m row_taker.gui_workbench choose-card \
+  --mouse 180,840 \
+  --save screenshots/choose-card-hover.png
+```
+
+## Animationsfolge speichern
+
+```bash
+python -m row_taker.gui_workbench row-taken \
+  --save-dir screenshots/row-taken
+```
+
+Ohne `--frames` werden die für die Szene hinterlegten interessanten Frames
+gerendert. Eine eigene Auswahl ist ebenfalls möglich:
+
+```bash
+python -m row_taker.gui_workbench row-taken \
+  --frames 0,4,8,12,16,24,32 \
+  --save-dir screenshots/row-taken
+```
+
+## Architekturregel
+
+Die Workbench darf kontrollieren:
+
+- `ClientState`
+- Fenstergröße
+- Mausposition
+- allgemeinen Frame-Zähler
+- Präsentationsframe-Zähler
+- Ausgabeziel Fenster oder PNG
+
+Sie darf nicht selbst zeichnen oder Produktionsdarstellung nachbauen. Sichtbare
+Spielinhalte müssen immer über `GameFrame.render()` und damit über den echten
+Produktionsrenderer laufen.
