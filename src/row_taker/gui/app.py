@@ -3,6 +3,7 @@ from __future__ import annotations
 import pygame
 
 from row_taker.client.actions import ClientAction
+from row_taker.client.core_state import ClientMode
 from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import ClientState
 from row_taker.gui.connect_form_state import ConnectFormState
@@ -105,17 +106,22 @@ class GuiApp:
         if self._client_state is None:
             raise RuntimeError("Live client active without client state")
 
-        if self._client_state.client_mode.value == "lobby":
-            return LobbyFrame.from_layout(
-                layout=layout,
-                state=self._client_state,
-            )
+        match self._client_state.client_mode:
+            case ClientMode.LOBBY:
+                return LobbyFrame.from_layout(
+                    layout=layout,
+                    state=self._client_state,
+                )
+            case ClientMode.GAME | ClientMode.ENDED:
+                return GameFrame.from_layout(
+                    layout=layout,
+                    state=self._client_state,
+                    presentation_elapsed_frames=self._presentation_elapsed_frames,
+                    last_action_summary=self._last_action_summary,
+                )
 
-        return GameFrame.from_layout(
-            layout=layout,
-            state=self._client_state,
-            presentation_elapsed_frames=self._presentation_elapsed_frames,
-            last_action_summary=self._last_action_summary,
+        raise RuntimeError(
+            f"Unsupported client mode: {self._client_state.client_mode!r}"
         )
 
     def _apply_screen_result(self, result: ScreenResult) -> None:

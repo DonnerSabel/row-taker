@@ -17,6 +17,7 @@ from row_taker.engine.game.phases import Phase, PhaseInfo
 from row_taker.engine.game.state import PublicState
 from row_taker.gui.game_visual_builder import build_game_visual_state
 from row_taker.gui.game_visual_state import PlayerPlayAnchor, RowCardAnchor
+from row_taker.gui.game_visual_static import build_stable_game_visual_state
 from row_taker.gui_workbench.scenarios import get_scenario
 from row_taker.gui_workbench.timeline import get_timeline
 
@@ -140,7 +141,7 @@ def test_status_text_and_message_level_are_built_before_rendering() -> None:
     assert visual_state.status.message_level == "error"
 
 
-def test_public_state_override_changes_visual_rows_without_changing_hand() -> None:
+def test_stable_builder_uses_supplied_public_state_without_changing_hand() -> None:
     state = get_scenario("choose-card").state
     assert state.public_state is not None
     override = PublicState(
@@ -152,10 +153,10 @@ def test_public_state_override_changes_visual_rows_without_changing_hand() -> No
         phase_info=PhaseInfo(phase=Phase.REVEAL_AND_RESOLVE),
     )
 
-    visual_state = build_game_visual_state(
+    visual_state = build_stable_game_visual_state(
         state,
+        public_state=override,
         last_action_summary="test",
-        public_state_override=override,
     )
 
     assert tuple(row.row_id for row in visual_state.rows) == (RowID("override"),)

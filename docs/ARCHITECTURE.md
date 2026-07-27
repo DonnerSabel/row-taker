@@ -282,6 +282,12 @@ Zustandsübergänge. Die Interaktionsschicht importiert umgekehrt keine
 Zeichenfunktionen. `LobbyFrame` ist der kleine, vorbereitete Adapter zwischen
 beiden Teilen.
 
+Die öffentliche Visual-State-API enthält keine Testparameter oder historischen
+GUI-Aliase. Tests mit abweichenden Public-State-Snapshots greifen gezielt auf
+den internen stabilen Builder zu. `GuiApp` wählt Lobby-, Spiel- und Endzustand
+explizit über `ClientMode`; ein beendetes Spiel bleibt als letzter `GameFrame`
+sichtbar.
+
 Die GUI-Workbench kontrolliert Fenstergröße, Mausposition, Zustände und
 Frame-Zähler. Sie bereitet abhängig vom Szenariotyp denselben `ConnectFrame`,
 `LobbyFrame` oder `GameFrame` vor wie die echte GUI und besitzt keine eigene

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
-
 import pygame
 
 from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
@@ -23,23 +21,6 @@ class GuiCard:
     rect: pygame.Rect
     selected: bool = False
     hovered: bool = False
-
-    @classmethod
-    def from_card(
-        cls,
-        card: Any,
-        rect: pygame.Rect,
-        *,
-        selected: bool = False,
-        hovered: bool = False,
-    ) -> GuiCard:
-        return cls(
-            card_value=int(card.value),
-            bullheads=int(card.bullheads),
-            rect=rect,
-            selected=selected,
-            hovered=hovered,
-        )
 
     @classmethod
     def from_card_value(
@@ -126,10 +107,6 @@ def _card_border_color(*, selected: bool, hovered: bool, theme: GuiTheme) -> pyg
     if hovered:
         return theme.palette.accent_hover
     return theme.palette.panel_border
-
-
-# Compatibility name for older imports while the GUI is being refactored.
-CardSprite = GuiCard
 
 
 def draw_card_back(

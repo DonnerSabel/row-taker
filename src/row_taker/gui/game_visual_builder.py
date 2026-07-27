@@ -11,7 +11,6 @@ from row_taker.client.presentation_events import (
     PresentationTrickFinished,
 )
 from row_taker.client.state import ClientState
-from row_taker.engine.game.state import PublicState
 from row_taker.gui.game_visual_presentations import (
     build_card_placed_visual_step,
     build_cards_revealed_panel,
@@ -29,58 +28,56 @@ def build_game_visual_state(
     *,
     last_action_summary: str,
     presentation_elapsed_frames: int = 0,
-    public_state_override: PublicState | None = None,
 ) -> GameVisualState:
     """Translate client semantics into the complete game-screen model."""
 
-    if public_state_override is None:
-        current_step = state.current_presentation_step
-        if current_step is not None and isinstance(
-            current_step.event,
-            PresentationCardPlaced,
-        ):
-            visual_step = build_card_placed_visual_step(
-                state,
-                last_action_summary=last_action_summary,
-            )
-            return resolve_visual_step(
-                visual_step,
-                presentation_elapsed_frames=presentation_elapsed_frames,
-            )
-        if current_step is not None and isinstance(
-            current_step.event,
-            PresentationRowTaken | PresentationOverflowResolved,
-        ):
-            visual_step = build_row_replacement_visual_step(
-                state,
-                last_action_summary=last_action_summary,
-            )
-            return resolve_visual_step(
-                visual_step,
-                presentation_elapsed_frames=presentation_elapsed_frames,
-            )
-        if current_step is not None and isinstance(
-            current_step.event,
-            PresentationRowChoiceRequired | PresentationRowChosen,
-        ):
-            return build_row_choice_visual_state(
-                state,
-                last_action_summary=last_action_summary,
-            )
-        if current_step is not None and isinstance(
-            current_step.event,
-            PresentationTrickFinished
-            | PresentationRoundFinished
-            | PresentationGameFinished,
-        ):
-            return build_finished_visual_state(
-                state,
-                last_action_summary=last_action_summary,
-            )
+    current_step = state.current_presentation_step
+    if current_step is not None and isinstance(
+        current_step.event,
+        PresentationCardPlaced,
+    ):
+        visual_step = build_card_placed_visual_step(
+            state,
+            last_action_summary=last_action_summary,
+        )
+        return resolve_visual_step(
+            visual_step,
+            presentation_elapsed_frames=presentation_elapsed_frames,
+        )
+    if current_step is not None and isinstance(
+        current_step.event,
+        PresentationRowTaken | PresentationOverflowResolved,
+    ):
+        visual_step = build_row_replacement_visual_step(
+            state,
+            last_action_summary=last_action_summary,
+        )
+        return resolve_visual_step(
+            visual_step,
+            presentation_elapsed_frames=presentation_elapsed_frames,
+        )
+    if current_step is not None and isinstance(
+        current_step.event,
+        PresentationRowChoiceRequired | PresentationRowChosen,
+    ):
+        return build_row_choice_visual_state(
+            state,
+            last_action_summary=last_action_summary,
+        )
+    if current_step is not None and isinstance(
+        current_step.event,
+        PresentationTrickFinished
+        | PresentationRoundFinished
+        | PresentationGameFinished,
+    ):
+        return build_finished_visual_state(
+            state,
+            last_action_summary=last_action_summary,
+        )
 
     return build_stable_game_visual_state(
         state,
-        public_state=public_state_override or state.public_state,
+        public_state=state.public_state,
         last_action_summary=last_action_summary,
         presentation_panel=build_cards_revealed_panel(state),
     )
