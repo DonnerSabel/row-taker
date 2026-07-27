@@ -49,23 +49,31 @@ class ConnectScreenTargets:
 
 
 @dataclass(frozen=True, slots=True)
-class ConnectScreen:
-    """Polished connect screen for the nicer GUI client."""
+class ConnectFrame:
+    """One fully prepared production frame of the connect screen."""
 
     connect_form: ConnectFormState
+    layout: GuiLayout
+    targets: ConnectScreenTargets
 
-    def build_targets(self, layout: GuiLayout) -> ConnectScreenTargets:
-        return build_connect_screen_targets(layout)
+    @classmethod
+    def from_layout(
+        cls,
+        *,
+        layout: GuiLayout,
+        connect_form: ConnectFormState,
+    ) -> ConnectFrame:
+        return cls(
+            connect_form=connect_form,
+            layout=layout,
+            targets=build_connect_screen_targets(layout),
+        )
 
-    def handle_event(
-        self,
-        event: pygame.event.Event,
-        targets: ConnectScreenTargets | None,
-    ) -> ScreenResult:
+    def handle_event(self, event: pygame.event.Event) -> ScreenResult:
         return handle_connect_event(
             event,
             connect_form=self.connect_form,
-            connect_targets=targets,
+            connect_targets=self.targets,
         )
 
     def render(
@@ -73,19 +81,14 @@ class ConnectScreen:
         screen: pygame.Surface,
         *,
         drawer: PrimitiveDrawer,
-        layout: GuiLayout,
-        targets: ConnectScreenTargets,
     ) -> None:
         render_connect_screen(
             screen,
             drawer=drawer,
-            layout=layout,
+            layout=self.layout,
             connect_form=self.connect_form,
-            connect_targets=targets,
+            connect_targets=self.targets,
         )
-
-    def normalized_connection_values(self) -> tuple[str, int, str] | None:
-        return normalized_connection_values(self.connect_form)
 
 
 def build_connect_screen_targets(layout: GuiLayout) -> ConnectScreenTargets:
@@ -338,7 +341,7 @@ __all__ = [
     "ConnectButtonTarget",
     "ConnectFieldTarget",
     "ConnectFormState",
-    "ConnectScreen",
+    "ConnectFrame",
     "ConnectScreenTargets",
     "activate_field",
     "activate_next_field",

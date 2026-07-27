@@ -64,7 +64,6 @@ def test_game_frame_prepares_visual_state_geometry_and_targets_once(monkeypatch)
     assert frame.visual_state is visual_state
     assert frame.geometry is geometry
     assert frame.targets is targets
-    assert frame.build_targets(layout) is targets
 
 
 def test_game_frame_render_uses_its_prepared_visual_state_and_targets(monkeypatch) -> None:
@@ -108,20 +107,3 @@ def test_game_frame_handle_event_uses_its_visual_state_and_targets(monkeypatch) 
         visual_state=visual_state,
         game_targets=targets,
     )
-
-
-def test_game_frame_rejects_layout_from_another_window() -> None:
-    layout = compute_layout(1280, 720)
-    other_layout = compute_layout(1400, 800)
-    geometry = Mock(window_rect=layout.window_rect)
-    frame = _frame(geometry=geometry)
-
-    with pytest.raises(ValueError, match="different window layout"):
-        frame.build_targets(other_layout)
-
-
-def test_game_frame_rejects_targets_from_another_frame() -> None:
-    frame = _frame()
-
-    with pytest.raises(ValueError, match="different prepared frame"):
-        frame.handle_event(object(), GameScreenTargets())

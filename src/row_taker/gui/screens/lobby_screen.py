@@ -59,35 +59,45 @@ class LobbyScreenTargets:
 
 
 @dataclass(frozen=True, slots=True)
-class LobbyScreen:
+class LobbyFrame:
+    """One fully prepared production frame of the lobby screen."""
+
     state: ClientState
-    frame_count: int
-    last_action_summary: str
+    layout: GuiLayout
+    targets: LobbyScreenTargets
 
-    def build_targets(self, layout: GuiLayout) -> LobbyScreenTargets:
-        return build_lobby_screen_targets(layout, self.state)
+    @classmethod
+    def from_layout(
+        cls,
+        *,
+        layout: GuiLayout,
+        state: ClientState,
+    ) -> LobbyFrame:
+        return cls(
+            state=state,
+            layout=layout,
+            targets=build_lobby_screen_targets(layout, state),
+        )
 
-    def handle_event(
-        self,
-        event: pygame.event.Event,
-        targets: LobbyScreenTargets | None,
-    ) -> ScreenResult:
-        return handle_lobby_event(event, state=self.state, lobby_targets=targets)
+    def handle_event(self, event: pygame.event.Event) -> ScreenResult:
+        return handle_lobby_event(
+            event,
+            state=self.state,
+            lobby_targets=self.targets,
+        )
 
     def render(
         self,
         screen: pygame.Surface,
         *,
         drawer: PrimitiveDrawer,
-        layout: GuiLayout,
-        targets: LobbyScreenTargets,
     ) -> None:
         render_lobby_screen(
             screen,
             drawer=drawer,
-            layout=layout,
+            layout=self.layout,
             client_state=self.state,
-            lobby_targets=targets,
+            lobby_targets=self.targets,
         )
 
 
@@ -622,7 +632,7 @@ def _seat_by_index(state: ClientState, seat_index: int) -> LobbySeatView | None:
 
 __all__ = [
     "LobbyButtonTarget",
-    "LobbyScreen",
+    "LobbyFrame",
     "LobbyScreenTargets",
     "SeatTarget",
     "build_lobby_screen_targets",

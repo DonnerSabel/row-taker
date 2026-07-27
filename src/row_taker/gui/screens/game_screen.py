@@ -95,20 +95,9 @@ class GameFrame:
             targets=targets,
         )
 
-    def build_targets(self, layout: GuiLayout | None = None) -> GameScreenTargets:
-        """Return the targets prepared together with this frame."""
-
-        self._require_matching_layout(layout)
-        return self.targets
-
-    def handle_event(
-        self,
-        event: pygame.event.Event,
-        targets: GameScreenTargets | None = None,
-    ) -> ScreenResult:
+    def handle_event(self, event: pygame.event.Event) -> ScreenResult:
         """Handle an event against this frame's own prepared targets."""
 
-        self._require_matching_targets(targets)
         return handle_game_event(
             event,
             visual_state=self.visual_state,
@@ -120,13 +109,9 @@ class GameFrame:
         screen: pygame.Surface,
         *,
         drawer: PrimitiveDrawer,
-        layout: GuiLayout | None = None,
-        targets: GameScreenTargets | None = None,
     ) -> None:
         """Render this complete frame through the production game renderer."""
 
-        self._require_matching_layout(layout)
-        self._require_matching_targets(targets)
         render_game_screen(
             screen,
             drawer=drawer,
@@ -136,19 +121,6 @@ class GameFrame:
             frame_count=self.frame_count,
             presentation_frame_count=self.presentation_frame_count,
         )
-
-    def _require_matching_layout(self, layout: GuiLayout | None) -> None:
-        if layout is not None and layout.window_rect != self.geometry.window_rect:
-            raise ValueError(
-                "GameFrame was prepared for a different window layout; "
-                "create a new frame before handling or rendering it."
-            )
-
-    def _require_matching_targets(self, targets: GameScreenTargets | None) -> None:
-        if targets is not None and targets is not self.targets:
-            raise ValueError(
-                "GameFrame received targets from a different prepared frame."
-            )
 
 
 def render_game_screen(

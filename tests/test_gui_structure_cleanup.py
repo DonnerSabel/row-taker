@@ -32,3 +32,23 @@ def test_source_tree_uses_canonical_gui_names() -> None:
     legacy_layout_name = "Demo" + "Layout"
     assert legacy_package not in source
     assert legacy_layout_name not in source
+
+
+def test_prepared_frames_do_not_accept_external_layout_or_targets() -> None:
+    from inspect import signature
+
+    from row_taker.gui.screens.connect_screen import ConnectFrame
+    from row_taker.gui.screens.game_screen import GameFrame
+    from row_taker.gui.screens.lobby_screen import LobbyFrame
+
+    for frame_type in (ConnectFrame, LobbyFrame, GameFrame):
+        assert tuple(signature(frame_type.handle_event).parameters) == ("self", "event")
+        assert tuple(signature(frame_type.render).parameters) == ("self", "screen", "drawer")
+
+
+def test_gui_app_no_longer_orchestrates_screen_targets() -> None:
+    app_source = (ROOT / "src/row_taker/gui/app.py").read_text(encoding="utf-8")
+    assert ".build_targets(" not in app_source
+    assert "handle_event(event, targets)" not in app_source
+    assert "layout=layout" not in app_source.split("def _process_current_screen", 1)[1].split("def _prepare_current_screen", 1)[0]
+

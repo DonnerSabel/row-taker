@@ -5,9 +5,7 @@ import pygame
 from row_taker.client.actions import ClientAction
 from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import ClientState
-from row_taker.gui.screens.connect_screen import ConnectScreen
-from row_taker.gui.screens.game_screen import GameFrame
-from row_taker.gui.screens.lobby_screen import LobbyScreen
+from row_taker.gui.connect_form_state import ConnectFormState
 from row_taker.gui.layout import (
     MIN_WINDOW_HEIGHT,
     MIN_WINDOW_WIDTH,
@@ -16,8 +14,11 @@ from row_taker.gui.layout import (
 )
 from row_taker.gui.live_client import LiveGuiClient
 from row_taker.gui.primitives import PrimitiveDrawer
-from row_taker.gui.connect_form_state import ConnectFormState
 from row_taker.gui.screen_result import ScreenResult
+from row_taker.gui.screens.connect_screen import ConnectFrame, normalized_connection_values
+from row_taker.gui.screens.game_screen import GameFrame
+from row_taker.gui.screens.lobby_screen import LobbyFrame
+from row_taker.gui.screens.prepared_screen import PreparedScreen
 from row_taker.protocol.transport import ClientTransport
 
 WINDOW_TITLE = "Row-Taker"
@@ -78,43 +79,37 @@ class GuiApp:
         if self._screen is None or self._drawer is None:
             raise RuntimeError("GuiApp not initialized")
 
-        layout = self._current_layout()
-        current_screen = self._build_current_screen(layout)
-        targets = current_screen.build_targets(layout)
+        current_screen = self._prepare_current_screen()
 
         for event in pygame.event.get():
-            result = current_screen.handle_event(event, targets)
+            result = current_screen.handle_event(event)
             self._apply_screen_result(result)
             if not self._running:
                 return
 
-            layout = self._current_layout()
-            current_screen = self._build_current_screen(layout)
-            targets = current_screen.build_targets(layout)
+            # Screen results may change navigation, client state, or even the
+            # active screen. Prepare a fresh immutable frame before the next
+            # event so rendering and hit testing always share the same data.
+            current_screen = self._prepare_current_screen()
 
-        current_screen.render(
-            self._screen,
-            drawer=self._drawer,
-            layout=layout,
-            targets=targets,
-        )
+        current_screen.render(self._screen, drawer=self._drawer)
         pygame.display.flip()
 
-    def _build_current_screen(
-        self,
-        layout: GuiLayout,
-    ) -> ConnectScreen | LobbyScreen | GameFrame:
+    def _prepare_current_screen(self) -> PreparedScreen:
+        layout = self._current_layout()
         if self._live_client is None:
-            return ConnectScreen(connect_form=self._connect_form)
+            return ConnectFrame.from_layout(
+                layout=layout,
+                connect_form=self._connect_form,
+            )
 
         if self._client_state is None:
             raise RuntimeError("Live client active without client state")
 
         if self._client_state.client_mode.value == "lobby":
-            return LobbyScreen(
+            return LobbyFrame.from_layout(
+                layout=layout,
                 state=self._client_state,
-                frame_count=self._frame_count,
-                last_action_summary=self._last_action_summary,
             )
 
         return GameFrame.from_layout(
@@ -150,8 +145,7 @@ class GuiApp:
             self._apply_client_action(result.client_action)
 
     def _attempt_connect(self) -> None:
-        current_screen = self._build_current_screen(self._current_layout())
-        connection_values = current_screen.normalized_connection_values()
+        connection_values = normalized_connection_values(self._connect_form)
         if connection_values is None:
             self._connect_form = ConnectFormState(
                 host=self._connect_form.host,

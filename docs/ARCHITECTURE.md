@@ -216,6 +216,23 @@ Geometrie und Interaktionsziele werden einmal gemeinsam vorbereitet und danach
 nicht unabhängig voneinander ausgetauscht. Bei einer Größenänderung wird ein
 neuer `GameFrame` erzeugt.
 
+Auch Connect- und Lobby-Screen folgen derselben Prepared-Screen-Grenze:
+
+```text
+GuiApp
+    ↓
+PreparedScreen
+    ├── ConnectFrame
+    ├── LobbyFrame
+    └── GameFrame
+```
+
+Jeder Frame besitzt sein Layout beziehungsweise seine Geometrie und seine
+Interaktionsziele selbst. `GuiApp` verarbeitet nur noch `handle_event(event)` und
+`render(surface, drawer=...)`; es kennt keine konkreten Target-Typen und reicht
+keine Layout- oder Target-Objekte zwischen Screens weiter. Nach jeder möglichen
+Zustandsänderung wird ein neuer unveränderlicher Frame vorbereitet.
+
 Die GUI-Workbench kontrolliert Fenstergröße, Mausposition, Zustände und
 Frame-Zähler. Sie benutzt denselben `GameFrame`, dieselbe Target-Erzeugung und
 denselben Produktionsrenderer wie die echte GUI. Sie besitzt keine eigene
