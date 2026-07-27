@@ -34,7 +34,7 @@ class GuiApp:
 
     def __init__(self) -> None:
         self._running = True
-        self._frame_count = 0
+        self._presentation_elapsed_frames = 0
         self._screen: pygame.Surface | None = None
         self._clock: pygame.time.Clock | None = None
         self._drawer: PrimitiveDrawer | None = None
@@ -42,7 +42,6 @@ class GuiApp:
         self._live_client: LiveGuiClient | None = None
         self._client_state: ClientState | None = None
         self._presentation_step: PresentationStep | None = None
-        self._presentation_start_frame = 0
         self._connect_form = ConnectFormState()
 
     def run(self) -> int:
@@ -115,11 +114,7 @@ class GuiApp:
         return GameFrame.from_layout(
             layout=layout,
             state=self._client_state,
-            frame_count=self._frame_count,
-            presentation_frame_count=max(
-                0,
-                self._frame_count - self._presentation_start_frame,
-            ),
+            presentation_elapsed_frames=self._presentation_elapsed_frames,
             last_action_summary=self._last_action_summary,
         )
 
@@ -199,7 +194,7 @@ class GuiApp:
         if step is self._presentation_step:
             return
         self._presentation_step = step
-        self._presentation_start_frame = self._frame_count
+        self._presentation_elapsed_frames = 0
 
     def _current_layout(self):
         if self._screen is None:
@@ -209,5 +204,6 @@ class GuiApp:
     def _tick(self) -> None:
         if self._clock is None:
             raise RuntimeError("GuiApp not initialized")
-        self._frame_count += 1
+        if self._presentation_step is not None:
+            self._presentation_elapsed_frames += 1
         self._clock.tick(FPS)

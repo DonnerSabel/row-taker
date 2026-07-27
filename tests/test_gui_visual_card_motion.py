@@ -23,8 +23,7 @@ def test_semantic_card_motion_anchors_resolve_to_real_layout(
     frame = GameFrame.from_layout(
         layout=compute_layout(*size),
         state=state,
-        frame_count=16,
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
         last_action_summary="test",
         mouse_pos=(-1, -1),
     )
@@ -72,8 +71,7 @@ def test_opponent_card_motion_starts_at_real_staged_card_slot() -> None:
     frame = GameFrame.from_layout(
         layout=compute_layout(1600, 900),
         state=state,
-        frame_count=16,
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
         last_action_summary="test",
         mouse_pos=(-1, -1),
     )
@@ -104,8 +102,7 @@ def test_own_card_motion_uses_hand_area_fallback_after_server_removed_card() -> 
     frame = GameFrame.from_layout(
         layout=compute_layout(1600, 900),
         state=state,
-        frame_count=16,
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
         last_action_summary="test",
         mouse_pos=(-1, -1),
     )

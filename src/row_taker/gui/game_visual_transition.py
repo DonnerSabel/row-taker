@@ -13,12 +13,12 @@ from row_taker.gui.game_visual_state import (
 def resolve_visual_step(
     step: GameVisualStep,
     *,
-    presentation_frame_count: int,
+    presentation_elapsed_frames: int,
 ) -> GameVisualState:
     """Resolve one visual before/after step at a deterministic frame."""
 
     duration = max(1, step.transition.duration_frames)
-    progress = max(0.0, min(1.0, presentation_frame_count / duration))
+    progress = max(0.0, min(1.0, presentation_elapsed_frames / duration))
     if progress >= 1.0:
         return step.after
 

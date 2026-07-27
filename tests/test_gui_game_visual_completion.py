@@ -26,17 +26,17 @@ def test_overflow_uses_before_and_after_snapshots_with_one_motion() -> None:
     before = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=0,
+        presentation_elapsed_frames=0,
     )
     middle = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
     )
     after = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=32,
+        presentation_elapsed_frames=32,
     )
 
     before_row = before.row_by_id(event.row_id)
@@ -103,7 +103,7 @@ def test_finish_events_are_complete_visual_states(event, headline: str) -> None:
     visual_state = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
     )
 
     assert visual_state.presentation_panel is not None

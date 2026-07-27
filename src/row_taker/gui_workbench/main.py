@@ -70,11 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="list available complete timelines and their steps",
     )
     parser.add_argument("--size", type=_parse_size, help="window/output size as WIDTHxHEIGHT")
-    parser.add_argument("--frame", type=int, default=0, help="general animation frame")
     parser.add_argument(
-        "--presentation-frame",
+        "--frame",
         type=int,
-        help="presentation animation frame; defaults to --frame",
+        default=0,
+        help="elapsed frame within the current presentation step",
     )
     parser.add_argument(
         "--mouse",
@@ -131,8 +131,6 @@ def run(argv: list[str] | None = None) -> int:
         parser.error("a scenario or --timeline is required unless a list option is used")
     if args.frame < 0:
         parser.error("--frame must be non-negative")
-    if args.presentation_frame is not None and args.presentation_frame < 0:
-        parser.error("--presentation-frame must be non-negative")
     if args.step < 0:
         parser.error("--step must be non-negative")
     if args.save is not None and args.save_dir is not None:
@@ -155,8 +153,7 @@ def run(argv: list[str] | None = None) -> int:
                 timeline.steps[args.step],
                 args.save,
                 size=args.size,
-                frame_count=args.frame,
-                presentation_frame_count=args.presentation_frame,
+                presentation_elapsed_frames=args.frame,
                 mouse_pos=args.mouse,
             )
             print(output)
@@ -177,8 +174,7 @@ def run(argv: list[str] | None = None) -> int:
         return WorkbenchApp(
             timeline=timeline,
             size=args.size,
-            frame_count=args.frame,
-            presentation_frame_count=args.presentation_frame,
+            presentation_elapsed_frames=args.frame,
             screenshot_dir=args.screenshot_dir,
         ).run()
 
@@ -188,8 +184,7 @@ def run(argv: list[str] | None = None) -> int:
             scenario,
             args.save,
             size=args.size,
-            frame_count=args.frame,
-            presentation_frame_count=args.presentation_frame,
+            presentation_elapsed_frames=args.frame,
             mouse_pos=args.mouse,
         )
         print(output)
@@ -210,8 +205,7 @@ def run(argv: list[str] | None = None) -> int:
     return WorkbenchApp(
         scenario,
         size=args.size,
-        frame_count=args.frame,
-        presentation_frame_count=args.presentation_frame,
+        presentation_elapsed_frames=args.frame,
         screenshot_dir=args.screenshot_dir,
     ).run()
 

@@ -21,8 +21,7 @@ def _frame(
 ) -> GameFrame:
     return GameFrame(
         visual_state=object() if visual_state is None else visual_state,
-        frame_count=17,
-        presentation_frame_count=5,
+        presentation_elapsed_frames=5,
         geometry=object() if geometry is None else geometry,
         targets=GameScreenTargets() if targets is None else targets,
     )
@@ -44,8 +43,7 @@ def test_game_frame_prepares_visual_state_geometry_and_targets_once(monkeypatch)
     frame = GameFrame.from_layout(
         layout=layout,
         state=state,
-        frame_count=17,
-        presentation_frame_count=5,
+        presentation_elapsed_frames=5,
         last_action_summary="test",
         mouse_pos=(123, 456),
     )
@@ -53,7 +51,7 @@ def test_game_frame_prepares_visual_state_geometry_and_targets_once(monkeypatch)
     build_visual_state.assert_called_once_with(
         state,
         last_action_summary="test",
-        presentation_frame_count=5,
+        presentation_elapsed_frames=5,
     )
     compute_geometry.assert_called_once_with(layout.window_rect, visual_state)
     build_targets.assert_called_once_with(
@@ -88,8 +86,7 @@ def test_game_frame_render_uses_its_prepared_visual_state_and_targets(monkeypatc
         geometry=geometry,
         visual_state=visual_state,
         game_targets=targets,
-        frame_count=17,
-        presentation_frame_count=5,
+        presentation_elapsed_frames=5,
     )
 
 

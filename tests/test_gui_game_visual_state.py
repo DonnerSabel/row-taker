@@ -190,17 +190,17 @@ def test_card_placed_uses_before_and_after_snapshots_with_one_motion() -> None:
     before = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=0,
+        presentation_elapsed_frames=0,
     )
     middle = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
     )
     after = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=32,
+        presentation_elapsed_frames=32,
     )
 
     before_row = before.row_by_id(event.row_id)
@@ -254,7 +254,7 @@ def test_completed_card_placement_stays_hidden_in_following_step() -> None:
     visual_state = build_game_visual_state(
         following,
         last_action_summary="test",
-        presentation_frame_count=0,
+        presentation_elapsed_frames=0,
     )
     completed_player = next(
         player
@@ -317,12 +317,12 @@ def test_card_placed_keeps_target_row_in_final_visual_column() -> None:
     before = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=0,
+        presentation_elapsed_frames=0,
     )
     after = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=32,
+        presentation_elapsed_frames=32,
     )
 
     expected_order = (
@@ -402,17 +402,17 @@ def test_row_taken_uses_snapshot_scores_row_replacement_and_one_motion() -> None
     before = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=0,
+        presentation_elapsed_frames=0,
     )
     middle = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
     )
     after = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=32,
+        presentation_elapsed_frames=32,
     )
 
     before_row = before.row_by_id(event.row_id)
@@ -489,12 +489,12 @@ def test_row_taken_keeps_replaced_row_in_one_visual_column() -> None:
     before = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=0,
+        presentation_elapsed_frames=0,
     )
     after = build_game_visual_state(
         state,
         last_action_summary="test",
-        presentation_frame_count=32,
+        presentation_elapsed_frames=32,
     )
 
     assert tuple(row.row_id for row in before.rows) == tuple(

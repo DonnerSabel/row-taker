@@ -320,3 +320,9 @@ Der Server akzeptiert `--log-level` und `--log-file`.
 CLI-Clients akzeptieren ebenfalls `--log-level` und `--log-file`.
 Lokal gestartete Bots übernehmen den Log-Level des Servers und erhalten bei
 gesetztem Server-Logpfad automatisch eine abgeleitete Bot-Logdatei.
+
+## GUI-Zeitmodell
+
+Die GUI führt nur `presentation_elapsed_frames`: die seit dem Beginn des
+aktuellen `PresentationStep` verstrichenen Frames. Ein neuer Step setzt den
+Zähler auf null. Ein zusätzlicher globaler Render-Frame-Zähler existiert nicht.

@@ -48,7 +48,7 @@ def build_game_visual_state(
     state: ClientState,
     *,
     last_action_summary: str,
-    presentation_frame_count: int = 0,
+    presentation_elapsed_frames: int = 0,
     public_state_override: PublicState | None = None,
 ) -> GameVisualState:
     """Translate client semantics into the complete game-screen model."""
@@ -65,7 +65,7 @@ def build_game_visual_state(
             )
             return resolve_visual_step(
                 visual_step,
-                presentation_frame_count=presentation_frame_count,
+                presentation_elapsed_frames=presentation_elapsed_frames,
             )
         if current_step is not None and isinstance(
             current_step.event,
@@ -77,7 +77,7 @@ def build_game_visual_state(
             )
             return resolve_visual_step(
                 visual_step,
-                presentation_frame_count=presentation_frame_count,
+                presentation_elapsed_frames=presentation_elapsed_frames,
             )
         if current_step is not None and isinstance(
             current_step.event,

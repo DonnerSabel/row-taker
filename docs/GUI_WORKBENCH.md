@@ -113,7 +113,7 @@ Einen einzelnen Zustand und Frame speichern:
 
 ```bash
 python -m row_taker.gui_workbench --timeline full-trick \
-  --step 5 --frame 16 --presentation-frame 16 \
+  --step 5 --frame 16 \
   --save screenshots/row-taken-016.png
 ```
 
@@ -139,3 +139,11 @@ Inhalte müssen immer über `ConnectFrame.render()`, `LobbyFrame.render()` oder
 Die festen Spielszenarien erzeugen echte `ClientState`-Objekte. Für
 Präsentationsabläufe werden die vorhandenen Reducer und der echte lokale
 Trick-Resolver verwendet. Eine separate Workbench-Darstellung existiert nicht.
+
+## Zeitsteuerung
+
+Die Workbench verwendet genau einen Zähler: `--frame` bezeichnet die seit dem
+Beginn des aktuellen Präsentationsschritts verstrichenen Frames. Ein Wechsel
+zum nächsten oder vorherigen Timeline-Schritt setzt diesen Zähler auf `0`.
+Interaktiv verändern Links/Rechts den Frame; mit gedrückter Umschalttaste in
+10er-Schritten.

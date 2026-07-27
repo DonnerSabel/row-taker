@@ -10,12 +10,12 @@ import pygame
 class AnimationClock:
     """Frame-based animation helper for the polished pygame GUI.
 
-    The GUI loop already has a monotonically increasing ``frame_count``. This
-    helper keeps tiny visual effects deterministic and local to rendering code:
-    no timers, no side effects and no game-state coupling.
+    ``elapsed_frames`` is local to the current presentation step. The helper
+    keeps tiny visual effects deterministic and local to rendering code: no
+    timers, no side effects and no game-state coupling.
     """
 
-    frame_count: int
+    elapsed_frames: int
 
     def pulse(
         self,
@@ -27,7 +27,7 @@ class AnimationClock:
         """Return a smooth value between ``low`` and ``high``."""
 
         period = max(1, period_frames)
-        phase = (self.frame_count % period) / period
+        phase = (self.elapsed_frames % period) / period
         normalized = (sin(phase * 2.0 * pi) + 1.0) / 2.0
         return low + (high - low) * normalized
 
@@ -73,7 +73,7 @@ class AnimationClock:
         """
 
         duration = max(1, duration_frames)
-        return max(0.0, min(1.0, self.frame_count / duration))
+        return max(0.0, min(1.0, self.elapsed_frames / duration))
 
     def ease_out_cubic(self, *, duration_frames: int = 36) -> float:
         progress = self.progress(duration_frames=duration_frames)

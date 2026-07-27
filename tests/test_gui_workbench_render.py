@@ -49,7 +49,6 @@ def test_prepare_scenario_frame_uses_real_production_frame(
 ) -> None:
     prepared = prepare_scenario_frame(
         get_scenario(scenario_name),
-        frame_count=7,
         mouse_pos=OFFSCREEN_MOUSE_POS,
     )
 
@@ -57,10 +56,12 @@ def test_prepare_scenario_frame_uses_real_production_frame(
 
 
 def test_game_render_uses_real_game_frame_and_production_targets() -> None:
-    rendered = render_scenario_frame(get_scenario("choose-card"), frame_count=7)
+    rendered = render_scenario_frame(
+        get_scenario("choose-card"), presentation_elapsed_frames=7
+    )
 
     assert isinstance(rendered.prepared_screen, GameFrame)
-    assert rendered.prepared_screen.frame_count == 7
+    assert rendered.prepared_screen.presentation_elapsed_frames == 7
     assert len(rendered.prepared_screen.targets.card_targets) == 10
     assert rendered.surface.get_size() == (1600, 900)
 
@@ -74,13 +75,11 @@ def test_identical_inputs_render_pixel_identically(scenario_name: str) -> None:
 
     first = render_scenario_frame(
         scenario,
-        frame_count=16,
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
     )
     second = render_scenario_frame(
         scenario,
-        frame_count=16,
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
     )
 
     assert _pixels(first.surface) == _pixels(second.surface)
@@ -133,8 +132,7 @@ def test_every_catalog_scenario_renders_all_interesting_frames(scenario) -> None
     for frame in scenario.interesting_frames:
         rendered = render_scenario_frame(
             scenario,
-            frame_count=frame,
-            presentation_frame_count=frame,
+            presentation_elapsed_frames=frame,
         )
         assert rendered.surface.get_size() == scenario.default_size
 

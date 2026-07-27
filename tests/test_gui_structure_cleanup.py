@@ -62,3 +62,17 @@ def test_workbench_uses_prepared_frames_instead_of_renderer_helpers() -> None:
     assert "ConnectFrame.from_layout" in app_source
     assert "LobbyFrame.from_layout" in app_source
     assert "GameFrame.from_layout" in app_source
+
+
+def test_gui_uses_single_presentation_frame_counter() -> None:
+    roots = (Path("src/row_taker/gui"), Path("src/row_taker/gui_workbench"))
+    texts = "\n".join(
+        path.read_text(encoding="utf-8")
+        for root in roots
+        for path in root.rglob("*.py")
+    )
+
+    assert "frame_count" not in texts
+    assert "presentation_frame_count" not in texts
+    assert "--presentation-frame" not in texts
+    assert "presentation_elapsed_frames" in texts

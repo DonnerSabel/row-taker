@@ -60,8 +60,7 @@ class GameFrame:
     """
 
     visual_state: GameVisualState
-    frame_count: int
-    presentation_frame_count: int
+    presentation_elapsed_frames: int
     geometry: BoardGeometry
     targets: GameScreenTargets
 
@@ -71,15 +70,14 @@ class GameFrame:
         *,
         layout: GuiLayout,
         state: ClientState,
-        frame_count: int,
-        presentation_frame_count: int,
+        presentation_elapsed_frames: int,
         last_action_summary: str,
         mouse_pos: tuple[int, int] | None = None,
     ) -> GameFrame:
         visual_state = build_game_visual_state(
             state,
             last_action_summary=last_action_summary,
-            presentation_frame_count=presentation_frame_count,
+            presentation_elapsed_frames=presentation_elapsed_frames,
         )
         geometry = _compute_geometry(layout.window_rect, visual_state)
         targets = build_game_screen_targets(
@@ -89,8 +87,7 @@ class GameFrame:
         )
         return cls(
             visual_state=visual_state,
-            frame_count=frame_count,
-            presentation_frame_count=presentation_frame_count,
+            presentation_elapsed_frames=presentation_elapsed_frames,
             geometry=geometry,
             targets=targets,
         )
@@ -118,8 +115,7 @@ class GameFrame:
             geometry=self.geometry,
             visual_state=self.visual_state,
             game_targets=self.targets,
-            frame_count=self.frame_count,
-            presentation_frame_count=self.presentation_frame_count,
+            presentation_elapsed_frames=self.presentation_elapsed_frames,
         )
 
 
@@ -130,12 +126,10 @@ def render_game_screen(
     geometry: BoardGeometry,
     visual_state: GameVisualState,
     game_targets: GameScreenTargets,
-    frame_count: int,
-    presentation_frame_count: int,
+    presentation_elapsed_frames: int,
     assets: GuiAssets = DEFAULT_GUI_ASSETS,
 ) -> None:
-    del frame_count  # Reserved for stable-frame animation independent of presentation steps.
-    presentation_clock = AnimationClock(presentation_frame_count)
+    presentation_clock = AnimationClock(presentation_elapsed_frames)
 
     _draw_full_background(screen, geometry.window_rect, assets)
     _draw_rows(

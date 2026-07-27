@@ -54,8 +54,7 @@ def prepare_scenario_frame(
     scenario: WorkbenchScenario,
     *,
     size: tuple[int, int] | None = None,
-    frame_count: int = 0,
-    presentation_frame_count: int | None = None,
+    presentation_elapsed_frames: int = 0,
     mouse_pos: tuple[int, int] = OFFSCREEN_MOUSE_POS,
 ) -> PreparedScreen:
     """Prepare the real production frame for one deterministic scenario."""
@@ -82,12 +81,7 @@ def prepare_scenario_frame(
             return GameFrame.from_layout(
                 layout=layout,
                 state=scenario.state,
-                frame_count=frame_count,
-                presentation_frame_count=(
-                    frame_count
-                    if presentation_frame_count is None
-                    else presentation_frame_count
-                ),
+                presentation_elapsed_frames=presentation_elapsed_frames,
                 last_action_summary=scenario.last_action_summary,
                 mouse_pos=mouse_pos,
             )
@@ -97,8 +91,7 @@ def render_scenario_frame(
     scenario: WorkbenchScenario,
     *,
     size: tuple[int, int] | None = None,
-    frame_count: int = 0,
-    presentation_frame_count: int | None = None,
+    presentation_elapsed_frames: int = 0,
     mouse_pos: tuple[int, int] = OFFSCREEN_MOUSE_POS,
     surface: pygame.Surface | None = None,
     drawer: PrimitiveDrawer | None = None,
@@ -119,8 +112,7 @@ def render_scenario_frame(
     prepared_screen = prepare_scenario_frame(
         scenario,
         size=resolved_size,
-        frame_count=frame_count,
-        presentation_frame_count=presentation_frame_count,
+        presentation_elapsed_frames=presentation_elapsed_frames,
         mouse_pos=mouse_pos,
     )
     prepared_screen.render(surface, drawer=drawer or PrimitiveDrawer())
@@ -136,16 +128,14 @@ def save_scenario_frame(
     output_path: Path,
     *,
     size: tuple[int, int] | None = None,
-    frame_count: int = 0,
-    presentation_frame_count: int | None = None,
+    presentation_elapsed_frames: int = 0,
     mouse_pos: tuple[int, int] = OFFSCREEN_MOUSE_POS,
 ) -> Path:
     prepare_headless_pygame()
     rendered = render_scenario_frame(
         scenario,
         size=size,
-        frame_count=frame_count,
-        presentation_frame_count=presentation_frame_count,
+        presentation_elapsed_frames=presentation_elapsed_frames,
         mouse_pos=mouse_pos,
     )
     output_path = output_path.resolve()
@@ -173,8 +163,7 @@ def save_scenario_frames(
             scenario,
             output_dir / f"{scenario.name}_frame_{frame:03d}.png",
             size=size,
-            frame_count=frame,
-            presentation_frame_count=frame,
+            presentation_elapsed_frames=frame,
             mouse_pos=mouse_pos,
         )
         for frame in selected_frames
@@ -208,8 +197,7 @@ def save_timeline_frames(
                         f"frame_{frame:03d}.png"
                     ),
                     size=timeline.default_size if size is None else size,
-                    frame_count=frame,
-                    presentation_frame_count=frame,
+                    presentation_elapsed_frames=frame,
                     mouse_pos=mouse_pos,
                 )
             )
@@ -225,8 +213,7 @@ class WorkbenchApp:
         *,
         timeline: WorkbenchTimeline | None = None,
         size: tuple[int, int] | None = None,
-        frame_count: int = 0,
-        presentation_frame_count: int | None = None,
+        presentation_elapsed_frames: int = 0,
         screenshot_dir: Path = Path("workbench-screenshots"),
     ) -> None:
         if (scenario is None) == (timeline is None):
@@ -239,12 +226,7 @@ class WorkbenchApp:
         )
         initial_scenario = self._scenarios[0]
         self._initial_size = initial_scenario.default_size if size is None else size
-        self._frame_count = frame_count
-        self._presentation_frame_count = (
-            frame_count
-            if presentation_frame_count is None
-            else presentation_frame_count
-        )
+        self._presentation_elapsed_frames = presentation_elapsed_frames
         self._screenshot_dir = screenshot_dir
         self._running = True
         self._auto_advance = False
@@ -266,8 +248,7 @@ class WorkbenchApp:
                 render_scenario_frame(
                     self.current_scenario,
                     size=screen.get_size(),
-                    frame_count=self._frame_count,
-                    presentation_frame_count=self._presentation_frame_count,
+                    presentation_elapsed_frames=self._presentation_elapsed_frames,
                     mouse_pos=pygame.mouse.get_pos(),
                     surface=screen,
                     drawer=drawer,
@@ -278,8 +259,7 @@ class WorkbenchApp:
                     self._screenshot_requested = False
 
                 if self._auto_advance:
-                    self._frame_count += 1
-                    self._presentation_frame_count += 1
+                    self._presentation_elapsed_frames += 1
                     pygame.display.set_caption(self._caption())
                 clock.tick(WORKBENCH_FPS)
             return 0
@@ -300,18 +280,12 @@ class WorkbenchApp:
             if event.key == pygame.K_p:
                 self._auto_advance = not self._auto_advance
             elif event.key == pygame.K_RIGHT:
-                self._presentation_frame_count += 10 if event.mod & pygame.KMOD_SHIFT else 1
+                self._presentation_elapsed_frames += 10 if event.mod & pygame.KMOD_SHIFT else 1
             elif event.key == pygame.K_LEFT:
                 step = 10 if event.mod & pygame.KMOD_SHIFT else 1
-                self._presentation_frame_count = max(0, self._presentation_frame_count - step)
-            elif event.key == pygame.K_UP:
-                self._frame_count += 10 if event.mod & pygame.KMOD_SHIFT else 1
-            elif event.key == pygame.K_DOWN:
-                step = 10 if event.mod & pygame.KMOD_SHIFT else 1
-                self._frame_count = max(0, self._frame_count - step)
+                self._presentation_elapsed_frames = max(0, self._presentation_elapsed_frames - step)
             elif event.key == pygame.K_HOME:
-                self._frame_count = 0
-                self._presentation_frame_count = 0
+                self._presentation_elapsed_frames = 0
             elif event.key == pygame.K_PAGEUP:
                 self.select_previous_step()
             elif event.key == pygame.K_PAGEDOWN:
@@ -323,8 +297,8 @@ class WorkbenchApp:
     def _save_current_frame(self, screen: pygame.Surface) -> None:
         self._screenshot_dir.mkdir(parents=True, exist_ok=True)
         output_path = self._screenshot_dir / (
-            f"{self.current_scenario.name}_frame_{self._frame_count:03d}_"
-            f"presentation_{self._presentation_frame_count:03d}.png"
+            f"{self.current_scenario.name}_frame_"
+            f"{self._presentation_elapsed_frames:03d}.png"
         )
         pygame.image.save(screen, str(output_path))
         print(output_path.resolve())
@@ -352,8 +326,7 @@ class WorkbenchApp:
         if bounded == self._timeline_step_index:
             return False
         self._timeline_step_index = bounded
-        self._frame_count = 0
-        self._presentation_frame_count = 0
+        self._presentation_elapsed_frames = 0
         self._auto_advance = False
         return True
 
@@ -368,7 +341,7 @@ class WorkbenchApp:
         return (
             f"Row-Taker GUI-Workbench | {timeline_part}"
             f"{scenario_category(self.current_scenario)}/{self.current_scenario.name} | "
-            f"frame={self._frame_count} presentation={self._presentation_frame_count} | "
-            f"{mode} | P Pause, Pfeile Frame, Bild auf/ab Zustand, "
+            f"frame={self._presentation_elapsed_frames} | "
+            f"{mode} | P Pause, Links/Rechts Frame, Bild auf/ab Zustand, "
             "Home Reset, S Screenshot"
         )

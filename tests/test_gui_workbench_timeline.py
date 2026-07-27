@@ -105,8 +105,7 @@ def test_every_timeline_step_renders_all_interesting_frames() -> None:
         for frame in step.interesting_frames:
             rendered = render_scenario_frame(
                 step,
-                frame_count=frame,
-                presentation_frame_count=frame,
+                presentation_elapsed_frames=frame,
             )
             assert rendered.surface.get_size() == timeline.default_size
 
@@ -128,8 +127,7 @@ def test_interactive_timeline_navigation_resets_animation_clocks() -> None:
     timeline = get_timeline("full-trick")
     app = WorkbenchApp(
         timeline=timeline,
-        frame_count=12,
-        presentation_frame_count=8,
+        presentation_elapsed_frames=8,
     )
 
     assert app.timeline_step_index == 0
@@ -140,6 +138,7 @@ def test_interactive_timeline_navigation_resets_animation_clocks() -> None:
     assert app.select_next_step() is True
     assert app.timeline_step_index == 1
     assert app.current_scenario == timeline.steps[1]
+    assert app._presentation_elapsed_frames == 0
 
     for _ in range(len(timeline.steps) + 2):
         app.select_next_step()

@@ -26,7 +26,7 @@ def test_all_workbench_scenarios_have_visible_interaction_targets(scenario) -> N
     visual_state = build_game_visual_state(
         scenario.state,
         last_action_summary="test",
-        presentation_frame_count=16,
+        presentation_elapsed_frames=16,
     )
 
     assert_selectable_objects_are_visible(visual_state)
@@ -48,7 +48,7 @@ def test_full_timeline_visual_states_match_their_snapshots() -> None:
             visual_state = build_game_visual_state(
                 state,
                 last_action_summary="test",
-                presentation_frame_count=frame,
+                presentation_elapsed_frames=frame,
             )
             assert_selectable_objects_are_visible(visual_state)
             assert_motion_anchors_are_resolvable(visual_state)

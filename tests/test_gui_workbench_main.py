@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from row_taker.gui_workbench.main import _parse_frames, _parse_point, _parse_size, run
 
 
@@ -30,3 +32,8 @@ def test_workbench_timeline_list_command(capsys) -> None:
     assert "full-trick" in output
     assert "PresentationRowChosen" in output
     assert "steps: 11" in output
+
+
+def test_workbench_rejects_removed_presentation_frame_option() -> None:
+    with pytest.raises(SystemExit):
+        run(["choose-card", "--presentation-frame", "16"])

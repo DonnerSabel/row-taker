@@ -101,8 +101,7 @@ def _frame_for_state(
     return GameFrame.from_layout(
         layout=compute_layout(*DEFAULT_SIZE),
         state=state,
-        frame_count=0,
-        presentation_frame_count=0,
+        presentation_elapsed_frames=0,
         last_action_summary="Timeline-Erzeugung über den echten GameFrame-Eingabepfad.",
         mouse_pos=mouse_pos,
     )
