@@ -3,11 +3,16 @@ from __future__ import annotations
 import pygame
 
 from row_taker.gui.assets import DEFAULT_GUI_ASSETS
-from row_taker.gui.menu_layout import DEFAULT_MENU_LAYOUT, MenuLayoutConfig, header_footer_layout
-from row_taker.gui.theme import DEFAULT_THEME, GuiTheme
-from row_taker.gui.widgets import centered_text_position, draw_overlay_panel, draw_panel, draw_vertical_gradient
 from row_taker.gui.layout import GuiLayout
+from row_taker.gui.menu_layout import DEFAULT_MENU_LAYOUT, MenuLayoutConfig, header_footer_layout
 from row_taker.gui.primitives import PrimitiveDrawer
+from row_taker.gui.theme import DEFAULT_THEME, GuiTheme
+from row_taker.gui.widgets import (
+    centered_text_position,
+    draw_overlay_panel,
+    draw_panel,
+    draw_vertical_gradient,
+)
 
 THEME = DEFAULT_THEME
 PALETTE = THEME.palette

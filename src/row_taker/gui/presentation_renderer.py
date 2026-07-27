@@ -20,9 +20,9 @@ from row_taker.gui.game_visual_state import (
     VisualMovingCard,
     VisualPresentationPanel,
 )
+from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_overlay_panel
-from row_taker.gui.primitives import PrimitiveDrawer
 
 THEME = DEFAULT_THEME
 PALETTE = THEME.palette

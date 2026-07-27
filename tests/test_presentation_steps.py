@@ -13,7 +13,6 @@ from row_taker.client.presentation_events import (
     PresentationRowTaken,
     PresentationTrickFinished,
 )
-from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import ClientState
 from row_taker.client.trick_presentation_resolver import (
     apply_trick_row_choice,

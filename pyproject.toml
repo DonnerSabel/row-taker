@@ -37,6 +37,11 @@ quote-style = "double"
 select = ["E", "F", "I", "UP", "B"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/test_gui_final_cleanup.py" = ["E402"]
+"tests/test_gui_game_visual_interaction.py" = ["E402"]
+"tests/test_gui_visual_card_motion.py" = ["E402"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

@@ -9,9 +9,9 @@ from row_taker.client.actions import (
     ClientActionChooseCard,
     ClientActionChooseRow,
 )
+from row_taker.engine.game.models import RowID
 from row_taker.gui.board_layout import BoardGeometry, CardPlacement, hand_card_placements
 from row_taker.gui.card import GuiCard
-from row_taker.engine.game.models import RowID
 from row_taker.gui.game_visual_state import GameVisualState, VisualHandCard
 from row_taker.gui.screen_result import NO_SCREEN_RESULT, ScreenResult
 

@@ -10,8 +10,8 @@ from row_taker.client.actions import ClientActionChooseRow
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import Row, RowID
 from row_taker.engine.game.state import PlayerState
-from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui.layout import compute_layout
+from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui_workbench.scenarios import get_scenario
 
 

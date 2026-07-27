@@ -4,6 +4,8 @@ from dataclasses import dataclass, replace
 
 import pygame
 
+from row_taker.gui.connect_form_state import ConnectFormState
+from row_taker.gui.layout import GuiLayout
 from row_taker.gui.menu_layout import DEFAULT_MENU_LAYOUT, compute_connect_panel_layout
 from row_taker.gui.menu_shell import (
     draw_menu_background,
@@ -12,12 +14,10 @@ from row_taker.gui.menu_shell import (
     draw_menu_panel,
     draw_text_input,
 )
+from row_taker.gui.primitives import PrimitiveDrawer
+from row_taker.gui.screen_result import NO_SCREEN_RESULT, ScreenResult
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_button, draw_overlay_panel
-from row_taker.gui.layout import GuiLayout
-from row_taker.gui.primitives import PrimitiveDrawer
-from row_taker.gui.connect_form_state import ConnectFormState
-from row_taker.gui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
 CONNECT_FIELD_ORDER = ("host", "port", "display_name")
 THEME = DEFAULT_THEME

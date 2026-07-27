@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import pygame
 
@@ -18,8 +18,8 @@ from row_taker.engine.game import RulesConfig, setup_game
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import EngineRow, PlayerID, RowID
 from row_taker.engine.game.state import PublicState
-from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui.layout import compute_layout
+from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui_workbench.scenarios import (
     ANIMATION_FRAMES,
     DEFAULT_SIZE,

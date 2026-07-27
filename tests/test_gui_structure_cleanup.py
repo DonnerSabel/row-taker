@@ -6,7 +6,6 @@ from typing import get_type_hints
 from row_taker.client.actions import ClientAction
 from row_taker.gui.screen_result import ScreenResult
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
