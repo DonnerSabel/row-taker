@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 import pygame
 
 from row_taker.client.state import ClientState
-from row_taker.engine.game import Phase
 from row_taker.engine.game.models import PlayerID
 from row_taker.gui.animation import AnimationClock
 from row_taker.gui.assets import DEFAULT_GUI_ASSETS, GuiAssets
@@ -15,6 +13,7 @@ from row_taker.gui.board_layout import (
     CardPlacement,
     OpponentSlotGeometry,
     compute_board_geometry,
+    hand_card_placements,
     row_card_placements,
 )
 from row_taker.gui.card import GuiCard, draw_card_back
@@ -23,7 +22,17 @@ from row_taker.gui.game_interaction import (
     build_game_screen_targets,
     handle_game_event,
 )
-from row_taker.gui.presentation_renderer import draw_presentation_card_motion, draw_presentation_panel
+from row_taker.gui.game_visual_builder import build_game_visual_state
+from row_taker.gui.game_visual_state import (
+    GameVisualState,
+    MessageLevel,
+    RowEmphasis,
+    VisualCard,
+)
+from row_taker.gui.presentation_renderer import (
+    draw_presentation_card_motion,
+    draw_presentation_panel,
+)
 from row_taker.gui.presentation_visuals import PresentationVisuals, build_presentation_visuals
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_badge, draw_button, draw_overlay_panel
@@ -46,15 +55,15 @@ class OpponentSlot:
 class GameFrame:
     """One fully prepared production frame of the game screen.
 
-    Geometry and interaction targets are created together from the same layout
-    and state. The live GUI and the future workbench can therefore render and
-    interact with exactly the same prepared frame.
+    The client state is translated once at the frame boundary. Geometry,
+    targets, rendering, and event handling below that boundary use the same
+    immutable ``GameVisualState``.
     """
 
-    state: ClientState
+    visual_state: GameVisualState
+    presentation_visuals: PresentationVisuals
     frame_count: int
     presentation_frame_count: int
-    last_action_summary: str
     geometry: BoardGeometry
     targets: GameScreenTargets
 
@@ -69,28 +78,27 @@ class GameFrame:
         last_action_summary: str,
         mouse_pos: tuple[int, int] | None = None,
     ) -> GameFrame:
-        geometry = _compute_geometry(layout.window_rect, state)
+        visual_state = build_game_visual_state(
+            state,
+            last_action_summary=last_action_summary,
+        )
+        geometry = _compute_geometry(layout.window_rect, visual_state)
         targets = build_game_screen_targets(
             geometry,
-            state,
+            visual_state,
             mouse_pos=mouse_pos,
         )
         return cls(
-            state=state,
+            visual_state=visual_state,
+            presentation_visuals=build_presentation_visuals(state),
             frame_count=frame_count,
             presentation_frame_count=presentation_frame_count,
-            last_action_summary=last_action_summary,
             geometry=geometry,
             targets=targets,
         )
 
     def build_targets(self, layout: DemoLayout | None = None) -> GameScreenTargets:
-        """Return the targets prepared together with this frame.
-
-        ``layout`` remains part of the common screen API used by ``GuiApp``.
-        Workbench callers can omit it. When supplied, it is checked so stale
-        frames cannot accidentally be rendered after a window-size change.
-        """
+        """Return the targets prepared together with this frame."""
 
         self._require_matching_layout(layout)
         return self.targets
@@ -105,7 +113,7 @@ class GameFrame:
         self._require_matching_targets(targets)
         return handle_game_event(
             event,
-            state=self.state,
+            visual_state=self.visual_state,
             game_targets=self.targets,
         )
 
@@ -125,11 +133,11 @@ class GameFrame:
             screen,
             drawer=drawer,
             geometry=self.geometry,
-            client_state=self.state,
+            visual_state=self.visual_state,
             game_targets=self.targets,
+            presentation_visuals=self.presentation_visuals,
             frame_count=self.frame_count,
             presentation_frame_count=self.presentation_frame_count,
-            last_action_summary=self.last_action_summary,
         )
 
     def _require_matching_layout(self, layout: DemoLayout | None) -> None:
@@ -151,39 +159,61 @@ def render_game_screen(
     *,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
-    client_state: ClientState,
+    visual_state: GameVisualState,
     game_targets: GameScreenTargets,
+    presentation_visuals: PresentationVisuals,
     frame_count: int,
     presentation_frame_count: int,
-    last_action_summary: str,
     assets: GuiAssets = DEFAULT_GUI_ASSETS,
 ) -> None:
-    presentation_visuals = build_presentation_visuals(client_state)
-    frame_clock = AnimationClock(frame_count)
+    del frame_count  # Reserved for stable-frame animation independent of presentation steps.
     presentation_clock = AnimationClock(presentation_frame_count)
 
     _draw_full_background(screen, geometry.window_rect, assets)
-    _draw_rows(screen, drawer, geometry, client_state, game_targets, assets, presentation_visuals, presentation_clock)
-    _draw_opponent_slots(screen, drawer, geometry, client_state, assets, presentation_visuals, presentation_clock)
-    _draw_hand(screen, drawer, client_state, game_targets, assets, presentation_visuals)
+    _draw_rows(
+        screen,
+        drawer,
+        geometry,
+        visual_state,
+        game_targets,
+        assets,
+        presentation_visuals,
+        presentation_clock,
+    )
+    _draw_opponent_slots(
+        screen,
+        drawer,
+        geometry,
+        visual_state,
+        assets,
+        presentation_visuals,
+        presentation_clock,
+    )
+    _draw_hand(
+        screen,
+        drawer,
+        geometry,
+        visual_state,
+        game_targets,
+        assets,
+        presentation_visuals,
+    )
     draw_presentation_card_motion(
         screen,
         drawer,
         geometry,
-        client_state,
-        game_targets,
+        visual_state,
         presentation_visuals,
         assets,
         presentation_clock,
-        opponent_slots=_opponent_slot_data(client_state, geometry),
+        opponent_slots=_opponent_slot_data(visual_state, geometry),
     )
-    _draw_stats_field(screen, drawer, geometry, client_state)
+    _draw_stats_field(screen, drawer, geometry, visual_state)
     _draw_status_overlay(
         screen,
         drawer,
         geometry,
-        client_state,
-        last_action_summary,
+        visual_state,
         game_targets,
         presentation_visuals,
         assets,
@@ -191,22 +221,23 @@ def render_game_screen(
     )
 
 
-def _compute_geometry(window_rect: pygame.Rect, state: ClientState) -> BoardGeometry:
-    public_state = state.public_state
-    player_state = state.player_state
-    row_count = len(public_state.rows) if public_state is not None else 4
-    hand_card_count = len(player_state.hand) if player_state is not None else 0
-    opponent_count = len(_opponent_players(state))
-
+def _compute_geometry(
+    window_rect: pygame.Rect,
+    visual_state: GameVisualState,
+) -> BoardGeometry:
     return compute_board_geometry(
         window_rect.size,
-        row_count=row_count,
-        hand_card_count=hand_card_count,
-        opponent_count=opponent_count,
+        row_count=len(visual_state.rows) or 4,
+        hand_card_count=len(visual_state.visible_hand),
+        opponent_count=len(visual_state.opponents),
     )
 
 
-def _draw_full_background(screen: pygame.Surface, window_rect: pygame.Rect, assets: GuiAssets) -> None:
+def _draw_full_background(
+    screen: pygame.Surface,
+    window_rect: pygame.Rect,
+    assets: GuiAssets,
+) -> None:
     board = assets.scaled_board_image_full(window_rect.width, window_rect.height)
     if board is None:
         screen.fill((18, 84, 38))
@@ -220,23 +251,32 @@ def _draw_rows(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
-    client_state: ClientState,
+    visual_state: GameVisualState,
     game_targets: GameScreenTargets,
     assets: GuiAssets,
     presentation_visuals: PresentationVisuals,
     animation_clock: AnimationClock,
 ) -> None:
-    public_state = client_state.public_state
-    if public_state is None:
-        return
-
     row_target_by_id = {target.row_id: target for target in game_targets.row_targets}
 
-    for row_index, (row, column_rect) in enumerate(zip(public_state.rows, geometry.row_columns, strict=False)):
+    for row_index, (row, column_rect) in enumerate(
+        zip(visual_state.rows, geometry.row_columns, strict=False)
+    ):
         target = row_target_by_id.get(row.row_id)
-        selectable = target is not None
+        selectable = row.row_id in visual_state.interaction.selectable_row_ids
         hovered = bool(target.hovered) if target is not None else False
-        placements = row_card_placements(geometry, row_index=row_index, card_count=len(row.cards))
+        placements = row_card_placements(
+            geometry,
+            row_index=row_index,
+            card_count=len(row.cards),
+        )
+        legacy_emphasis = presentation_visuals.row_emphasis_for(row.row_id)
+        emphasis = legacy_emphasis if legacy_emphasis != "none" else row.emphasis
+        taken_values = (
+            presentation_visuals.taken_card_values
+            if legacy_emphasis in {"taken", "overflow"}
+            else tuple(card.card_value for card in row.taken_cards)
+        )
         _draw_row_column(
             screen,
             drawer,
@@ -246,8 +286,9 @@ def _draw_rows(
             placements=placements,
             selectable=selectable,
             hovered=hovered,
+            emphasis=emphasis,
+            taken_card_values=taken_values,
             assets=assets,
-            presentation_visuals=presentation_visuals,
             animation_clock=animation_clock,
         )
 
@@ -258,38 +299,71 @@ def _draw_row_column(
     rect: pygame.Rect,
     *,
     row_id: object,
-    cards: tuple[Any, ...],
+    cards: tuple[VisualCard, ...],
     placements: tuple[CardPlacement, ...],
     selectable: bool,
     hovered: bool,
+    emphasis: RowEmphasis,
+    taken_card_values: tuple[int, ...],
     assets: GuiAssets,
-    presentation_visuals: PresentationVisuals,
     animation_clock: AnimationClock,
 ) -> None:
     lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
-    emphasis = presentation_visuals.row_emphasis_for(row_id)
-    lane_fill = PALETTE.lane_overlay_active if emphasis != "none" or hovered else PALETTE.lane_overlay
+    lane_fill = (
+        PALETTE.lane_overlay_active
+        if emphasis != "none" or hovered
+        else PALETTE.lane_overlay
+    )
     pygame.draw.rect(lane_surface, lane_fill, lane_surface.get_rect(), border_radius=8)
     screen.blit(lane_surface, rect)
 
-    border = _row_border_color(selectable=selectable, hovered=hovered, emphasis=emphasis)
+    border = _row_border_color(
+        selectable=selectable,
+        hovered=hovered,
+        emphasis=emphasis,
+    )
     if emphasis != "none":
         _draw_pulsing_outline(screen, rect, border, animation_clock, max_inflate=12)
     border_width = 4 if emphasis != "none" or hovered else 3 if selectable else 1
     pygame.draw.rect(screen, border, rect, border_width, border_radius=8)
 
-    label_color = border if selectable or hovered or emphasis != "none" else PALETTE.text_muted
-    drawer.draw_text(screen, str(row_id), (rect.left + 8, rect.top + 6), role="small", color=label_color)
+    label_color = (
+        border
+        if selectable or hovered or emphasis != "none"
+        else PALETTE.text_muted
+    )
+    drawer.draw_text(
+        screen,
+        str(row_id),
+        (rect.left + 8, rect.top + 6),
+        role="small",
+        color=label_color,
+    )
 
     if emphasis in {"taken", "overflow"}:
-        _draw_row_taken_badge(screen, drawer, rect, presentation_visuals)
+        _draw_row_taken_badge(
+            screen,
+            drawer,
+            rect,
+            taken_card_values=taken_card_values,
+        )
 
     for card, placement in zip(cards, placements, strict=False):
         selected = selectable or hovered or emphasis != "none"
-        GuiCard.from_card(card, placement.rect, selected=selected).draw(screen, drawer=drawer, assets=assets)
+        GuiCard(
+            card_value=card.card_value,
+            bullheads=card.bullheads,
+            rect=placement.rect,
+            selected=selected,
+        ).draw(screen, drawer=drawer, assets=assets)
 
 
-def _row_border_color(*, selectable: bool, hovered: bool, emphasis: str) -> pygame.Color:
+def _row_border_color(
+    *,
+    selectable: bool,
+    hovered: bool,
+    emphasis: RowEmphasis,
+) -> pygame.Color:
     if emphasis == "placed":
         return PALETTE.row_placed
     if emphasis == "choice":
@@ -309,13 +383,19 @@ def _draw_row_taken_badge(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     rect: pygame.Rect,
-    presentation_visuals: PresentationVisuals,
+    *,
+    taken_card_values: tuple[int, ...],
 ) -> None:
-    cards = ", ".join(str(value) for value in presentation_visuals.taken_card_values)
+    cards = ", ".join(str(value) for value in taken_card_values)
     if not cards:
         return
 
-    badge_rect = pygame.Rect(rect.left + 8, rect.bottom - 34, max(1, rect.width - 16), 26)
+    badge_rect = pygame.Rect(
+        rect.left + 8,
+        rect.bottom - 34,
+        max(1, rect.width - 16),
+        26,
+    )
     draw_badge(
         screen,
         drawer,
@@ -331,30 +411,47 @@ def _draw_opponent_slots(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
-    client_state: ClientState,
+    visual_state: GameVisualState,
     assets: GuiAssets,
     presentation_visuals: PresentationVisuals,
     animation_clock: AnimationClock,
 ) -> None:
-    revealed_by_player = _revealed_card_values_by_player(client_state)
-    opponents = _opponent_slot_data(client_state, geometry)
+    opponents = _opponent_slot_data(visual_state, geometry)
 
-    for index, slot in enumerate(opponents):
+    for index, (player, slot) in enumerate(
+        zip(visual_state.opponents, opponents, strict=False)
+    ):
         color = _player_color(index)
         circle_rect = slot.geometry.circle_rect
-        active_player = slot.player_id == presentation_visuals.active_player_id
+        active_player = (
+            player.emphasis == "active"
+            or player.player_id == presentation_visuals.active_player_id
+        )
         pygame.draw.ellipse(screen, color, circle_rect)
-        pygame.draw.ellipse(screen, pygame.Color(255, 255, 255, 150), circle_rect, 2)
+        pygame.draw.ellipse(
+            screen,
+            pygame.Color(255, 255, 255, 150),
+            circle_rect,
+            2,
+        )
         if active_player:
-            inflate = 8 + animation_clock.pulse_inflate(period_frames=54, max_pixels=8)
+            inflate = 8 + animation_clock.pulse_inflate(
+                period_frames=54,
+                max_pixels=8,
+            )
             ring_color = animation_clock.pulsed_color(
                 PALETTE.accent,
                 PALETTE.accent_hover,
                 period_frames=54,
             )
-            pygame.draw.ellipse(screen, ring_color, circle_rect.inflate(inflate, inflate), 3)
+            pygame.draw.ellipse(
+                screen,
+                ring_color,
+                circle_rect.inflate(inflate, inflate),
+                3,
+            )
 
-        initials = _initials(slot.player_name)
+        initials = _initials(player.name)
         drawer.draw_text(
             screen,
             initials,
@@ -363,73 +460,78 @@ def _draw_opponent_slots(
             color=PALETTE.text_primary,
         )
 
-        card_value = presentation_visuals.card_value_for_player(slot.player_id)
+        card_value = presentation_visuals.card_value_for_player(player.player_id)
         if card_value is None:
-            card_value = revealed_by_player.get(slot.player_id)
+            card_value = player.staged_card_value
         staged_rect = slot.geometry.staged_card.rect
         if card_value is None:
             draw_card_back(screen, staged_rect)
         else:
-            GuiCard.from_card_value(card_value, staged_rect, selected=active_player).draw(
-                screen, drawer=drawer, assets=assets
-            )
+            GuiCard.from_card_value(
+                card_value,
+                staged_rect,
+                selected=active_player,
+            ).draw(screen, drawer=drawer, assets=assets)
 
 
-def _opponent_slot_data(client_state: ClientState, geometry: BoardGeometry) -> tuple[OpponentSlot, ...]:
-    players = _opponent_players(client_state)
+def _opponent_slot_data(
+    visual_state: GameVisualState,
+    geometry: BoardGeometry,
+) -> tuple[OpponentSlot, ...]:
     return tuple(
         OpponentSlot(
             player_id=player.player_id,
             player_name=player.name,
             geometry=slot_geometry,
         )
-        for player, slot_geometry in zip(players, geometry.opponent_slots, strict=False)
+        for player, slot_geometry in zip(
+            visual_state.opponents,
+            geometry.opponent_slots,
+            strict=False,
+        )
     )
-
-
-def _revealed_card_values_by_player(client_state: ClientState) -> dict[PlayerID, int]:
-    revealed = client_state.revealed_trick
-    if revealed is None:
-        return {}
-    return {play.player_id: play.card_value for play in revealed.plays}
 
 
 def _draw_hand(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    client_state: ClientState,
+    geometry: BoardGeometry,
+    visual_state: GameVisualState,
     game_targets: GameScreenTargets,
     assets: GuiAssets,
     presentation_visuals: PresentationVisuals,
 ) -> None:
-    player_state = client_state.player_state
-    if player_state is None:
-        return
-
+    hand_cards = visual_state.visible_hand
+    placements = hand_card_placements(geometry, card_count=len(hand_cards))
     target_by_value = {target.card_value: target for target in game_targets.card_targets}
-    for card in player_state.hand:
-        target = target_by_value.get(card.value)
-        if target is None:
-            continue
-        selected = card.value in presentation_visuals.focus_card_values
-        visible_card = GuiCard.from_card(
-            card,
-            target.rect,
-            selected=target.card.selected or selected,
-            hovered=target.card.hovered,
-        )
-        visible_card.draw(screen, drawer=drawer, assets=assets)
 
-    if (
-        player_state.phase_info.phase == Phase.CHOOSE_ROW
-        and player_state.pending_card_value() is not None
-        and game_targets.card_targets
-    ):
-        pending_rect = pygame.Rect(24, max(60, game_targets.card_targets[0].rect.top - 42), 270, 34)
+    for card, placement in zip(hand_cards, placements, strict=False):
+        target = target_by_value.get(card.card_value)
+        selected = (
+            card.emphasis == "selected"
+            or card.card_value in presentation_visuals.focus_card_values
+            or (target is not None and target.card.selected)
+        )
+        hovered = target.card.hovered if target is not None else False
+        GuiCard(
+            card_value=card.card_value,
+            bullheads=card.bullheads,
+            rect=placement.rect,
+            selected=selected,
+            hovered=hovered,
+        ).draw(screen, drawer=drawer, assets=assets)
+
+    if visual_state.status.hand_prompt is not None and placements:
+        pending_rect = pygame.Rect(
+            24,
+            max(60, placements[0].rect.top - 42),
+            270,
+            34,
+        )
         _draw_overlay_box(screen, pending_rect)
         drawer.draw_text(
             screen,
-            f"Reihe für Karte {player_state.pending_card_value()} wählen",
+            visual_state.status.hand_prompt,
             (pending_rect.left + 10, pending_rect.top + 8),
             role="small",
             color=PALETTE.accent,
@@ -440,46 +542,57 @@ def _draw_stats_field(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
-    client_state: ClientState,
+    visual_state: GameVisualState,
 ) -> None:
     rect = geometry.stats_rect
     draw_overlay_panel(screen, rect, radius=12, alpha=35, theme=THEME)
 
-    player_state = client_state.player_state
-    public_state = client_state.public_state
-    own_score = "-"
-    own_name = "-"
-    if player_state is not None:
-        own_player = player_state.self_player()
-        own_score = str(own_player.score)
-        own_name = own_player.name
+    own_player = visual_state.own_player
+    own_score = str(own_player.score) if own_player is not None else "-"
+    own_name = own_player.name if own_player is not None else "-"
 
-    drawer.draw_text(screen, own_name, (rect.left + 12, rect.top + 14), role="small", color=PALETTE.text_muted)
-    drawer.draw_text(screen, "Hornochsen", (rect.left + 12, rect.top + 42), role="small", color=PALETTE.text_muted)
-    drawer.draw_text(screen, own_score, (rect.left + 12, rect.top + 66), role="title", color=PALETTE.accent)
+    drawer.draw_text(
+        screen,
+        own_name,
+        (rect.left + 12, rect.top + 14),
+        role="small",
+        color=PALETTE.text_muted,
+    )
+    drawer.draw_text(
+        screen,
+        "Hornochsen",
+        (rect.left + 12, rect.top + 42),
+        role="small",
+        color=PALETTE.text_muted,
+    )
+    drawer.draw_text(
+        screen,
+        own_score,
+        (rect.left + 12, rect.top + 66),
+        role="title",
+        color=PALETTE.accent,
+    )
 
-    if public_state is not None:
-        y = rect.top + 112
-        for player in public_state.players:
-            marker = "★ " if player.player_id == client_state.own_player_id else ""
-            drawer.draw_text(
-                screen,
-                f"{marker}{player.name}: {player.score}",
-                (rect.left + 12, y),
-                role="tiny",
-                color=PALETTE.text_primary if marker else PALETTE.text_muted,
-            )
-            y += 20
-            if y > rect.bottom - 54:
-                break
+    y = rect.top + 112
+    for player in visual_state.players:
+        marker = "★ " if player.is_self else ""
+        drawer.draw_text(
+            screen,
+            f"{marker}{player.name}: {player.score}",
+            (rect.left + 12, y),
+            role="tiny",
+            color=PALETTE.text_primary if player.is_self else PALETTE.text_muted,
+        )
+        y += 20
+        if y > rect.bottom - 54:
+            break
 
 
 def _draw_status_overlay(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
-    client_state: ClientState,
-    last_action_summary: str,
+    visual_state: GameVisualState,
     game_targets: GameScreenTargets,
     presentation_visuals: PresentationVisuals,
     assets: GuiAssets,
@@ -487,29 +600,29 @@ def _draw_status_overlay(
 ) -> None:
     _draw_overlay_box(screen, geometry.overlay_rect)
 
-    player_state = client_state.player_state
-    phase = player_state.phase_info.phase.value if player_state is not None else "-"
-    player_name = player_state.self_player_name() if player_state is not None else "-"
-
-    line_1 = f"{player_name}  |  Phase: {phase}  |  Aktion: {client_state.pending_action.value}"
     drawer.draw_text(
         screen,
-        line_1,
+        visual_state.status.primary_line,
         (geometry.overlay_rect.left + 10, geometry.overlay_rect.top + 8),
         role="small",
     )
-
-    line_2 = client_state.flash_message.text if client_state.flash_message is not None else last_action_summary
     drawer.draw_text(
         screen,
-        line_2,
+        visual_state.status.secondary_line,
         (geometry.overlay_rect.left + 10, geometry.overlay_rect.top + 30),
         role="tiny",
-        color=PALETTE.text_muted,
+        color=_status_message_color(visual_state.status.message_level),
     )
 
     if presentation_visuals.has_event:
-        draw_presentation_panel(screen, drawer, geometry, presentation_visuals, assets, animation_clock)
+        draw_presentation_panel(
+            screen,
+            drawer,
+            geometry,
+            presentation_visuals,
+            assets,
+            animation_clock,
+        )
 
     if game_targets.continue_target is not None:
         draw_button(
@@ -523,6 +636,14 @@ def _draw_status_overlay(
         )
 
 
+def _status_message_color(level: MessageLevel) -> pygame.Color:
+    if level == "error":
+        return PALETTE.danger
+    if level == "info":
+        return PALETTE.text_primary
+    return PALETTE.text_muted
+
+
 def _draw_pulsing_outline(
     screen: pygame.Surface,
     rect: pygame.Rect,
@@ -531,48 +652,27 @@ def _draw_pulsing_outline(
     *,
     max_inflate: int,
 ) -> None:
-    inflate = animation_clock.pulse_inflate(period_frames=54, max_pixels=max_inflate)
+    inflate = animation_clock.pulse_inflate(
+        period_frames=54,
+        max_pixels=max_inflate,
+    )
     glow_rect = rect.inflate(inflate, inflate)
     alpha = animation_clock.pulse_alpha(period_frames=54, low=42, high=115)
     overlay = pygame.Surface(glow_rect.size, pygame.SRCALPHA)
     glow_color = pygame.Color(color)
     glow_color.a = alpha
-    pygame.draw.rect(overlay, glow_color, overlay.get_rect(), width=3, border_radius=10)
+    pygame.draw.rect(
+        overlay,
+        glow_color,
+        overlay.get_rect(),
+        width=3,
+        border_radius=10,
+    )
     screen.blit(overlay, glow_rect)
-
-
-def _draw_presentation_card_strip(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    rect: pygame.Rect,
-    *,
-    card_values: tuple[int, ...],
-    assets: GuiAssets,
-) -> None:
-    max_cards = min(4, len(card_values))
-    card_width = max(32, min(44, (rect.width - 28) // max(1, max_cards)))
-    card_size = (card_width, round(card_width * 1.5))
-    x = rect.left + 12
-    y = rect.top + 34
-    for value in card_values[:max_cards]:
-        card_rect = pygame.Rect(x, y, card_size[0], card_size[1])
-        GuiCard.from_card_value(value, card_rect, selected=True).draw(screen, drawer=drawer, assets=assets)
-        x += card_width + 8
-
-    remaining = len(card_values) - max_cards
-    if remaining > 0:
-        drawer.draw_text(screen, f"+{remaining}", (x + 2, y + 18), role="small", color=PALETTE.text_muted)
 
 
 def _draw_overlay_box(screen: pygame.Surface, rect: pygame.Rect) -> None:
     draw_overlay_panel(screen, rect, theme=THEME)
-
-
-def _opponent_players(state: ClientState) -> tuple[Any, ...]:
-    public_state = state.public_state
-    if public_state is None:
-        return ()
-    return tuple(player for player in public_state.players if player.player_id != state.own_player_id)
 
 
 def _initials(name: str) -> str:

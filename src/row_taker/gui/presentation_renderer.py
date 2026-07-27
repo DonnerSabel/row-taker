@@ -4,12 +4,15 @@ from typing import Any
 
 import pygame
 
-from row_taker.client.state import ClientState
 from row_taker.gui.animation import AnimationClock, lerp_rect
 from row_taker.gui.assets import GuiAssets
-from row_taker.gui.board_layout import BoardGeometry, row_card_placements
+from row_taker.gui.board_layout import (
+    BoardGeometry,
+    hand_card_placements,
+    row_card_placements,
+)
 from row_taker.gui.card import GuiCard
-from row_taker.gui.game_interaction import GameScreenTargets
+from row_taker.gui.game_visual_state import GameVisualState
 from row_taker.gui.presentation_visuals import PresentationVisuals
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_overlay_panel
@@ -23,8 +26,7 @@ def draw_presentation_card_motion(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
-    client_state: ClientState,
-    game_targets: GameScreenTargets,
+    visual_state: GameVisualState,
     presentation_visuals: PresentationVisuals,
     assets: GuiAssets,
     animation_clock: AnimationClock,
@@ -43,13 +45,12 @@ def draw_presentation_card_motion(
     card_value = presentation_visuals.replacement_card_value or presentation_visuals.focus_card_values[0]
     source_rect = _presentation_motion_source_rect(
         geometry,
-        client_state,
-        game_targets,
+        visual_state,
         presentation_visuals,
         card_value=card_value,
         opponent_slots=opponent_slots,
     )
-    target_rect = _presentation_motion_target_rect(geometry, client_state, presentation_visuals)
+    target_rect = _presentation_motion_target_rect(geometry, visual_state, presentation_visuals)
     if source_rect is None or target_rect is None:
         return
 
@@ -114,17 +115,18 @@ def draw_presentation_panel(
 
 def _presentation_motion_source_rect(
     geometry: BoardGeometry,
-    client_state: ClientState,
-    game_targets: GameScreenTargets,
+    visual_state: GameVisualState,
     presentation_visuals: PresentationVisuals,
     *,
     card_value: int,
     opponent_slots: tuple[Any, ...],
 ) -> pygame.Rect | None:
-    if presentation_visuals.active_player_id == client_state.own_player_id:
-        for target in game_targets.card_targets:
-            if target.card_value == card_value:
-                return target.rect
+    if presentation_visuals.active_player_id == visual_state.own_player_id:
+        hand_cards = visual_state.visible_hand
+        placements = hand_card_placements(geometry, card_count=len(hand_cards))
+        for card, placement in zip(hand_cards, placements, strict=False):
+            if card.card_value == card_value:
+                return placement.rect
         fallback = pygame.Rect(0, 0, *geometry.staged_card_size)
         fallback.center = geometry.hand_rect.center
         return fallback
@@ -138,14 +140,13 @@ def _presentation_motion_source_rect(
 
 def _presentation_motion_target_rect(
     geometry: BoardGeometry,
-    client_state: ClientState,
+    visual_state: GameVisualState,
     presentation_visuals: PresentationVisuals,
 ) -> pygame.Rect | None:
-    public_state = client_state.public_state
-    if public_state is None or presentation_visuals.active_row_id is None:
+    if presentation_visuals.active_row_id is None:
         return None
 
-    for row_index, row in enumerate(public_state.rows):
+    for row_index, row in enumerate(visual_state.rows):
         if row.row_id != presentation_visuals.active_row_id:
             continue
 
