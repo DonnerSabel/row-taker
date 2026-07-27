@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from row_taker.gui.game_visual_invariants import assert_motion_anchors_are_resolvable
 from row_taker.gui.game_visual_state import (
     GameVisualState,
     GameVisualStep,
@@ -31,4 +32,6 @@ def resolve_visual_step(
         )
         for motion in step.transition.card_motions
     )
-    return replace(step.before, moving_cards=moving_cards)
+    visual_state = replace(step.before, moving_cards=moving_cards)
+    assert_motion_anchors_are_resolvable(visual_state)
+    return visual_state

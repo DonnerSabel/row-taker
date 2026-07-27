@@ -19,7 +19,6 @@ from row_taker.gui.game_visual_state import (
     VisualMovingCard,
     VisualPresentationPanel,
 )
-from row_taker.gui.presentation_visuals import PresentationVisuals
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_overlay_panel
 from row_taker.gui_common.primitives import PrimitiveDrawer
@@ -33,46 +32,31 @@ def draw_presentation_card_motion(
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
     visual_state: GameVisualState,
-    presentation_visuals: PresentationVisuals,
     assets: GuiAssets,
-    animation_clock: AnimationClock,
     *,
     opponent_slots: tuple[Any, ...],
 ) -> None:
-    """Draw semantic visual-state motions, then legacy motions if necessary."""
+    """Draw all semantic card motions from the resolved visual state."""
 
-    if visual_state.moving_cards:
-        for moving_card in visual_state.moving_cards:
-            resolved = resolve_visual_card_motion_rects(
-                geometry,
-                visual_state,
-                moving_card,
-                opponent_slots=opponent_slots,
-            )
-            if resolved is None:
-                continue
-            source_rect, target_rect = resolved
-            _draw_moving_card(
-                screen,
-                drawer,
-                source_rect=source_rect,
-                target_rect=target_rect,
-                card_value=moving_card.card_value,
-                progress=moving_card.progress,
-                assets=assets,
-            )
-        return
-
-    _draw_legacy_presentation_card_motion(
-        screen,
-        drawer,
-        geometry,
-        visual_state,
-        presentation_visuals,
-        assets,
-        animation_clock,
-        opponent_slots=opponent_slots,
-    )
+    for moving_card in visual_state.moving_cards:
+        resolved = resolve_visual_card_motion_rects(
+            geometry,
+            visual_state,
+            moving_card,
+            opponent_slots=opponent_slots,
+        )
+        if resolved is None:
+            continue
+        source_rect, target_rect = resolved
+        _draw_moving_card(
+            screen,
+            drawer,
+            source_rect=source_rect,
+            target_rect=target_rect,
+            card_value=moving_card.card_value,
+            progress=moving_card.progress,
+            assets=assets,
+        )
 
 
 def resolve_visual_card_motion_rects(
@@ -115,7 +99,9 @@ def _visual_motion_source_rect(
         for card, placement in zip(visual_state.hand, placements, strict=False):
             if card.card_value == source.card_value:
                 return placement.rect
-        return None
+        fallback = pygame.Rect(0, 0, *geometry.staged_card_size)
+        fallback.center = geometry.hand_rect.center
+        return fallback
 
     for slot in opponent_slots:
         if slot.player_id == source.player_id:
@@ -142,54 +128,6 @@ def _visual_motion_target_rect(
             return None
         return placements[target.card_index].rect
     return None
-
-
-def _draw_legacy_presentation_card_motion(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    geometry: BoardGeometry,
-    visual_state: GameVisualState,
-    presentation_visuals: PresentationVisuals,
-    assets: GuiAssets,
-    animation_clock: AnimationClock,
-    *,
-    opponent_slots: tuple[Any, ...],
-) -> None:
-    if not presentation_visuals.has_event:
-        return
-    if presentation_visuals.active_row_id is None:
-        return
-    if not presentation_visuals.focus_card_values:
-        return
-
-    card_value = (
-        presentation_visuals.replacement_card_value
-        or presentation_visuals.focus_card_values[0]
-    )
-    source_rect = _legacy_motion_source_rect(
-        geometry,
-        visual_state,
-        presentation_visuals,
-        card_value=card_value,
-        opponent_slots=opponent_slots,
-    )
-    target_rect = _legacy_motion_target_rect(
-        geometry,
-        visual_state,
-        presentation_visuals,
-    )
-    if source_rect is None or target_rect is None:
-        return
-
-    _draw_moving_card(
-        screen,
-        drawer,
-        source_rect=source_rect,
-        target_rect=target_rect,
-        card_value=card_value,
-        progress=animation_clock.ease_out_cubic(duration_frames=32),
-        assets=assets,
-    )
 
 
 def _draw_moving_card(
@@ -282,58 +220,6 @@ def draw_presentation_panel(
             role="tiny",
             color=PALETTE.text_primary,
         )
-
-
-def _legacy_motion_source_rect(
-    geometry: BoardGeometry,
-    visual_state: GameVisualState,
-    presentation_visuals: PresentationVisuals,
-    *,
-    card_value: int,
-    opponent_slots: tuple[Any, ...],
-) -> pygame.Rect | None:
-    if presentation_visuals.active_player_id == visual_state.own_player_id:
-        hand_cards = visual_state.hand
-        placements = hand_card_placements(geometry, card_count=len(hand_cards))
-        for card, placement in zip(hand_cards, placements, strict=False):
-            if card.card_value == card_value:
-                return placement.rect
-        fallback = pygame.Rect(0, 0, *geometry.staged_card_size)
-        fallback.center = geometry.hand_rect.center
-        return fallback
-
-    for slot in opponent_slots:
-        if slot.player_id == presentation_visuals.active_player_id:
-            return slot.geometry.staged_card.rect
-
-    return None
-
-
-def _legacy_motion_target_rect(
-    geometry: BoardGeometry,
-    visual_state: GameVisualState,
-    presentation_visuals: PresentationVisuals,
-) -> pygame.Rect | None:
-    if presentation_visuals.active_row_id is None:
-        return None
-
-    for row_index, row in enumerate(visual_state.rows):
-        if row.row_id != presentation_visuals.active_row_id:
-            continue
-
-        placements = row_card_placements(
-            geometry,
-            row_index=row_index,
-            card_count=max(1, len(row.cards)),
-        )
-        if placements:
-            return placements[-1].rect
-
-        target = pygame.Rect(0, 0, *geometry.row_card_size)
-        target.center = geometry.row_columns[row_index].center
-        return target
-
-    return None
 
 
 def _draw_motion_path(

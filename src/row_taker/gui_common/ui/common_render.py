@@ -5,7 +5,9 @@ import pygame
 from row_taker.client.presentation_events import (
     PresentationCardsRevealed,
     PresentationEvent,
+    PresentationGameFinished,
     PresentationOverflowResolved,
+    PresentationRoundFinished,
     PresentationRowChoiceRequired,
     PresentationRowChosen,
     PresentationRowTaken,
@@ -66,4 +68,8 @@ def format_presentation_event(event: PresentationEvent) -> str:
         return f'Überlauf aufgelöst -> {event.player_name} erhielt {event.bullheads} Hornochsen'
     if isinstance(event, PresentationTrickFinished):
         return 'Stich beendet'
+    if isinstance(event, PresentationRoundFinished):
+        return 'Runde beendet'
+    if isinstance(event, PresentationGameFinished):
+        return 'Spiel beendet'
     return event.__class__.__name__

@@ -126,3 +126,9 @@ Die Workbench darf kontrollieren:
 Sie darf nicht selbst zeichnen oder Produktionsdarstellung nachbauen. Sichtbare
 Spielinhalte müssen immer über `GameFrame.render()` und damit über den echten
 Produktionsrenderer laufen.
+
+Der Produktionsframe übersetzt den kontrollierten `ClientState` über denselben
+`GameVisualStateBuilder` wie die echte GUI. Auch vollständige Präsentationsabläufe
+verwenden daher ausschließlich `GameVisualState`, semantische Kartenanker und
+die echten Vorher-/Nachher-Snapshots. Eine separate Presentation- oder
+Workbench-Darstellung existiert nicht.

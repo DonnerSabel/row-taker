@@ -33,7 +33,6 @@ from row_taker.gui.presentation_renderer import (
     draw_presentation_card_motion,
     draw_presentation_panel,
 )
-from row_taker.gui.presentation_visuals import PresentationVisuals, build_presentation_visuals
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_badge, draw_button, draw_overlay_panel
 from row_taker.gui_common.layout import DemoLayout
@@ -61,7 +60,6 @@ class GameFrame:
     """
 
     visual_state: GameVisualState
-    presentation_visuals: PresentationVisuals
     frame_count: int
     presentation_frame_count: int
     geometry: BoardGeometry
@@ -89,14 +87,8 @@ class GameFrame:
             visual_state,
             mouse_pos=mouse_pos,
         )
-        presentation_visuals = (
-            PresentationVisuals()
-            if visual_state.presentation_panel is not None
-            else build_presentation_visuals(state)
-        )
         return cls(
             visual_state=visual_state,
-            presentation_visuals=presentation_visuals,
             frame_count=frame_count,
             presentation_frame_count=presentation_frame_count,
             geometry=geometry,
@@ -141,7 +133,6 @@ class GameFrame:
             geometry=self.geometry,
             visual_state=self.visual_state,
             game_targets=self.targets,
-            presentation_visuals=self.presentation_visuals,
             frame_count=self.frame_count,
             presentation_frame_count=self.presentation_frame_count,
         )
@@ -167,7 +158,6 @@ def render_game_screen(
     geometry: BoardGeometry,
     visual_state: GameVisualState,
     game_targets: GameScreenTargets,
-    presentation_visuals: PresentationVisuals,
     frame_count: int,
     presentation_frame_count: int,
     assets: GuiAssets = DEFAULT_GUI_ASSETS,
@@ -183,7 +173,6 @@ def render_game_screen(
         visual_state,
         game_targets,
         assets,
-        presentation_visuals,
         presentation_clock,
     )
     _draw_opponent_slots(
@@ -192,7 +181,6 @@ def render_game_screen(
         geometry,
         visual_state,
         assets,
-        presentation_visuals,
         presentation_clock,
     )
     _draw_hand(
@@ -202,16 +190,13 @@ def render_game_screen(
         visual_state,
         game_targets,
         assets,
-        presentation_visuals,
     )
     draw_presentation_card_motion(
         screen,
         drawer,
         geometry,
         visual_state,
-        presentation_visuals,
         assets,
-        presentation_clock,
         opponent_slots=_opponent_slot_data(visual_state, geometry),
     )
     _draw_stats_field(screen, drawer, geometry, visual_state)
@@ -221,7 +206,6 @@ def render_game_screen(
         geometry,
         visual_state,
         game_targets,
-        presentation_visuals,
         assets,
         presentation_clock,
     )
@@ -260,7 +244,6 @@ def _draw_rows(
     visual_state: GameVisualState,
     game_targets: GameScreenTargets,
     assets: GuiAssets,
-    presentation_visuals: PresentationVisuals,
     animation_clock: AnimationClock,
 ) -> None:
     row_target_by_id = {target.row_id: target for target in game_targets.row_targets}
@@ -276,13 +259,8 @@ def _draw_rows(
             row_index=row_index,
             card_count=len(row.cards),
         )
-        legacy_emphasis = presentation_visuals.row_emphasis_for(row.row_id)
-        emphasis = legacy_emphasis if legacy_emphasis != "none" else row.emphasis
-        taken_values = (
-            presentation_visuals.taken_card_values
-            if legacy_emphasis in {"taken", "overflow"}
-            else tuple(card.card_value for card in row.taken_cards)
-        )
+        emphasis = row.emphasis
+        taken_values = tuple(card.card_value for card in row.taken_cards)
         _draw_row_column(
             screen,
             drawer,
@@ -419,7 +397,6 @@ def _draw_opponent_slots(
     geometry: BoardGeometry,
     visual_state: GameVisualState,
     assets: GuiAssets,
-    presentation_visuals: PresentationVisuals,
     animation_clock: AnimationClock,
 ) -> None:
     opponents = _opponent_slot_data(visual_state, geometry)
@@ -429,10 +406,7 @@ def _draw_opponent_slots(
     ):
         color = _player_color(index)
         circle_rect = slot.geometry.circle_rect
-        active_player = (
-            player.emphasis == "active"
-            or player.player_id == presentation_visuals.active_player_id
-        )
+        active_player = player.emphasis == "active"
         pygame.draw.ellipse(screen, color, circle_rect)
         pygame.draw.ellipse(
             screen,
@@ -466,9 +440,7 @@ def _draw_opponent_slots(
             color=PALETTE.text_primary,
         )
 
-        card_value = presentation_visuals.card_value_for_player(player.player_id)
-        if card_value is None:
-            card_value = player.staged_card_value
+        card_value = player.staged_card_value
         staged_rect = slot.geometry.staged_card.rect
         if card_value is None:
             draw_card_back(screen, staged_rect)
@@ -505,7 +477,6 @@ def _draw_hand(
     visual_state: GameVisualState,
     game_targets: GameScreenTargets,
     assets: GuiAssets,
-    presentation_visuals: PresentationVisuals,
 ) -> None:
     hand_cards = visual_state.hand
     placements = hand_card_placements(geometry, card_count=len(hand_cards))
@@ -515,10 +486,8 @@ def _draw_hand(
         if not card.visible:
             continue
         target = target_by_value.get(card.card_value)
-        selected = (
-            card.emphasis == "selected"
-            or card.card_value in presentation_visuals.focus_card_values
-            or (target is not None and target.card.selected)
+        selected = card.emphasis == "selected" or (
+            target is not None and target.card.selected
         )
         hovered = target.card.hovered if target is not None else False
         GuiCard(
@@ -602,7 +571,6 @@ def _draw_status_overlay(
     geometry: BoardGeometry,
     visual_state: GameVisualState,
     game_targets: GameScreenTargets,
-    presentation_visuals: PresentationVisuals,
     assets: GuiAssets,
     animation_clock: AnimationClock,
 ) -> None:
@@ -622,7 +590,7 @@ def _draw_status_overlay(
         color=_status_message_color(visual_state.status.message_level),
     )
 
-    presentation_panel = visual_state.presentation_panel or presentation_visuals.panel
+    presentation_panel = visual_state.presentation_panel
     if presentation_panel is not None:
         draw_presentation_panel(
             screen,

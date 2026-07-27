@@ -6,14 +6,21 @@ from row_taker.client.core_state import PendingAction
 from row_taker.client.presentation_events import (
     PresentationCardPlaced,
     PresentationCardsRevealed,
+    PresentationGameFinished,
     PresentationOverflowResolved,
+    PresentationRoundFinished,
     PresentationRowChoiceRequired,
     PresentationRowChosen,
     PresentationRowTaken,
+    PresentationTrickFinished,
 )
 from row_taker.client.state import ClientState
 from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game.state import PublicState
+from row_taker.gui.game_visual_invariants import (
+    assert_selectable_objects_are_visible,
+    assert_visual_matches_public_state,
+)
 from row_taker.gui.game_visual_state import (
     GameVisualState,
     GameVisualStep,
@@ -62,9 +69,9 @@ def build_game_visual_state(
             )
         if current_step is not None and isinstance(
             current_step.event,
-            PresentationRowTaken,
+            PresentationRowTaken | PresentationOverflowResolved,
         ):
-            visual_step = _build_row_taken_visual_step(
+            visual_step = _build_row_replacement_visual_step(
                 state,
                 last_action_summary=last_action_summary,
             )
@@ -77,6 +84,16 @@ def build_game_visual_state(
             PresentationRowChoiceRequired | PresentationRowChosen,
         ):
             return _build_row_choice_visual_state(
+                state,
+                last_action_summary=last_action_summary,
+            )
+        if current_step is not None and isinstance(
+            current_step.event,
+            PresentationTrickFinished
+            | PresentationRoundFinished
+            | PresentationGameFinished,
+        ):
+            return _build_finished_visual_state(
                 state,
                 last_action_summary=last_action_summary,
             )
@@ -131,7 +148,7 @@ def _build_row_choice_visual_state(
     )
 
 
-def _build_row_taken_visual_step(
+def _build_row_replacement_visual_step(
     state: ClientState,
     *,
     last_action_summary: str,
@@ -139,34 +156,46 @@ def _build_row_taken_visual_step(
     presentation_step = state.current_presentation_step
     if presentation_step is None or not isinstance(
         presentation_step.event,
-        PresentationRowTaken,
+        PresentationRowTaken | PresentationOverflowResolved,
     ):
-        raise ValueError("current presentation step is not PresentationRowTaken")
+        raise ValueError(
+            "current presentation step is neither "
+            "PresentationRowTaken nor PresentationOverflowResolved"
+        )
 
     event = presentation_step.event
+    if isinstance(event, PresentationRowTaken):
+        replacement_card_value = event.replacement_card_value
+        emphasis: RowEmphasis = "taken"
+        headline = f"{event.player_name} nimmt Reihe {event.row_id}"
+    else:
+        replacement_card_value = event.card_value
+        emphasis = "overflow"
+        headline = f"Overflow: {event.player_name} nimmt Reihe {event.row_id}"
+
     completed_cards = _completed_card_values_by_player(state)
     hidden_player_ids = frozenset((*completed_cards, event.player_id))
     hidden_hand_card_values = frozenset(
         card_value
         for player_id, card_value in (
             *completed_cards.items(),
-            (event.player_id, event.replacement_card_value),
+            (event.player_id, replacement_card_value),
         )
         if player_id == state.own_player_id
     )
     panel = VisualPresentationPanel(
-        headline=f"{event.player_name} nimmt Reihe {event.row_id}",
+        headline=headline,
         details=_presentation_details(state),
-        card_values=(event.replacement_card_value,),
+        card_values=(replacement_card_value,),
     )
-    row_emphasis = {event.row_id: "taken"}
+    row_emphasis = {event.row_id: emphasis}
     taken_cards = _visual_cards_for_row(
         presentation_step.public_state_before,
         event.row_id,
     )
     if tuple(card.card_value for card in taken_cards) != event.taken_cards:
         raise ValueError(
-            "row-taken snapshot does not match the presented cards: "
+            "row replacement snapshot does not match the presented cards: "
             f"row={event.row_id!r}, cards={event.taken_cards!r}"
         )
     taken_cards_by_row_id = {event.row_id: taken_cards}
@@ -196,16 +225,19 @@ def _build_row_taken_visual_step(
         presentation_panel=panel,
     )
 
+    assert_visual_matches_public_state(before, presentation_step.public_state_before)
+    assert_visual_matches_public_state(after, presentation_step.public_state_after)
+
     target_row = after.row_by_id(event.row_id)
     if target_row is None or target_row.card_values != event.row_cards_after:
         raise ValueError(
-            "row-taken after snapshot does not match the replacement row: "
+            "row replacement after snapshot does not match the replacement row: "
             f"row={event.row_id!r}, cards={event.row_cards_after!r}"
         )
-    if target_row.card_values != (event.replacement_card_value,):
+    if target_row.card_values != (replacement_card_value,):
         raise ValueError(
-            "row-taken replacement row must contain only the replacement card: "
-            f"row={event.row_id!r}, card={event.replacement_card_value}"
+            "replacement row must contain only the replacement card: "
+            f"row={event.row_id!r}, card={replacement_card_value}"
         )
 
     return GameVisualStep(
@@ -214,10 +246,10 @@ def _build_row_taken_visual_step(
         transition=VisualTransition(
             card_motions=(
                 VisualCardMotion(
-                    card_value=event.replacement_card_value,
+                    card_value=replacement_card_value,
                     source=PlayerPlayAnchor(
                         player_id=event.player_id,
-                        card_value=event.replacement_card_value,
+                        card_value=replacement_card_value,
                     ),
                     target=RowCardAnchor(
                         row_id=event.row_id,
@@ -228,6 +260,53 @@ def _build_row_taken_visual_step(
             duration_frames=ROW_REPLACEMENT_DURATION_FRAMES,
         ),
     )
+
+
+def _build_finished_visual_state(
+    state: ClientState,
+    *,
+    last_action_summary: str,
+) -> GameVisualState:
+    presentation_step = state.current_presentation_step
+    if presentation_step is None or not isinstance(
+        presentation_step.event,
+        PresentationTrickFinished
+        | PresentationRoundFinished
+        | PresentationGameFinished,
+    ):
+        raise ValueError("current presentation step is not a finish event")
+
+    event = presentation_step.event
+    if isinstance(event, PresentationTrickFinished):
+        headline = "Stich beendet"
+    elif isinstance(event, PresentationRoundFinished):
+        headline = "Runde beendet"
+    else:
+        headline = "Spiel beendet"
+
+    completed_cards = _completed_card_values_by_player(state)
+    hidden_player_ids = frozenset(completed_cards)
+    hidden_hand_card_values = frozenset(
+        card_value
+        for player_id, card_value in completed_cards.items()
+        if player_id == state.own_player_id
+    )
+    visual_state = _build_stable_game_visual_state(
+        state,
+        public_state=presentation_step.public_state_after,
+        last_action_summary=last_action_summary,
+        hidden_staged_player_ids=hidden_player_ids,
+        hidden_hand_card_values=hidden_hand_card_values,
+        presentation_panel=VisualPresentationPanel(
+            headline=headline,
+            details=_presentation_details(state),
+        ),
+    )
+    assert_visual_matches_public_state(
+        visual_state,
+        presentation_step.public_state_after,
+    )
+    return visual_state
 
 
 def _visual_cards_for_row(
@@ -293,6 +372,9 @@ def _build_card_placed_visual_step(
         visual_row_order=visual_row_order,
         presentation_panel=panel,
     )
+
+    assert_visual_matches_public_state(before, presentation_step.public_state_before)
+    assert_visual_matches_public_state(after, presentation_step.public_state_after)
 
     target_row = after.row_by_id(event.row_id)
     if target_row is None or not target_row.cards:
@@ -376,7 +458,7 @@ def _build_stable_game_visual_state(
         players=players,
         last_action_summary=last_action_summary,
     )
-    return GameVisualState(
+    visual_state = GameVisualState(
         rows=rows,
         players=players,
         hand=hand,
@@ -384,6 +466,8 @@ def _build_stable_game_visual_state(
         status=status,
         presentation_panel=presentation_panel,
     )
+    assert_selectable_objects_are_visible(visual_state)
+    return visual_state
 
 
 def _build_rows(

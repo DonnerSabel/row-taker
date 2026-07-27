@@ -10,6 +10,7 @@ from row_taker.gui.presentation_renderer import resolve_visual_card_motion_rects
 from row_taker.gui.screens.game_screen import GameFrame, _opponent_slot_data
 from row_taker.gui_common.layout import compute_layout
 from row_taker.gui_workbench.scenarios import get_scenario
+from row_taker.gui_workbench.timeline import get_timeline
 
 
 @pytest.mark.parametrize("scenario_name", ["card-placed", "row-taken"])
@@ -95,3 +96,34 @@ def test_opponent_card_motion_starts_at_real_staged_card_slot() -> None:
         if slot.player_id == moving_card.source.player_id
     )
     assert source_rect == expected_slot.geometry.staged_card.rect
+
+
+def test_own_card_motion_uses_hand_area_fallback_after_server_removed_card() -> None:
+    timeline = get_timeline("full-trick")
+    state = timeline.steps[5].state
+    frame = GameFrame.from_layout(
+        layout=compute_layout(1600, 900),
+        state=state,
+        frame_count=16,
+        presentation_frame_count=16,
+        last_action_summary="test",
+        mouse_pos=(-1, -1),
+    )
+    moving_card = frame.visual_state.moving_cards[0]
+    assert moving_card.source.player_id == frame.visual_state.own_player_id
+    assert all(
+        card.card_value != moving_card.source.card_value
+        for card in frame.visual_state.hand
+    )
+
+    resolved = resolve_visual_card_motion_rects(
+        frame.geometry,
+        frame.visual_state,
+        moving_card,
+        opponent_slots=_opponent_slot_data(frame.visual_state, frame.geometry),
+    )
+
+    assert resolved is not None
+    source_rect, _target_rect = resolved
+    assert source_rect.size == frame.geometry.staged_card_size
+    assert source_rect.center == frame.geometry.hand_rect.center

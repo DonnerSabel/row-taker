@@ -173,22 +173,43 @@ Nicht in Clients gehören:
 - lokale Sonderlogik, die der Engine widerspricht
 
 
-### Produktionsframe und GUI-Workbench
+### Produktionsframe, GameVisualState und GUI-Workbench
 
 Die aktuelle Pygame-GUI übersetzt den `ClientState` an der Frame-Grenze einmalig
-in einen pygame-unabhängigen `GameVisualState`. Ein vollständig vorbereiteter
-`GameFrame` besitzt gemeinsam:
+in einen pygame-unabhängigen `GameVisualState`:
+
+```text
+ClientState
+    ↓
+GameVisualStateBuilder
+    ↓
+GameVisualState
+    ↓
+GameFrame
+    ├── BoardGeometry
+    ├── GameScreenTargets
+    └── Produktionsrenderer
+```
+
+Der `GameVisualState` ist die vollständige semantische Beschreibung des
+sichtbaren Spielbildschirms. Er enthält Reihen, Spieler, Handkarten,
+Interaktionsmöglichkeiten, Statusinformationen, Präsentationspanel und
+semantische Kartenbewegungen. Er enthält keine pygame-Objekte, Pixelkoordinaten,
+Fonts, Farben, Protokollnachrichten oder Client-Actions.
+
+Alle Präsentationsereignisse werden vor dem Rendering in vollständige visuelle
+Zustände übersetzt. Zustandsverändernde Schritte verwenden die unveränderlichen
+`public_state_before`- und `public_state_after`-Snapshots und eine semantische
+Transition. Der Renderer kennt keine `PresentationEvent`-Typen und keinen
+`ClientState`. Die frühere `PresentationVisuals`-Kompatibilitätsschicht ist
+entfernt.
+
+Ein vollständig vorbereiteter `GameFrame` besitzt gemeinsam:
 
 - den verwendeten `GameVisualState`
-- vorübergehend noch `PresentationVisuals` für nicht migrierte Präsentationsschritte
 - die für die Fenstergröße berechnete `BoardGeometry`
 - die daraus und aus der Mausposition erzeugten `GameScreenTargets`
 - die allgemeinen und presentationsbezogenen Frame-Zähler
-
-`PresentationCardsRevealed` ist bereits vollständig in den `GameVisualState`
-migriert: aufgedeckte Karten, eigene Kartenhervorhebung und Panel-Inhalte werden
-vor dem Rendering erzeugt. Die Legacy-Schicht bleibt nur für die noch nicht
-migrierten Präsentationsereignisse bestehen.
 
 Geometrie und Interaktionsziele werden einmal gemeinsam vorbereitet und danach
 nicht unabhängig voneinander ausgetauscht. Bei einer Größenänderung wird ein
