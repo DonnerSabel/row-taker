@@ -11,7 +11,7 @@ from row_taker.gui.layout import compute_layout
 from row_taker.gui.screen_result import NO_SCREEN_RESULT
 from row_taker.gui.screens import connect_screen, lobby_screen
 from row_taker.gui.screens.connect_screen import ConnectFrame, ConnectScreenTargets
-from row_taker.gui.screens.game_screen import GameFrame
+from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui.screens.lobby_screen import LobbyFrame, LobbyScreenTargets
 from row_taker.gui.screens.prepared_screen import PreparedScreen
 from row_taker.gui_workbench.scenarios import get_scenario

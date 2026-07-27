@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
 
 import pygame
 
+from row_taker.engine.game.models import PlayerID
 from row_taker.gui.animation import AnimationClock, lerp_rect
 from row_taker.gui.assets import GuiAssets
 from row_taker.gui.board_layout import (
@@ -34,7 +35,7 @@ def draw_presentation_card_motion(
     visual_state: GameVisualState,
     assets: GuiAssets,
     *,
-    opponent_slots: tuple[Any, ...],
+    opponent_staged_card_rects: Mapping[PlayerID, pygame.Rect],
 ) -> None:
     """Draw all semantic card motions from the resolved visual state."""
 
@@ -43,7 +44,7 @@ def draw_presentation_card_motion(
             geometry,
             visual_state,
             moving_card,
-            opponent_slots=opponent_slots,
+            opponent_staged_card_rects=opponent_staged_card_rects,
         )
         if resolved is None:
             continue
@@ -64,7 +65,7 @@ def resolve_visual_card_motion_rects(
     visual_state: GameVisualState,
     moving_card: VisualMovingCard,
     *,
-    opponent_slots: tuple[Any, ...],
+    opponent_staged_card_rects: Mapping[PlayerID, pygame.Rect],
 ) -> tuple[pygame.Rect, pygame.Rect] | None:
     """Resolve semantic motion anchors through current production geometry."""
 
@@ -72,7 +73,7 @@ def resolve_visual_card_motion_rects(
         geometry,
         visual_state,
         moving_card.source,
-        opponent_slots=opponent_slots,
+        opponent_staged_card_rects=opponent_staged_card_rects,
     )
     target_rect = _visual_motion_target_rect(
         geometry,
@@ -89,7 +90,7 @@ def _visual_motion_source_rect(
     visual_state: GameVisualState,
     source: PlayerPlayAnchor,
     *,
-    opponent_slots: tuple[Any, ...],
+    opponent_staged_card_rects: Mapping[PlayerID, pygame.Rect],
 ) -> pygame.Rect | None:
     if source.player_id == visual_state.own_player_id:
         placements = hand_card_placements(
@@ -103,10 +104,7 @@ def _visual_motion_source_rect(
         fallback.center = geometry.hand_rect.center
         return fallback
 
-    for slot in opponent_slots:
-        if slot.player_id == source.player_id:
-            return slot.geometry.staged_card.rect
-    return None
+    return opponent_staged_card_rects.get(source.player_id)
 
 
 def _visual_motion_target_rect(

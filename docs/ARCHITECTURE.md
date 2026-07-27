@@ -225,6 +225,27 @@ Geometrie und Interaktionsziele werden einmal gemeinsam vorbereitet und danach
 nicht unabhängig voneinander ausgetauscht. Bei einer Größenänderung wird ein
 neuer `GameFrame` erzeugt.
 
+Der vorbereitete Frame und das Zeichnen sind getrennt organisiert:
+
+```text
+screens/game_frame.py
+    vorbereitet Visual State, Geometrie und Targets
+        ↓
+rendering/game_renderer.py
+    orchestriert die Render-Reihenfolge
+        ├── rendering/board_renderer.py
+        ├── rendering/game_hud_renderer.py
+        └── presentation_renderer.py
+```
+
+`board_renderer` zeichnet ausschließlich Reihen und deren Hervorhebungen.
+`game_hud_renderer` zeichnet Gegner, Hand, Punktestände und Statusbereiche.
+Der zentrale `game_renderer` enthält nur die sichtbare Reihenfolge dieser
+Zeichenschritte. Die Renderermodule kennen weder `ClientState` noch
+`PresentationEvent`-Typen. Semantische Kartenbewegungen erhalten für Gegner
+nur eine Zuordnung von `PlayerID` zu vorbereitetem Kartenrechteck; ein fremder
+Screen-Datentyp wird nicht zwischen Renderern weitergereicht.
+
 Auch Connect- und Lobby-Screen folgen derselben Prepared-Screen-Grenze:
 
 ```text

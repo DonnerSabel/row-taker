@@ -16,7 +16,7 @@ from row_taker.gui.live_client import LiveGuiClient
 from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui.screen_result import ScreenResult
 from row_taker.gui.screens.connect_screen import ConnectFrame, normalized_connection_values
-from row_taker.gui.screens.game_screen import GameFrame
+from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui.screens.lobby_screen import LobbyFrame
 from row_taker.gui.screens.prepared_screen import PreparedScreen
 from row_taker.protocol.transport import ClientTransport

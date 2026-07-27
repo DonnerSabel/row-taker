@@ -38,7 +38,7 @@ def test_prepared_frames_do_not_accept_external_layout_or_targets() -> None:
     from inspect import signature
 
     from row_taker.gui.screens.connect_screen import ConnectFrame
-    from row_taker.gui.screens.game_screen import GameFrame
+    from row_taker.gui.screens.game_frame import GameFrame
     from row_taker.gui.screens.lobby_screen import LobbyFrame
 
     for frame_type in (ConnectFrame, LobbyFrame, GameFrame):
