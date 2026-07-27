@@ -31,3 +31,11 @@ def test_game_visual_state_import_does_not_load_pygame() -> None:
 
 def test_game_visual_builder_import_does_not_load_pygame() -> None:
     _assert_import_does_not_load_pygame("row_taker.gui.game_visual_builder")
+
+
+def test_game_visual_static_import_does_not_load_pygame() -> None:
+    _assert_import_does_not_load_pygame("row_taker.gui.game_visual_static")
+
+
+def test_game_visual_presentations_import_does_not_load_pygame() -> None:
+    _assert_import_does_not_load_pygame("row_taker.gui.game_visual_presentations")

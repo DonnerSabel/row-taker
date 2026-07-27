@@ -12,7 +12,7 @@ WorkbenchScenario
 ```
 
 Die Workbench kontrolliert nur Zustand, Fenstergröße, Mausposition,
-Frame-Zähler und Ausgabeziel.
+Präsentationsframe und Ausgabeziel.
 
 ## Szenen auflisten
 
@@ -41,8 +41,7 @@ Steuerung:
 - `P`: Animation starten oder pausieren
 - `Links` / `Rechts`: Präsentationsframe um eins ändern
 - `Shift` + `Links` / `Rechts`: Präsentationsframe um zehn ändern
-- `Oben` / `Unten`: allgemeinen Animationsframe ändern
-- `Home`: beide Frame-Zähler auf null setzen
+- `Home`: Präsentationsframe auf null setzen
 - `S`: aktuellen Produktionsframe als PNG speichern
 - `Esc`: Workbench schließen
 
@@ -101,7 +100,7 @@ Zusätzliche Steuerung in einer Timeline:
 - `Bild ab`: nächster erzeugter Zustand
 - `Bild auf`: vorheriger erzeugter Zustand
 
-Beim Zustandswechsel werden beide Frame-Zähler auf null gesetzt. Die gesamte
+Beim Zustandswechsel wird der Präsentationsframe auf null gesetzt. Die gesamte
 Timeline kann als PNG-Serie gespeichert werden:
 
 ```bash
@@ -128,7 +127,6 @@ Die Workbench darf kontrollieren:
 - `ConnectFormState` oder `ClientState`
 - Fenstergröße
 - Mausposition
-- allgemeinen Frame-Zähler
 - Präsentationsframe-Zähler
 - Ausgabeziel Fenster oder PNG
 

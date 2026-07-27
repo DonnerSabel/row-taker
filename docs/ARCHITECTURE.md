@@ -182,7 +182,9 @@ in einen pygame-unabhängigen `GameVisualState`:
 ```text
 ClientState
     ↓
-GameVisualStateBuilder
+GameVisualStateBuilder (Orchestrierung)
+    ├── game_visual_static
+    └── game_visual_presentations
     ↓
 GameVisualState
     ↓
@@ -191,6 +193,13 @@ GameFrame
     ├── GameScreenTargets
     └── Produktionsrenderer
 ```
+
+Der öffentliche `GameVisualStateBuilder` bleibt ein kurzer, direkter
+Dispatcher. `game_visual_static` baut Reihen, Spieler, Hand, Status und
+Interaktion; `game_visual_presentations` übersetzt Präsentationsschritte in
+stabile Zustände oder semantische Vorher-/Nachher-Transitionen. Beide Module
+sind pygame-unabhängig und bilden keine Handler-Registry oder zweite
+Framework-Schicht.
 
 Der `GameVisualState` ist die vollständige semantische Beschreibung des
 sichtbaren Spielbildschirms. Er enthält Reihen, Spieler, Handkarten,
@@ -210,7 +219,7 @@ Ein vollständig vorbereiteter `GameFrame` besitzt gemeinsam:
 - den verwendeten `GameVisualState`
 - die für die Fenstergröße berechnete `BoardGeometry`
 - die daraus und aus der Mausposition erzeugten `GameScreenTargets`
-- die allgemeinen und presentationsbezogenen Frame-Zähler
+- die seit Beginn des aktuellen Präsentationsschritts verstrichenen Frames
 
 Geometrie und Interaktionsziele werden einmal gemeinsam vorbereitet und danach
 nicht unabhängig voneinander ausgetauscht. Bei einer Größenänderung wird ein
