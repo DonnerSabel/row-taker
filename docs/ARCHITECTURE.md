@@ -141,6 +141,19 @@ Das bedeutet:
 Die GUI oder CLI beobachtet diese fachlichen Schritte.
 Sie wird nicht per Callback aus der Engine heraus gesteuert.
 
+Jeder clientseitige Präsentationsschritt enthält zusätzlich zum
+`PresentationEvent` zwei unveränderliche fachliche Snapshots:
+
+- `public_state_before`
+- `public_state_after`
+
+Rein erklärende Ereignisse besitzen denselben Vorher- und Nachher-Zustand.
+Fachlich verändernde Ereignisse wie Kartenablage oder Reihenübernahme tragen
+den Zustand vor und nach dem zugehörigen Engine-Schritt. Der Client verwaltet
+intern Queues solcher `PresentationStep`-Objekte. Die bisherigen
+`presentation_events`-Properties bleiben vorübergehend als abgeleitete
+Kompatibilitätssicht erhalten.
+
 ---
 
 ## GUI- und CLI-Prinzip

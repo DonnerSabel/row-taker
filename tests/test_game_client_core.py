@@ -4,6 +4,7 @@ from client_test_support import apply_server_message, player_state_for
 
 from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction
 from row_taker.client.presentation_events import PresentationCardsRevealed, PresentationRowTaken
+from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import ClientState
 from row_taker.protocol.messages import (
     CardsRevealed,
@@ -136,11 +137,21 @@ def test_cards_revealed_queues_presentation_events_before_display() -> None:
 
 def test_choose_card_requested_clears_visible_and_pending_presentation() -> None:
     player_state = player_state_for(0)
+    visible_step = PresentationStep(
+        event=PresentationCardsRevealed(plays=()),
+        public_state_before=player_state.public_state,
+        public_state_after=player_state.public_state,
+    )
+    pending_step = PresentationStep(
+        event=PresentationCardsRevealed(plays=()),
+        public_state_before=player_state.public_state,
+        public_state_after=player_state.public_state,
+    )
     state = ClientState(
         core_state=ClientCoreState(
             public_state=player_state.public_state,
-            presentation_events=(PresentationCardsRevealed(plays=()),),
-            pending_presentation_events=(PresentationCardsRevealed(plays=()),),
+            presentation_steps=(visible_step,),
+            pending_presentation_steps=(pending_step,),
         ),
     )
 
@@ -151,5 +162,7 @@ def test_choose_card_requested_clears_visible_and_pending_presentation() -> None
         ChooseCardRequested(player_id=player_state.self_player_id, state=player_state),
     )
 
+    assert new_state.presentation_steps == ()
+    assert new_state.pending_presentation_steps == ()
     assert new_state.presentation_events == ()
     assert new_state.pending_presentation_events == ()

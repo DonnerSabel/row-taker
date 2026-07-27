@@ -19,6 +19,7 @@ from row_taker.client.presentation_events import (
     PresentationRowTaken,
     PresentationTrickFinished,
 )
+from row_taker.client.presentation_steps import PresentationStep
 
 __all__ = [
     "PresentationCardPlaced",
@@ -30,6 +31,7 @@ __all__ = [
     "PresentationRowChoiceRequired",
     "PresentationRowChosen",
     "PresentationRowTaken",
+    "PresentationStep",
     "PresentationTrickFinished",
     "build_presentation_card_placed",
     "build_presentation_cards_revealed",

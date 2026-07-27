@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from row_taker.client.presentation_events import PresentationEvent
+from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.trick_presentation_resolver import TrickPresentationState
 from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.protocol.messages import CardsRevealed, LobbyView
@@ -32,8 +32,8 @@ class ClientCoreState:
     session_error: str | None = None
     revealed_trick: CardsRevealed | None = None
     trick_presentation_state: TrickPresentationState | None = None
-    presentation_events: tuple[PresentationEvent, ...] = ()
-    pending_presentation_events: tuple[PresentationEvent, ...] = ()
+    presentation_steps: tuple[PresentationStep, ...] = ()
+    pending_presentation_steps: tuple[PresentationStep, ...] = ()
     received_game_revision: int | None = None
     applied_game_revision: int | None = None
     client_mode: ClientMode = ClientMode.LOBBY

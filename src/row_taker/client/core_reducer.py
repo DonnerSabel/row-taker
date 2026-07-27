@@ -15,7 +15,7 @@ from row_taker.client.actions import (
     ClientActionStartGame,
 )
 from row_taker.client.core_state import ClientMode, PendingAction
-from row_taker.client.presentation_events import PresentationEvent
+from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import (
     ClientState,
     UiMessage,
@@ -62,24 +62,24 @@ class ActionResult:
 
 
 
-def append_presentation_events(state: ClientState, events: tuple[PresentationEvent, ...]) -> ClientState:
-    if not events:
+def append_presentation_steps(state: ClientState, steps: tuple[PresentationStep, ...]) -> ClientState:
+    if not steps:
         return state
     return with_core_updates(
         state,
-        pending_presentation_events=state.pending_presentation_events + events,
+        pending_presentation_steps=state.pending_presentation_steps + steps,
     )
 
 
 
 def advance_presentation_queue(state: ClientState) -> ClientState:
-    if not state.pending_presentation_events:
+    if not state.pending_presentation_steps:
         return state
-    next_event = state.pending_presentation_events[0]
+    next_step = state.pending_presentation_steps[0]
     return with_core_updates(
         state,
-        presentation_events=state.presentation_events + (next_event,),
-        pending_presentation_events=state.pending_presentation_events[1:],
+        presentation_steps=state.presentation_steps + (next_step,),
+        pending_presentation_steps=state.pending_presentation_steps[1:],
     )
 
 
@@ -101,8 +101,8 @@ def reduce_server_message(state: ClientState, message: ServerToClientMessage) ->
                 player_state=None,
                 revealed_trick=None,
                 trick_presentation_state=None,
-                presentation_events=(),
-                pending_presentation_events=(),
+                presentation_steps=(),
+                pending_presentation_steps=(),
             )
             return with_feedback_updates(next_state, flash_message=UiMessage(level="info", text="Spielstart..."))
         case StateUpdated(state=public_state):
@@ -120,28 +120,28 @@ def reduce_server_message(state: ClientState, message: ServerToClientMessage) ->
             )
         case CardsRevealed() as revealed:
             presentation_state = None
-            queued_events: tuple[PresentationEvent, ...] = ()
+            queued_steps: tuple[PresentationStep, ...] = ()
             if state.public_state is not None:
                 presentation_state = start_trick_presentation(state.public_state, revealed)
-                queued_events = presentation_state.events
+                queued_steps = presentation_state.presentation_steps
             next_state = with_core_updates(
                 state,
                 revealed_trick=revealed,
                 trick_presentation_state=presentation_state,
             )
             next_state = with_feedback_updates(next_state, flash_message=None)
-            return append_presentation_events(next_state, queued_events)
+            return append_presentation_steps(next_state, queued_steps)
         case RowChoiceCommitted(row_id=row_id):
             presentation_state = state.trick_presentation_state
-            new_events: tuple[PresentationEvent, ...] = ()
+            new_steps: tuple[PresentationStep, ...] = ()
             if presentation_state is not None and presentation_state.pending_row_choice is not None:
-                previous_count = len(presentation_state.events)
+                previous_count = len(presentation_state.presentation_steps)
                 presentation_state = apply_trick_row_choice(presentation_state, row_id)
-                new_events = presentation_state.events[previous_count:]
+                new_steps = presentation_state.presentation_steps[previous_count:]
             next_state = enter_game_mode(state, pending_action=PendingAction.NONE)
             next_state = with_core_updates(next_state, trick_presentation_state=presentation_state)
             next_state = with_feedback_updates(next_state, flash_message=None)
-            return append_presentation_events(next_state, new_events)
+            return append_presentation_steps(next_state, new_steps)
         case ChooseCardRequested(player_id=player_id, state=player_state):
             next_state = enter_game_mode(state, pending_action=PendingAction.CHOOSE_CARD, player_state=player_state)
             next_state = with_core_updates(
@@ -151,8 +151,8 @@ def reduce_server_message(state: ClientState, message: ServerToClientMessage) ->
                 player_state=player_state,
                 revealed_trick=None,
                 trick_presentation_state=None,
-                presentation_events=(),
-                pending_presentation_events=(),
+                presentation_steps=(),
+                pending_presentation_steps=(),
                 client_mode=ClientMode.GAME,
                 pending_action=PendingAction.CHOOSE_CARD,
             )

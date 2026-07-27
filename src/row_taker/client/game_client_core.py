@@ -57,7 +57,7 @@ class GameClientCore:
         return CoreUpdate(state=self.state)
 
     def has_pending_presentation(self) -> bool:
-        return bool(self.state.pending_presentation_events)
+        return bool(self.state.pending_presentation_steps)
 
     def _drain_server_inbox(self) -> CoreUpdate:
         applied: list[ServerToClientMessage] = []
@@ -74,6 +74,6 @@ class GameClientCore:
         return CoreUpdate(state=self.state, applied_server_messages=tuple(applied))
 
     def _should_defer(self, message: ServerToClientMessage) -> bool:
-        if not self.state.pending_presentation_events:
+        if not self.state.pending_presentation_steps:
             return False
         return not isinstance(message, (SessionEnded, ServerError))

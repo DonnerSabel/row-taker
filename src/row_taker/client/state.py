@@ -10,6 +10,7 @@ from row_taker.client.core_state import (
     initial_client_core_state,
 )
 from row_taker.client.presentation_events import PresentationEvent
+from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.trick_presentation_resolver import TrickPresentationState
 from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.protocol.messages import CardsRevealed, LobbyView
@@ -79,12 +80,26 @@ class ClientState:
         return self.core_state.trick_presentation_state
 
     @property
+    def presentation_steps(self) -> tuple[PresentationStep, ...]:
+        return self.core_state.presentation_steps
+
+    @property
+    def pending_presentation_steps(self) -> tuple[PresentationStep, ...]:
+        return self.core_state.pending_presentation_steps
+
+    @property
+    def current_presentation_step(self) -> PresentationStep | None:
+        if not self.pending_presentation_steps:
+            return None
+        return self.pending_presentation_steps[0]
+
+    @property
     def presentation_events(self) -> tuple[PresentationEvent, ...]:
-        return self.core_state.presentation_events
+        return tuple(step.event for step in self.presentation_steps)
 
     @property
     def pending_presentation_events(self) -> tuple[PresentationEvent, ...]:
-        return self.core_state.pending_presentation_events
+        return tuple(step.event for step in self.pending_presentation_steps)
 
     @property
     def received_game_revision(self) -> int | None:
@@ -124,11 +139,11 @@ def initial_client_state(own_client_id: str | None = None) -> ClientState:
 
 
 def has_pending_presentation(state: ClientState) -> bool:
-    return bool(state.core_state.pending_presentation_events)
+    return bool(state.core_state.pending_presentation_steps)
 
 
 def has_visible_presentation(state: ClientState) -> bool:
-    return bool(state.core_state.presentation_events)
+    return bool(state.core_state.presentation_steps)
 
 
 def with_core_updates(state: ClientState, **changes: object) -> ClientState:
