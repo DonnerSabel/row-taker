@@ -66,6 +66,52 @@ python -m row_taker.gui_workbench row-taken \
   --save-dir screenshots/row-taken
 ```
 
+## Vollständige Timeline untersuchen
+
+Patch C ergänzt reproduzierbare Abläufe, deren Zustände nicht manuell erfunden
+werden. Die Timeline wird mit dem echten `MatchHub`, `GameClientCore`, den
+Produktions-Reducern und `GameFrame.handle_event()` erzeugt.
+
+Verfügbare Timelines und ihre Zustände:
+
+```bash
+python -m row_taker.gui_workbench --list-timelines
+```
+
+Die vollständige Stichauflösung interaktiv öffnen:
+
+```bash
+python -m row_taker.gui_workbench --timeline full-trick
+```
+
+Zusätzliche Steuerung in einer Timeline:
+
+- `Bild ab`: nächster erzeugter Zustand
+- `Bild auf`: vorheriger erzeugter Zustand
+
+Beim Zustandswechsel werden beide Frame-Zähler auf null gesetzt. Dadurch beginnt
+die Animation jedes Präsentationsereignisses genauso neu wie beim Wechsel des
+vordersten Ereignisses in der echten GUI.
+
+Die gesamte Timeline als PNG-Serie speichern:
+
+```bash
+python -m row_taker.gui_workbench --timeline full-trick \
+  --save-dir screenshots/full-trick
+```
+
+Einen einzelnen Zustand und Frame speichern:
+
+```bash
+python -m row_taker.gui_workbench --timeline full-trick \
+  --step 5 --frame 16 --presentation-frame 16 \
+  --save screenshots/row-taken-016.png
+```
+
+Die Timeline enthält auch den Zustand nach der geleerten Präsentationsqueue.
+Dessen `PublicState` wird beim Aufbau gegen den tatsächlichen Endzustand des
+`MatchHub` geprüft.
+
 ## Architekturregel
 
 Die Workbench darf kontrollieren:

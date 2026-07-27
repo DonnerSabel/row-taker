@@ -13,6 +13,7 @@ from row_taker.gui.screens.game_screen import GameFrame
 from row_taker.gui_common.layout import compute_layout
 from row_taker.gui_common.primitives import PrimitiveDrawer
 from row_taker.gui_workbench.scenarios import WorkbenchScenario
+from row_taker.gui_workbench.timeline import WorkbenchTimeline
 
 WORKBENCH_FPS = 30
 OFFSCREEN_MOUSE_POS = (-1, -1)
@@ -127,20 +128,61 @@ def save_scenario_frames(
     )
 
 
+def save_timeline_frames(
+    timeline: WorkbenchTimeline,
+    output_dir: Path,
+    *,
+    frames: tuple[int, ...] | None = None,
+    size: tuple[int, int] | None = None,
+    mouse_pos: tuple[int, int] = OFFSCREEN_MOUSE_POS,
+) -> tuple[Path, ...]:
+    """Render every timeline step through the production renderer."""
+
+    output_dir = output_dir.resolve()
+    outputs: list[Path] = []
+    for step_index, scenario in enumerate(timeline.steps):
+        selected_frames = scenario.interesting_frames if frames is None else frames
+        if not selected_frames:
+            raise ValueError("at least one frame is required")
+        for frame in selected_frames:
+            outputs.append(
+                save_scenario_frame(
+                    scenario,
+                    output_dir
+                    / (
+                        f"{timeline.name}_step_{step_index:02d}_{scenario.name}_"
+                        f"frame_{frame:03d}.png"
+                    ),
+                    size=timeline.default_size if size is None else size,
+                    frame_count=frame,
+                    presentation_frame_count=frame,
+                    mouse_pos=mouse_pos,
+                )
+            )
+    return tuple(outputs)
+
+
 class WorkbenchApp:
     """Interactive timing and resize host around the production game renderer."""
 
     def __init__(
         self,
-        scenario: WorkbenchScenario,
+        scenario: WorkbenchScenario | None = None,
         *,
+        timeline: WorkbenchTimeline | None = None,
         size: tuple[int, int] | None = None,
         frame_count: int = 0,
         presentation_frame_count: int | None = None,
         screenshot_dir: Path = Path("workbench-screenshots"),
     ) -> None:
-        self._scenario = scenario
-        self._initial_size = scenario.default_size if size is None else size
+        if (scenario is None) == (timeline is None):
+            raise ValueError("provide exactly one scenario or timeline")
+
+        self._timeline = timeline
+        self._timeline_step_index = 0
+        self._scenarios = (scenario,) if scenario is not None else timeline.steps
+        initial_scenario = self._scenarios[0]
+        self._initial_size = initial_scenario.default_size if size is None else size
         self._frame_count = frame_count
         self._presentation_frame_count = (
             frame_count
@@ -167,7 +209,7 @@ class WorkbenchApp:
 
                 mouse_pos = pygame.mouse.get_pos()
                 render_scenario_frame(
-                    self._scenario,
+                    self.current_scenario,
                     size=screen.get_size(),
                     frame_count=self._frame_count,
                     presentation_frame_count=self._presentation_frame_count,
@@ -214,6 +256,10 @@ class WorkbenchApp:
             elif event.key == pygame.K_HOME:
                 self._frame_count = 0
                 self._presentation_frame_count = 0
+            elif event.key == pygame.K_PAGEUP:
+                self.select_previous_step()
+            elif event.key == pygame.K_PAGEDOWN:
+                self.select_next_step()
             elif event.key == pygame.K_s:
                 self._screenshot_requested = True
             pygame.display.set_caption(self._caption())
@@ -221,16 +267,51 @@ class WorkbenchApp:
     def _save_current_frame(self, screen: pygame.Surface) -> None:
         self._screenshot_dir.mkdir(parents=True, exist_ok=True)
         output_path = self._screenshot_dir / (
-            f"{self._scenario.name}_frame_{self._frame_count:03d}_"
+            f"{self.current_scenario.name}_frame_{self._frame_count:03d}_"
             f"presentation_{self._presentation_frame_count:03d}.png"
         )
         pygame.image.save(screen, str(output_path))
         print(output_path.resolve())
 
+    @property
+    def current_scenario(self) -> WorkbenchScenario:
+        return self._scenarios[self._timeline_step_index]
+
+    @property
+    def timeline_step_index(self) -> int:
+        return self._timeline_step_index
+
+    @property
+    def timeline_step_count(self) -> int:
+        return len(self._scenarios)
+
+    def select_next_step(self) -> bool:
+        return self._select_step(self._timeline_step_index + 1)
+
+    def select_previous_step(self) -> bool:
+        return self._select_step(self._timeline_step_index - 1)
+
+    def _select_step(self, index: int) -> bool:
+        bounded = min(max(index, 0), len(self._scenarios) - 1)
+        if bounded == self._timeline_step_index:
+            return False
+        self._timeline_step_index = bounded
+        self._frame_count = 0
+        self._presentation_frame_count = 0
+        self._auto_advance = False
+        return True
+
     def _caption(self) -> str:
         mode = "läuft" if self._auto_advance else "pausiert"
+        timeline_part = ""
+        if self._timeline is not None:
+            timeline_part = (
+                f"{self._timeline.name} "
+                f"[{self._timeline_step_index + 1}/{len(self._scenarios)}] | "
+            )
         return (
-            f"Row-Taker GUI-Workbench | {self._scenario.name} | "
+            f"Row-Taker GUI-Workbench | {timeline_part}{self.current_scenario.name} | "
             f"frame={self._frame_count} presentation={self._presentation_frame_count} | "
-            f"{mode} | P Pause, Pfeile Schritt, Home Reset, S Screenshot"
+            f"{mode} | P Pause, Pfeile Frame, Bild auf/ab Zustand, "
+            "Home Reset, S Screenshot"
         )

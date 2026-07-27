@@ -16,3 +16,12 @@ def test_workbench_list_command(capsys) -> None:
     assert "choose-card" in output
     assert "overflow-resolved" in output
     assert "frames: 0,8,16,24,32" in output
+
+
+def test_workbench_timeline_list_command(capsys) -> None:
+    assert run(["--list-timelines"]) == 0
+
+    output = capsys.readouterr().out
+    assert "full-trick" in output
+    assert "PresentationRowChosen" in output
+    assert "steps: 11" in output

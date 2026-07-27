@@ -8,8 +8,14 @@ from row_taker.gui_workbench.app import (
     WorkbenchApp,
     save_scenario_frame,
     save_scenario_frames,
+    save_timeline_frames,
 )
 from row_taker.gui_workbench.scenarios import get_scenario, scenario_names, scenarios
+from row_taker.gui_workbench.timeline import (
+    get_timeline,
+    timeline_names,
+    timelines,
+)
 
 
 def _parse_size(text: str) -> tuple[int, int]:
@@ -45,10 +51,20 @@ def _parse_frames(text: str) -> tuple[int, ...]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m row_taker.gui_workbench",
-        description="Render deterministic scenarios with the production Row-Taker Pygame GUI.",
+        description=(
+            "Render deterministic scenarios or complete timelines with the "
+            "production Row-Taker Pygame GUI."
+        ),
     )
     parser.add_argument("scenario", nargs="?", choices=scenario_names())
+    parser.add_argument("--timeline", choices=timeline_names(), help="open a complete state timeline")
+    parser.add_argument("--step", type=int, default=0, help="timeline step used by --save")
     parser.add_argument("--list", action="store_true", help="list available scenarios")
+    parser.add_argument(
+        "--list-timelines",
+        action="store_true",
+        help="list available complete timelines and their steps",
+    )
     parser.add_argument("--size", type=_parse_size, help="window/output size as WIDTHxHEIGHT")
     parser.add_argument("--frame", type=int, default=0, help="general animation frame")
     parser.add_argument(
@@ -67,7 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--frames",
         type=_parse_frames,
-        help="comma-separated frame series; defaults to the scenario's interesting frames",
+        help="comma-separated frame series; defaults to each state's interesting frames",
     )
     parser.add_argument(
         "--screenshot-dir",
@@ -78,26 +94,87 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _print_scenarios() -> None:
+    for scenario in scenarios():
+        frames = ",".join(str(frame) for frame in scenario.interesting_frames)
+        print(f"{scenario.name:22} {scenario.description} [frames: {frames}]")
+
+
+def _print_timelines() -> None:
+    for timeline in timelines():
+        print(f"{timeline.name:22} {timeline.description} [steps: {len(timeline.steps)}]")
+        for index, step in enumerate(timeline.steps):
+            frames = ",".join(str(frame) for frame in step.interesting_frames)
+            print(f"  {index:02d} {step.name:36} {step.description} [frames: {frames}]")
+
+
 def run(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
     if args.list:
-        for scenario in scenarios():
-            frames = ",".join(str(frame) for frame in scenario.interesting_frames)
-            print(f"{scenario.name:22} {scenario.description} [frames: {frames}]")
+        _print_scenarios()
+    if args.list_timelines:
+        _print_timelines()
+    if args.list or args.list_timelines:
         return 0
 
-    if args.scenario is None:
-        parser.error("a scenario is required unless --list is used")
+    if args.scenario is not None and args.timeline is not None:
+        parser.error("use either a scenario or --timeline, not both")
+    if args.scenario is None and args.timeline is None:
+        parser.error("a scenario or --timeline is required unless a list option is used")
     if args.frame < 0:
         parser.error("--frame must be non-negative")
     if args.presentation_frame is not None and args.presentation_frame < 0:
         parser.error("--presentation-frame must be non-negative")
+    if args.step < 0:
+        parser.error("--step must be non-negative")
     if args.save is not None and args.save_dir is not None:
         parser.error("use either --save or --save-dir, not both")
     if args.frames is not None and args.save_dir is None:
         parser.error("--frames requires --save-dir")
+    if args.timeline is None and args.step != 0:
+        parser.error("--step is only valid with --timeline")
+
+    if args.timeline is not None:
+        timeline = get_timeline(args.timeline)
+        if args.step >= len(timeline.steps):
+            parser.error(
+                f"--step must be between 0 and {len(timeline.steps) - 1} "
+                f"for timeline {timeline.name!r}"
+            )
+
+        if args.save is not None:
+            output = save_scenario_frame(
+                timeline.steps[args.step],
+                args.save,
+                size=args.size,
+                frame_count=args.frame,
+                presentation_frame_count=args.presentation_frame,
+                mouse_pos=args.mouse,
+            )
+            print(output)
+            return 0
+
+        if args.save_dir is not None:
+            outputs = save_timeline_frames(
+                timeline,
+                args.save_dir,
+                frames=args.frames,
+                size=args.size,
+                mouse_pos=args.mouse,
+            )
+            for output in outputs:
+                print(output)
+            return 0
+
+        return WorkbenchApp(
+            timeline=timeline,
+            size=args.size,
+            frame_count=args.frame,
+            presentation_frame_count=args.presentation_frame,
+            screenshot_dir=args.screenshot_dir,
+        ).run()
 
     scenario = get_scenario(args.scenario)
     if args.save is not None:
