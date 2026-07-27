@@ -4,8 +4,13 @@ import pygame
 
 from row_taker.client.actions import ClientAction
 from row_taker.client.state import ClientState
-from row_taker.gui.screens.game_screen import GameScreen
-from row_taker.gui_common.layout import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, compute_layout
+from row_taker.gui.screens.game_screen import GameFrame
+from row_taker.gui_common.layout import (
+    MIN_WINDOW_HEIGHT,
+    MIN_WINDOW_WIDTH,
+    DemoLayout,
+    compute_layout,
+)
 from row_taker.gui_common.live_client import LiveGuiClient
 from row_taker.gui_common.primitives import PrimitiveDrawer
 from row_taker.gui.screens.connect_screen import ConnectScreen
@@ -77,7 +82,7 @@ class GuiApp:
             raise RuntimeError("GuiApp not initialized")
 
         layout = self._current_layout()
-        current_screen = self._build_current_screen()
+        current_screen = self._build_current_screen(layout)
         targets = current_screen.build_targets(layout)
 
         for event in pygame.event.get():
@@ -87,7 +92,7 @@ class GuiApp:
                 return
 
             layout = self._current_layout()
-            current_screen = self._build_current_screen()
+            current_screen = self._build_current_screen(layout)
             targets = current_screen.build_targets(layout)
 
         current_screen.render(
@@ -98,7 +103,10 @@ class GuiApp:
         )
         pygame.display.flip()
 
-    def _build_current_screen(self) -> ConnectScreen | LobbyScreen | GameScreen:
+    def _build_current_screen(
+        self,
+        layout: DemoLayout,
+    ) -> ConnectScreen | LobbyScreen | GameFrame:
         if self._live_client is None:
             return ConnectScreen(connect_form=self._connect_form)
 
@@ -112,7 +120,8 @@ class GuiApp:
                 last_action_summary=self._last_action_summary,
             )
 
-        return GameScreen(
+        return GameFrame.from_layout(
+            layout=layout,
             state=self._client_state,
             frame_count=self._frame_count,
             presentation_frame_count=max(0, self._frame_count - self._presentation_start_frame),
@@ -141,7 +150,8 @@ class GuiApp:
             self._apply_client_action(result.client_action)
 
     def _attempt_connect(self) -> None:
-        connection_values = self._build_current_screen().normalized_connection_values()
+        current_screen = self._build_current_screen(self._current_layout())
+        connection_values = current_screen.normalized_connection_values()
         if connection_values is None:
             self._connect_form = ConnectFormState(
                 host=self._connect_form.host,

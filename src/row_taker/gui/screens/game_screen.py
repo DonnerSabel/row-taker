@@ -43,15 +43,46 @@ class OpponentSlot:
 
 
 @dataclass(frozen=True, slots=True)
-class GameScreen:
+class GameFrame:
+    """One fully prepared production frame of the game screen.
+
+    Geometry and interaction targets are created together from the same layout
+    and state. The live GUI and the future workbench can therefore render and
+    interact with exactly the same prepared frame.
+    """
+
     state: ClientState
     frame_count: int
     presentation_frame_count: int
     last_action_summary: str
+    geometry: BoardGeometry
+    targets: GameScreenTargets
+
+    @classmethod
+    def from_layout(
+        cls,
+        *,
+        layout: DemoLayout,
+        state: ClientState,
+        frame_count: int,
+        presentation_frame_count: int,
+        last_action_summary: str,
+    ) -> GameFrame:
+        geometry = _compute_geometry(layout.window_rect, state)
+        targets = build_game_screen_targets(geometry, state)
+        return cls(
+            state=state,
+            frame_count=frame_count,
+            presentation_frame_count=presentation_frame_count,
+            last_action_summary=last_action_summary,
+            geometry=geometry,
+            targets=targets,
+        )
 
     def build_targets(self, layout: DemoLayout) -> GameScreenTargets:
-        geometry = _compute_geometry(layout.window_rect, self.state)
-        return build_game_screen_targets(geometry, self.state)
+        # GuiApp uses one common screen protocol. This frame was already
+        # prepared from the same layout, so target creation must not be repeated.
+        return self.targets
 
     def handle_event(
         self,
@@ -68,11 +99,10 @@ class GameScreen:
         layout: DemoLayout,
         targets: GameScreenTargets,
     ) -> None:
-        geometry = _compute_geometry(layout.window_rect, self.state)
         render_game_screen(
             screen,
             drawer=drawer,
-            geometry=geometry,
+            geometry=self.geometry,
             client_state=self.state,
             game_targets=targets,
             frame_count=self.frame_count,
