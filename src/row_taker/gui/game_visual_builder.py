@@ -7,6 +7,8 @@ from row_taker.client.presentation_events import (
     PresentationCardPlaced,
     PresentationCardsRevealed,
     PresentationOverflowResolved,
+    PresentationRowChoiceRequired,
+    PresentationRowChosen,
     PresentationRowTaken,
 )
 from row_taker.client.state import ClientState
@@ -57,12 +59,62 @@ def build_game_visual_state(
                 visual_step,
                 presentation_frame_count=presentation_frame_count,
             )
+        if current_step is not None and isinstance(
+            current_step.event,
+            PresentationRowChoiceRequired | PresentationRowChosen,
+        ):
+            return _build_row_choice_visual_state(
+                state,
+                last_action_summary=last_action_summary,
+            )
 
     return _build_stable_game_visual_state(
         state,
         public_state=public_state_override or state.public_state,
         last_action_summary=last_action_summary,
         presentation_panel=_build_cards_revealed_panel(state),
+    )
+
+
+def _build_row_choice_visual_state(
+    state: ClientState,
+    *,
+    last_action_summary: str,
+) -> GameVisualState:
+    presentation_step = state.current_presentation_step
+    if presentation_step is None or not isinstance(
+        presentation_step.event,
+        PresentationRowChoiceRequired | PresentationRowChosen,
+    ):
+        raise ValueError(
+            "current presentation step is neither "
+            "PresentationRowChoiceRequired nor PresentationRowChosen"
+        )
+
+    event = presentation_step.event
+    row_emphasis: dict[RowID, RowEmphasis] = {}
+    if isinstance(event, PresentationRowChosen):
+        row_emphasis[event.row_id] = "choice"
+        headline = f"{event.player_name} wählt Reihe {event.row_id}"
+    else:
+        headline = f"{event.player_name} muss eine Reihe wählen"
+
+    selected_hand_card_value = (
+        event.card_value if event.player_id == state.own_player_id else None
+    )
+    return _build_stable_game_visual_state(
+        state,
+        public_state=presentation_step.public_state_before,
+        last_action_summary=last_action_summary,
+        active_player_id=event.player_id,
+        row_emphasis_by_id=row_emphasis,
+        staged_card_values_override={event.player_id: event.card_value},
+        selected_hand_card_value=selected_hand_card_value,
+        presentation_panel=VisualPresentationPanel(
+            headline=headline,
+            details=_presentation_details(state),
+            card_values=(event.card_value,),
+        ),
     )
 
 
@@ -158,11 +210,15 @@ def _build_stable_game_visual_state(
     hidden_staged_player_ids: frozenset[PlayerID] = frozenset(),
     hidden_hand_card_values: frozenset[int] = frozenset(),
     active_player_id: PlayerID | None = None,
+    staged_card_values_override: Mapping[PlayerID, int] | None = None,
+    selected_hand_card_value: int | None = None,
     row_emphasis_by_id: Mapping[RowID, RowEmphasis] | None = None,
     visual_row_order: tuple[RowID, ...] | None = None,
     presentation_panel: VisualPresentationPanel | None = None,
 ) -> GameVisualState:
     revealed_values = _revealed_card_values_by_player(state)
+    if staged_card_values_override is not None:
+        revealed_values = {**revealed_values, **staged_card_values_override}
     staged_values = {
         player_id: card_value
         for player_id, card_value in revealed_values.items()
@@ -181,7 +237,11 @@ def _build_stable_game_visual_state(
     )
     hand = _build_hand(
         state,
-        selected_card_value=_own_revealed_card_value(state, revealed_values),
+        selected_card_value=(
+            selected_hand_card_value
+            if selected_hand_card_value is not None
+            else _own_revealed_card_value(state, revealed_values)
+        ),
         hidden_card_values=hidden_hand_card_values,
     )
     interaction = _build_interaction(state, hand)

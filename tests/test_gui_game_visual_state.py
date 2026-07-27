@@ -4,7 +4,11 @@ from dataclasses import replace
 
 from row_taker.client.core_reducer import advance_presentation_queue
 from row_taker.client.core_state import PendingAction
-from row_taker.client.presentation_events import PresentationCardPlaced
+from row_taker.client.presentation_events import (
+    PresentationCardPlaced,
+    PresentationRowChoiceRequired,
+    PresentationRowChosen,
+)
 from row_taker.client.state import UiMessage
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import Row, RowID
@@ -13,6 +17,7 @@ from row_taker.engine.game.state import PublicState
 from row_taker.gui.game_visual_builder import build_game_visual_state
 from row_taker.gui.game_visual_state import PlayerPlayAnchor, RowCardAnchor
 from row_taker.gui_workbench.scenarios import get_scenario
+from row_taker.gui_workbench.timeline import get_timeline
 
 
 def _state_with_rows(rows: tuple[Row, ...]):
@@ -328,3 +333,61 @@ def test_card_placed_keeps_target_row_in_final_visual_column() -> None:
     assert tuple(row.row_id for row in before.rows) == expected_order
     assert tuple(row.row_id for row in after.rows) == expected_order
     assert before.moving_cards[0].target == RowCardAnchor(target_row_id, 1)
+def test_row_choice_required_lives_in_visual_state() -> None:
+    state = get_scenario("row-choice-required").state
+    current_step = state.current_presentation_step
+    assert current_step is not None
+    assert isinstance(current_step.event, PresentationRowChoiceRequired)
+    event = current_step.event
+
+    visual_state = build_game_visual_state(state, last_action_summary="test")
+
+    assert visual_state.presentation_panel is not None
+    assert (
+        visual_state.presentation_panel.headline
+        == f"{event.player_name} muss eine Reihe wählen"
+    )
+    assert visual_state.presentation_panel.card_values == (event.card_value,)
+    assert visual_state.interaction.can_advance_presentation is True
+    assert all(row.emphasis == "none" for row in visual_state.rows)
+
+    active_player = next(
+        player for player in visual_state.players if player.player_id == event.player_id
+    )
+    assert active_player.emphasis == "active"
+    assert active_player.staged_card_value == event.card_value
+
+    if event.player_id == state.own_player_id:
+        own_card = next(
+            card for card in visual_state.hand if card.card_value == event.card_value
+        )
+        assert own_card.emphasis == "selected"
+
+
+def test_row_chosen_lives_in_visual_state_and_marks_stable_row_id() -> None:
+    state = get_timeline("full-trick").steps[4].state
+    current_step = state.current_presentation_step
+    assert current_step is not None
+    assert isinstance(current_step.event, PresentationRowChosen)
+    event = current_step.event
+
+    visual_state = build_game_visual_state(state, last_action_summary="test")
+
+    assert visual_state.presentation_panel is not None
+    assert (
+        visual_state.presentation_panel.headline
+        == f"{event.player_name} wählt Reihe {event.row_id}"
+    )
+    assert visual_state.presentation_panel.card_values == (event.card_value,)
+    assert visual_state.interaction.can_advance_presentation is True
+
+    chosen_row = visual_state.row_by_id(event.row_id)
+    assert chosen_row is not None
+    assert chosen_row.emphasis == "choice"
+    assert sum(row.emphasis == "choice" for row in visual_state.rows) == 1
+
+    active_player = next(
+        player for player in visual_state.players if player.player_id == event.player_id
+    )
+    assert active_player.emphasis == "active"
+    assert active_player.staged_card_value == event.card_value

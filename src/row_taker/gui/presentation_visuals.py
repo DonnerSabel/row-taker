@@ -8,8 +8,6 @@ from row_taker.client.presentation_events import (
     PresentationGameFinished,
     PresentationOverflowResolved,
     PresentationRoundFinished,
-    PresentationRowChoiceRequired,
-    PresentationRowChosen,
     PresentationRowTaken,
     PresentationTrickFinished,
 )
@@ -71,29 +69,6 @@ def build_presentation_visuals(state: ClientState) -> PresentationVisuals:
 
     event = state.pending_presentation_events[0]
     details = tuple(format_presentation_event(item) for item in state.pending_presentation_events[:3])
-
-    if isinstance(event, PresentationRowChoiceRequired):
-        return PresentationVisuals(
-            current_event=event,
-            active_player_id=event.player_id,
-            played_card_values_by_player={event.player_id: event.card_value},
-            focus_card_values=(event.card_value,),
-            row_emphasis="choice",
-            headline=f"{event.player_name} muss eine Reihe wählen",
-            details=details,
-        )
-
-    if isinstance(event, PresentationRowChosen):
-        return PresentationVisuals(
-            current_event=event,
-            active_row_id=event.row_id,
-            active_player_id=event.player_id,
-            played_card_values_by_player={event.player_id: event.card_value},
-            focus_card_values=(event.card_value,),
-            row_emphasis="choice",
-            headline=f"{event.player_name} wählt Reihe {event.row_id}",
-            details=details,
-        )
 
     if isinstance(event, PresentationRowTaken):
         return PresentationVisuals(
