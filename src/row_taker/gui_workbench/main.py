@@ -10,7 +10,11 @@ from row_taker.gui_workbench.app import (
     save_scenario_frames,
     save_timeline_frames,
 )
-from row_taker.gui_workbench.scenarios import get_scenario, scenario_names, scenarios
+from row_taker.gui_workbench.scenarios import (
+    get_scenario,
+    scenario_names,
+    scenarios,
+)
 from row_taker.gui_workbench.timeline import (
     get_timeline,
     timeline_names,
@@ -95,9 +99,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _print_scenarios() -> None:
-    for scenario in scenarios():
-        frames = ",".join(str(frame) for frame in scenario.interesting_frames)
-        print(f"{scenario.name:22} {scenario.description} [frames: {frames}]")
+    for category in ("connect", "lobby", "game"):
+        print(f"[{category}]")
+        for scenario in scenarios(category):
+            frames = ",".join(str(frame) for frame in scenario.interesting_frames)
+            print(f"  {scenario.name:22} {scenario.description} [frames: {frames}]")
 
 
 def _print_timelines() -> None:

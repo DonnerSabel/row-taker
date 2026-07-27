@@ -65,6 +65,7 @@ class LobbyFrame:
     state: ClientState
     layout: GuiLayout
     targets: LobbyScreenTargets
+    mouse_pos: tuple[int, int] = (-1, -1)
 
     @classmethod
     def from_layout(
@@ -72,11 +73,13 @@ class LobbyFrame:
         *,
         layout: GuiLayout,
         state: ClientState,
+        mouse_pos: tuple[int, int] | None = None,
     ) -> LobbyFrame:
         return cls(
             state=state,
             layout=layout,
             targets=build_lobby_screen_targets(layout, state),
+            mouse_pos=_current_mouse_pos() if mouse_pos is None else mouse_pos,
         )
 
     def handle_event(self, event: pygame.event.Event) -> ScreenResult:
@@ -98,7 +101,15 @@ class LobbyFrame:
             layout=self.layout,
             client_state=self.state,
             lobby_targets=self.targets,
+            mouse_pos=self.mouse_pos,
         )
+
+
+def _current_mouse_pos() -> tuple[int, int]:
+    try:
+        return pygame.mouse.get_pos()
+    except pygame.error:
+        return (-1, -1)
 
 
 def build_lobby_screen_targets(layout: GuiLayout, state: ClientState) -> LobbyScreenTargets:
@@ -140,13 +151,25 @@ def render_lobby_screen(
     layout: GuiLayout,
     client_state: ClientState,
     lobby_targets: LobbyScreenTargets,
+    mouse_pos: tuple[int, int],
 ) -> None:
     draw_menu_background(screen)
     lobby_view = client_state.lobby_view
     endpoint = "-" if lobby_view is None else lobby_view.server_endpoint or "-"
     draw_menu_header(screen, drawer, layout, title="Row-Taker Lobby", subtitle=f"Server: {endpoint}")
-    _draw_lobby_panels(screen, drawer, layout, client_state, lobby_targets)
-    hint, is_error = _footer_hint_text(client_state, lobby_targets)
+    _draw_lobby_panels(
+        screen,
+        drawer,
+        layout,
+        client_state,
+        lobby_targets,
+        mouse_pos=mouse_pos,
+    )
+    hint, is_error = _footer_hint_text(
+        client_state,
+        lobby_targets,
+        mouse_pos=mouse_pos,
+    )
     draw_menu_footer(screen, drawer, layout, text=hint, is_error=is_error)
 
 
@@ -269,12 +292,21 @@ def _draw_lobby_panels(
     layout: GuiLayout,
     state: ClientState,
     targets: LobbyScreenTargets,
+    *,
+    mouse_pos: tuple[int, int],
 ) -> None:
     lobby_view = state.lobby_view
     seat_count = 4 if lobby_view is None else max(1, lobby_view.seat_count)
     panel_layout = compute_lobby_panel_layout(layout, seat_count)
 
-    _draw_seat_area(screen, drawer, panel_layout.seats_rect, state, targets)
+    _draw_seat_area(
+        screen,
+        drawer,
+        panel_layout.seats_rect,
+        state,
+        targets,
+        mouse_pos=mouse_pos,
+    )
     _draw_participants_panel(screen, drawer, panel_layout.participants_rect, state)
 
 
@@ -284,6 +316,8 @@ def _draw_seat_area(
     panel_rect: pygame.Rect,
     state: ClientState,
     targets: LobbyScreenTargets,
+    *,
+    mouse_pos: tuple[int, int],
 ) -> None:
     lobby_view = state.lobby_view
     draw_menu_panel(screen, panel_rect, alpha=168)
@@ -293,7 +327,6 @@ def _draw_seat_area(
         drawer.draw_text(screen, "Noch keine Lobby-Daten empfangen.", (panel_rect.left + MENU_LAYOUT.panel_padding_x, panel_rect.top + 76))
         return
 
-    mouse_pos = pygame.mouse.get_pos()
     seats_by_index = {seat.seat_index: seat for seat in lobby_view.seats}
     for target in targets.seat_targets:
         seat = seats_by_index[target.seat_index]
@@ -302,11 +335,16 @@ def _draw_seat_area(
         editing = _is_editing_bot_name(state) and selected
         _draw_seat_card(screen, drawer, target.rect, seat, state, selected=selected, hovered=hovered, editing=editing)
 
-    _draw_action_buttons(screen, drawer, targets)
+    _draw_action_buttons(screen, drawer, targets, mouse_pos=mouse_pos)
 
 
-def _draw_action_buttons(screen: pygame.Surface, drawer: PrimitiveDrawer, targets: LobbyScreenTargets) -> None:
-    mouse_pos = pygame.mouse.get_pos()
+def _draw_action_buttons(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
+    targets: LobbyScreenTargets,
+    *,
+    mouse_pos: tuple[int, int],
+) -> None:
     for target in targets.button_targets:
         hovered = target.rect.collidepoint(mouse_pos)
         variant = "success" if target.button_id == "start_game" else "neutral"
@@ -484,13 +522,18 @@ def _draw_participants_scroll_hint(screen: pygame.Surface, rect: pygame.Rect, *,
     pygame.draw.rect(screen, PALETTE.panel_border_active, pygame.Rect(track.left, track.top, track.width, thumb_height), border_radius=3)
 
 
-def _footer_hint_text(state: ClientState, targets: LobbyScreenTargets) -> tuple[str, bool]:
+def _footer_hint_text(
+    state: ClientState,
+    targets: LobbyScreenTargets,
+    *,
+    mouse_pos: tuple[int, int],
+) -> tuple[str, bool]:
     if state.flash_message is not None:
         return state.flash_message.text, state.flash_message.level == "error"
     if _is_editing_bot_name(state):
         return "Botname eingeben · Enter oder Klick außerhalb übernimmt · Esc bricht ab", False
 
-    hovered = _hovered_button_id(targets)
+    hovered = _hovered_button_id(targets, mouse_pos)
     if hovered == "start_game":
         return "Spiel mit der aktuellen Sitzplatzbelegung starten.", False
     if hovered == "take_seat":
@@ -506,8 +549,10 @@ def _footer_hint_text(state: ClientState, targets: LobbyScreenTargets) -> tuple[
     return "Wähle einen Sitzplatz. Freie Plätze können belegt oder mit einem Bot vorbereitet werden.", False
 
 
-def _hovered_button_id(targets: LobbyScreenTargets) -> str | None:
-    mouse_pos = pygame.mouse.get_pos()
+def _hovered_button_id(
+    targets: LobbyScreenTargets,
+    mouse_pos: tuple[int, int],
+) -> str | None:
     for target in targets.button_targets:
         if target.rect.collidepoint(mouse_pos):
             return target.button_id

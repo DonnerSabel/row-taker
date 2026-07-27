@@ -10,10 +10,13 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 import pytest
 
+from row_taker.gui.screens.connect_screen import ConnectFrame
 from row_taker.gui.screens.game_screen import GameFrame
+from row_taker.gui.screens.lobby_screen import LobbyFrame
 from row_taker.gui_workbench.app import (
     OFFSCREEN_MOUSE_POS,
     prepare_headless_pygame,
+    prepare_scenario_frame,
     render_scenario_frame,
     save_scenario_frame,
     save_scenario_frames,
@@ -32,17 +35,42 @@ def _pixels(surface: pygame.Surface) -> bytes:
     return pygame.image.tobytes(surface, "RGBA")
 
 
-def test_render_uses_real_game_frame_and_production_targets() -> None:
+@pytest.mark.parametrize(
+    ("scenario_name", "frame_type"),
+    (
+        ("connect-default", ConnectFrame),
+        ("lobby-waiting", LobbyFrame),
+        ("choose-card", GameFrame),
+    ),
+)
+def test_prepare_scenario_frame_uses_real_production_frame(
+    scenario_name: str,
+    frame_type: type,
+) -> None:
+    prepared = prepare_scenario_frame(
+        get_scenario(scenario_name),
+        frame_count=7,
+        mouse_pos=OFFSCREEN_MOUSE_POS,
+    )
+
+    assert isinstance(prepared, frame_type)
+
+
+def test_game_render_uses_real_game_frame_and_production_targets() -> None:
     rendered = render_scenario_frame(get_scenario("choose-card"), frame_count=7)
 
-    assert isinstance(rendered.game_frame, GameFrame)
-    assert rendered.game_frame.frame_count == 7
-    assert len(rendered.game_frame.targets.card_targets) == 10
+    assert isinstance(rendered.prepared_screen, GameFrame)
+    assert rendered.prepared_screen.frame_count == 7
+    assert len(rendered.prepared_screen.targets.card_targets) == 10
     assert rendered.surface.get_size() == (1600, 900)
 
 
-def test_identical_inputs_render_pixel_identically() -> None:
-    scenario = get_scenario("card-placed")
+@pytest.mark.parametrize(
+    "scenario_name",
+    ("connect-error", "lobby-bot-name-edit", "card-placed"),
+)
+def test_identical_inputs_render_pixel_identically(scenario_name: str) -> None:
+    scenario = get_scenario(scenario_name)
 
     first = render_scenario_frame(
         scenario,
@@ -58,10 +86,11 @@ def test_identical_inputs_render_pixel_identically() -> None:
     assert _pixels(first.surface) == _pixels(second.surface)
 
 
-def test_explicit_mouse_position_uses_real_hover_path() -> None:
+def test_explicit_mouse_position_uses_real_game_hover_path() -> None:
     scenario = get_scenario("choose-card")
     plain = render_scenario_frame(scenario, mouse_pos=OFFSCREEN_MOUSE_POS)
-    first_target = plain.game_frame.targets.card_targets[0]
+    assert isinstance(plain.prepared_screen, GameFrame)
+    first_target = plain.prepared_screen.targets.card_targets[0]
 
     hovered = render_scenario_frame(
         scenario,
@@ -69,7 +98,34 @@ def test_explicit_mouse_position_uses_real_hover_path() -> None:
     )
 
     assert _pixels(plain.surface) != _pixels(hovered.surface)
-    assert hovered.game_frame.targets.card_targets[0].card.hovered is True
+    assert isinstance(hovered.prepared_screen, GameFrame)
+    assert hovered.prepared_screen.targets.card_targets[0].card.hovered is True
+
+
+def test_explicit_mouse_position_uses_real_connect_hover_path() -> None:
+    scenario = get_scenario("connect-default")
+    plain = render_scenario_frame(scenario, mouse_pos=OFFSCREEN_MOUSE_POS)
+    assert isinstance(plain.prepared_screen, ConnectFrame)
+    connect_button = plain.prepared_screen.targets.button_targets[0]
+
+    hovered = render_scenario_frame(scenario, mouse_pos=connect_button.rect.center)
+
+    assert _pixels(plain.surface) != _pixels(hovered.surface)
+    assert isinstance(hovered.prepared_screen, ConnectFrame)
+    assert hovered.prepared_screen.mouse_pos == connect_button.rect.center
+
+
+def test_explicit_mouse_position_uses_real_lobby_hover_path() -> None:
+    scenario = get_scenario("lobby-waiting")
+    plain = render_scenario_frame(scenario, mouse_pos=OFFSCREEN_MOUSE_POS)
+    assert isinstance(plain.prepared_screen, LobbyFrame)
+    seat_target = plain.prepared_screen.targets.seat_targets[0]
+
+    hovered = render_scenario_frame(scenario, mouse_pos=seat_target.rect.center)
+
+    assert _pixels(plain.surface) != _pixels(hovered.surface)
+    assert isinstance(hovered.prepared_screen, LobbyFrame)
+    assert hovered.prepared_screen.mouse_pos == seat_target.rect.center
 
 
 @pytest.mark.parametrize("scenario", scenarios(), ids=lambda item: item.name)
@@ -85,10 +141,8 @@ def test_every_catalog_scenario_renders_all_interesting_frames(scenario) -> None
 
 def test_save_scenario_frame_writes_real_png(tmp_path: Path) -> None:
     output = save_scenario_frame(
-        get_scenario("row-taken"),
-        tmp_path / "nested" / "row-taken.png",
-        frame_count=16,
-        presentation_frame_count=16,
+        get_scenario("lobby-full"),
+        tmp_path / "nested" / "lobby-full.png",
     )
 
     assert output.is_file()
@@ -108,7 +162,7 @@ def test_save_scenario_frames_uses_interesting_frames_by_default(tmp_path: Path)
 
 
 def test_render_rejects_surface_with_wrong_size() -> None:
-    scenario = get_scenario("choose-card")
+    scenario = get_scenario("connect-default")
 
     with pytest.raises(ValueError, match="does not match requested size"):
         render_scenario_frame(

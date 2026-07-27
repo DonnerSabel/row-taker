@@ -21,7 +21,7 @@ from row_taker.gui_workbench.scenarios import get_scenario, scenarios
 from row_taker.gui_workbench.timeline import get_timeline
 
 
-@pytest.mark.parametrize("scenario", scenarios(), ids=lambda item: item.name)
+@pytest.mark.parametrize("scenario", scenarios("game"), ids=lambda item: item.name)
 def test_all_workbench_scenarios_have_visible_interaction_targets(scenario) -> None:
     visual_state = build_game_visual_state(
         scenario.state,

@@ -55,6 +55,7 @@ class ConnectFrame:
     connect_form: ConnectFormState
     layout: GuiLayout
     targets: ConnectScreenTargets
+    mouse_pos: tuple[int, int] = (-1, -1)
 
     @classmethod
     def from_layout(
@@ -62,11 +63,13 @@ class ConnectFrame:
         *,
         layout: GuiLayout,
         connect_form: ConnectFormState,
+        mouse_pos: tuple[int, int] | None = None,
     ) -> ConnectFrame:
         return cls(
             connect_form=connect_form,
             layout=layout,
             targets=build_connect_screen_targets(layout),
+            mouse_pos=_current_mouse_pos() if mouse_pos is None else mouse_pos,
         )
 
     def handle_event(self, event: pygame.event.Event) -> ScreenResult:
@@ -88,7 +91,15 @@ class ConnectFrame:
             layout=self.layout,
             connect_form=self.connect_form,
             connect_targets=self.targets,
+            mouse_pos=self.mouse_pos,
         )
+
+
+def _current_mouse_pos() -> tuple[int, int]:
+    try:
+        return pygame.mouse.get_pos()
+    except pygame.error:
+        return (-1, -1)
 
 
 def build_connect_screen_targets(layout: GuiLayout) -> ConnectScreenTargets:
@@ -227,9 +238,10 @@ def render_connect_screen(
     layout: GuiLayout,
     connect_form: ConnectFormState,
     connect_targets: ConnectScreenTargets,
+    mouse_pos: tuple[int, int],
 ) -> None:
     draw_menu_background(screen)
-    hovered_button_id = _hovered_button_id(connect_targets)
+    hovered_button_id = _hovered_button_id(connect_targets, mouse_pos)
     draw_menu_header(
         screen,
         drawer,
@@ -237,7 +249,13 @@ def render_connect_screen(
         title="Row-Taker",
         subtitle="Mit Server verbinden und direkt in die Lobby wechseln.",
     )
-    _draw_connect_panel(screen, drawer, connect_form, connect_targets)
+    _draw_connect_panel(
+        screen,
+        drawer,
+        connect_form,
+        connect_targets,
+        mouse_pos=mouse_pos,
+    )
     draw_menu_footer(
         screen,
         drawer,
@@ -252,6 +270,8 @@ def _draw_connect_panel(
     drawer: PrimitiveDrawer,
     connect_form: ConnectFormState,
     targets: ConnectScreenTargets,
+    *,
+    mouse_pos: tuple[int, int],
 ) -> None:
     panel = targets.panel_rect
     draw_menu_panel(screen, panel)
@@ -266,7 +286,6 @@ def _draw_connect_panel(
         color=PALETTE.text_muted,
     )
 
-    mouse_pos = pygame.mouse.get_pos()
     for target in targets.field_targets:
         active = connect_form.active_field == target.field_name
         hovered = target.rect.collidepoint(mouse_pos)
@@ -325,8 +344,10 @@ def _footer_hint_text(connect_form: ConnectFormState, hovered_button_id: str | N
     return connect_form.status_message
 
 
-def _hovered_button_id(connect_targets: ConnectScreenTargets) -> str | None:
-    mouse_pos = pygame.mouse.get_pos()
+def _hovered_button_id(
+    connect_targets: ConnectScreenTargets,
+    mouse_pos: tuple[int, int],
+) -> str | None:
     for target in connect_targets.button_targets:
         if target.rect.collidepoint(mouse_pos):
             return target.button_id

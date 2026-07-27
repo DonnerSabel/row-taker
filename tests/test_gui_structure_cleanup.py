@@ -52,3 +52,13 @@ def test_gui_app_no_longer_orchestrates_screen_targets() -> None:
     assert "handle_event(event, targets)" not in app_source
     assert "layout=layout" not in app_source.split("def _process_current_screen", 1)[1].split("def _prepare_current_screen", 1)[0]
 
+
+
+def test_workbench_uses_prepared_frames_instead_of_renderer_helpers() -> None:
+    app_source = (ROOT / "src/row_taker/gui_workbench/app.py").read_text(encoding="utf-8")
+    assert "render_connect_screen" not in app_source
+    assert "render_lobby_screen" not in app_source
+    assert "render_game_screen" not in app_source
+    assert "ConnectFrame.from_layout" in app_source
+    assert "LobbyFrame.from_layout" in app_source
+    assert "GameFrame.from_layout" in app_source

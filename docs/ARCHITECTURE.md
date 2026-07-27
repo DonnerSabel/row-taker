@@ -234,15 +234,17 @@ keine Layout- oder Target-Objekte zwischen Screens weiter. Nach jeder möglichen
 Zustandsänderung wird ein neuer unveränderlicher Frame vorbereitet.
 
 Die GUI-Workbench kontrolliert Fenstergröße, Mausposition, Zustände und
-Frame-Zähler. Sie benutzt denselben `GameFrame`, dieselbe Target-Erzeugung und
-denselben Produktionsrenderer wie die echte GUI. Sie besitzt keine eigene
-Karten-, Reihen- oder Animationsdarstellung.
+Frame-Zähler. Sie bereitet abhängig vom Szenariotyp denselben `ConnectFrame`,
+`LobbyFrame` oder `GameFrame` vor wie die echte GUI und besitzt keine eigene
+Zeichenlogik. Damit lassen sich Connect-, Lobby- und Spieloberfläche über den
+jeweiligen Produktionsrenderer reproduzierbar prüfen.
 
-Die festen Workbench-Szenarien erzeugen echte `ClientState`-Objekte. Für
-Präsentationsabläufe werden die vorhandenen Reducer und der echte lokale
-Trick-Resolver verwendet, sodass nicht parallel eine zweite Darstellungslogik
-entsteht. Der Workbench-Code darf nur die Eingaben des Produktionsframes und das
-Ausgabeziel kontrollieren.
+Connect-Szenarien liefern ausschließlich einen `ConnectFormState`; Lobby- und
+Spielszenarien liefern echte `ClientState`-Objekte. Für Präsentationsabläufe
+werden die vorhandenen Reducer und der echte lokale Trick-Resolver verwendet,
+sodass nicht parallel eine zweite Darstellungslogik entsteht. Der
+Workbench-Code darf nur Eingaben der Prepared Frames und das Ausgabeziel
+kontrollieren.
 
 ---
 

@@ -1,9 +1,18 @@
 # GUI-Workbench
 
-Die GUI-Workbench ist ein deterministischer Host für die echte Pygame-Spieloberfläche.
-Sie besitzt keinen eigenen Karten-, Reihen- oder Animationsrenderer. Jede Szene wird
-als echter `ClientState` aufgebaut und anschließend über denselben `GameFrame` wie
-im Netzwerkspiel gerendert.
+Die GUI-Workbench ist ein deterministischer Host für **alle drei echten
+Pygame-Oberflächen**. Sie besitzt keine eigene Zeichenlogik. Jedes Szenario wird
+durch genau den Prepared Frame gerendert, den auch `GuiApp` verwendet:
+
+```text
+WorkbenchScenario
+    ├── ConnectWorkbenchScenario → ConnectFrame
+    ├── LobbyWorkbenchScenario   → LobbyFrame
+    └── GameWorkbenchScenario    → GameFrame
+```
+
+Die Workbench kontrolliert nur Zustand, Fenstergröße, Mausposition,
+Frame-Zähler und Ausgabeziel.
 
 ## Szenen auflisten
 
@@ -11,11 +20,21 @@ im Netzwerkspiel gerendert.
 python -m row_taker.gui_workbench --list
 ```
 
-## Interaktiv untersuchen
+Die Ausgabe ist in `[connect]`, `[lobby]` und `[game]` gegliedert.
+
+Beispiele:
 
 ```bash
+python -m row_taker.gui_workbench connect-error
+python -m row_taker.gui_workbench lobby-bot-name-edit
 python -m row_taker.gui_workbench card-placed
 ```
+
+Die Connect-Szenen decken Standardwerte, ungültige Eingaben,
+Verbindungsfehler und lange Feldwerte ab. Die Lobby-Szenen decken leere und
+volle Lobbys, Sitzplatzauswahl, Bot-Namenseingabe und lange Namen ab.
+
+## Interaktiv untersuchen
 
 Steuerung:
 
@@ -28,29 +47,30 @@ Steuerung:
 - `Esc`: Workbench schließen
 
 Die Fenstergröße kann normal verändert werden. Für jede Größe wird ein neuer
-`GameFrame` mit der echten Produktionsgeometrie und den echten Interaktionszielen
-erzeugt.
+Prepared Frame mit der echten Produktionsgeometrie und den echten
+Interaktionszielen erzeugt.
 
 ## Einzelnen Frame speichern
 
 ```bash
-python -m row_taker.gui_workbench card-placed \
+python -m row_taker.gui_workbench lobby-long-names \
   --size 1600x900 \
-  --frame 16 \
-  --presentation-frame 16 \
-  --save screenshots/card-placed-016.png
+  --save screenshots/lobby-long-names.png
 ```
 
 Gespeicherte Frames verwenden standardmäßig die Mausposition `(-1, -1)`, damit
-kein zufälliger Hover-Zustand entsteht. Ein Hover kann gezielt reproduziert werden:
+kein zufälliger Hover-Zustand entsteht. Ein Hover kann gezielt reproduziert
+werden:
 
 ```bash
-python -m row_taker.gui_workbench choose-card \
-  --mouse 180,840 \
-  --save screenshots/choose-card-hover.png
+python -m row_taker.gui_workbench connect-default \
+  --mouse 700,650 \
+  --save screenshots/connect-hover.png
 ```
 
 ## Animationsfolge speichern
+
+Für Spiel-Präsentationen können mehrere Frames ausgegeben werden:
 
 ```bash
 python -m row_taker.gui_workbench row-taken \
@@ -68,19 +88,11 @@ python -m row_taker.gui_workbench row-taken \
 
 ## Vollständige Timeline untersuchen
 
-Patch C ergänzt reproduzierbare Abläufe, deren Zustände nicht manuell erfunden
-werden. Die Timeline wird mit dem echten `MatchHub`, `GameClientCore`, den
+Die Timeline wird mit dem echten `MatchHub`, `GameClientCore`, den
 Produktions-Reducern und `GameFrame.handle_event()` erzeugt.
-
-Verfügbare Timelines und ihre Zustände:
 
 ```bash
 python -m row_taker.gui_workbench --list-timelines
-```
-
-Die vollständige Stichauflösung interaktiv öffnen:
-
-```bash
 python -m row_taker.gui_workbench --timeline full-trick
 ```
 
@@ -89,11 +101,8 @@ Zusätzliche Steuerung in einer Timeline:
 - `Bild ab`: nächster erzeugter Zustand
 - `Bild auf`: vorheriger erzeugter Zustand
 
-Beim Zustandswechsel werden beide Frame-Zähler auf null gesetzt. Dadurch beginnt
-die Animation jedes Präsentationsereignisses genauso neu wie beim Wechsel des
-vordersten Ereignisses in der echten GUI.
-
-Die gesamte Timeline als PNG-Serie speichern:
+Beim Zustandswechsel werden beide Frame-Zähler auf null gesetzt. Die gesamte
+Timeline kann als PNG-Serie gespeichert werden:
 
 ```bash
 python -m row_taker.gui_workbench --timeline full-trick \
@@ -109,15 +118,14 @@ python -m row_taker.gui_workbench --timeline full-trick \
 ```
 
 Die Timeline navigiert direkt über `PresentationStep`-Objekte und enthält auch
-den Zustand nach der geleerten Präsentationsqueue.
-Dessen `PublicState` wird beim Aufbau gegen den tatsächlichen Endzustand des
-`MatchHub` geprüft.
+den Zustand nach der geleerten Präsentationsqueue. Dessen `PublicState` wird
+beim Aufbau gegen den tatsächlichen Endzustand des `MatchHub` geprüft.
 
 ## Architekturregel
 
 Die Workbench darf kontrollieren:
 
-- `ClientState`
+- `ConnectFormState` oder `ClientState`
 - Fenstergröße
 - Mausposition
 - allgemeinen Frame-Zähler
@@ -125,11 +133,9 @@ Die Workbench darf kontrollieren:
 - Ausgabeziel Fenster oder PNG
 
 Sie darf nicht selbst zeichnen oder Produktionsdarstellung nachbauen. Sichtbare
-Spielinhalte müssen immer über `GameFrame.render()` und damit über den echten
-Produktionsrenderer laufen.
+Inhalte müssen immer über `ConnectFrame.render()`, `LobbyFrame.render()` oder
+`GameFrame.render()` laufen.
 
-Der Produktionsframe übersetzt den kontrollierten `ClientState` über denselben
-`GameVisualStateBuilder` wie die echte GUI. Auch vollständige Präsentationsabläufe
-verwenden daher ausschließlich `GameVisualState`, semantische Kartenanker und
-die echten Vorher-/Nachher-Snapshots. Eine separate Presentation- oder
-Workbench-Darstellung existiert nicht.
+Die festen Spielszenarien erzeugen echte `ClientState`-Objekte. Für
+Präsentationsabläufe werden die vorhandenen Reducer und der echte lokale
+Trick-Resolver verwendet. Eine separate Workbench-Darstellung existiert nicht.

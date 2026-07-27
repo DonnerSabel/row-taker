@@ -24,18 +24,24 @@ def test_connect_frame_prepares_and_owns_layout_and_targets(monkeypatch) -> None
     build_targets = Mock(return_value=targets)
     monkeypatch.setattr(connect_screen, "build_connect_screen_targets", build_targets)
 
-    frame = ConnectFrame.from_layout(layout=layout, connect_form=form)
+    frame = ConnectFrame.from_layout(layout=layout, connect_form=form, mouse_pos=(10, 20))
 
     build_targets.assert_called_once_with(layout)
     assert frame.layout is layout
     assert frame.targets is targets
+    assert frame.mouse_pos == (10, 20)
 
 
 def test_connect_frame_uses_its_own_prepared_data(monkeypatch) -> None:
     layout = compute_layout(1280, 720)
     form = ConnectFormState()
     targets = Mock(spec=ConnectScreenTargets)
-    frame = ConnectFrame(connect_form=form, layout=layout, targets=targets)
+    frame = ConnectFrame(
+        connect_form=form,
+        layout=layout,
+        targets=targets,
+        mouse_pos=(30, 40),
+    )
     event = object()
     handle = Mock(return_value=NO_SCREEN_RESULT)
     render = Mock()
@@ -54,6 +60,7 @@ def test_connect_frame_uses_its_own_prepared_data(monkeypatch) -> None:
         layout=layout,
         connect_form=form,
         connect_targets=targets,
+        mouse_pos=(30, 40),
     )
 
 
@@ -64,18 +71,24 @@ def test_lobby_frame_prepares_and_owns_layout_and_targets(monkeypatch) -> None:
     build_targets = Mock(return_value=targets)
     monkeypatch.setattr(lobby_screen, "build_lobby_screen_targets", build_targets)
 
-    frame = LobbyFrame.from_layout(layout=layout, state=state)
+    frame = LobbyFrame.from_layout(layout=layout, state=state, mouse_pos=(50, 60))
 
     build_targets.assert_called_once_with(layout, state)
     assert frame.layout is layout
     assert frame.targets is targets
+    assert frame.mouse_pos == (50, 60)
 
 
 def test_lobby_frame_uses_its_own_prepared_data(monkeypatch) -> None:
     layout = compute_layout(1280, 720)
     state = get_scenario("choose-card").state
     targets = Mock(spec=LobbyScreenTargets)
-    frame = LobbyFrame(state=state, layout=layout, targets=targets)
+    frame = LobbyFrame(
+        state=state,
+        layout=layout,
+        targets=targets,
+        mouse_pos=(70, 80),
+    )
     event = object()
     handle = Mock(return_value=NO_SCREEN_RESULT)
     render = Mock()
@@ -94,6 +107,7 @@ def test_lobby_frame_uses_its_own_prepared_data(monkeypatch) -> None:
         layout=layout,
         client_state=state,
         lobby_targets=targets,
+        mouse_pos=(70, 80),
     )
 
 

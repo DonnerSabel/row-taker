@@ -9,10 +9,19 @@ from pathlib import Path
 
 import pygame
 
-from row_taker.gui.screens.game_screen import GameFrame
 from row_taker.gui.layout import compute_layout
 from row_taker.gui.primitives import PrimitiveDrawer
-from row_taker.gui_workbench.scenarios import WorkbenchScenario
+from row_taker.gui.screens.connect_screen import ConnectFrame
+from row_taker.gui.screens.game_screen import GameFrame
+from row_taker.gui.screens.lobby_screen import LobbyFrame
+from row_taker.gui.screens.prepared_screen import PreparedScreen
+from row_taker.gui_workbench.scenarios import (
+    ConnectWorkbenchScenario,
+    GameWorkbenchScenario,
+    LobbyWorkbenchScenario,
+    WorkbenchScenario,
+    scenario_category,
+)
 from row_taker.gui_workbench.timeline import WorkbenchTimeline
 
 WORKBENCH_FPS = 30
@@ -22,7 +31,8 @@ OFFSCREEN_MOUSE_POS = (-1, -1)
 @dataclass(frozen=True, slots=True)
 class RenderedWorkbenchFrame:
     surface: pygame.Surface
-    game_frame: GameFrame
+    prepared_screen: PreparedScreen
+
 
 
 def prepare_headless_pygame() -> None:
@@ -39,6 +49,50 @@ def prepare_headless_pygame() -> None:
         pygame.display.set_mode((1, 1), pygame.HIDDEN)
 
 
+
+def prepare_scenario_frame(
+    scenario: WorkbenchScenario,
+    *,
+    size: tuple[int, int] | None = None,
+    frame_count: int = 0,
+    presentation_frame_count: int | None = None,
+    mouse_pos: tuple[int, int] = OFFSCREEN_MOUSE_POS,
+) -> PreparedScreen:
+    """Prepare the real production frame for one deterministic scenario."""
+
+    resolved_size = scenario.default_size if size is None else size
+    if resolved_size[0] <= 0 or resolved_size[1] <= 0:
+        raise ValueError(f"invalid workbench size: {resolved_size!r}")
+    layout = compute_layout(*resolved_size)
+
+    match scenario:
+        case ConnectWorkbenchScenario():
+            return ConnectFrame.from_layout(
+                layout=layout,
+                connect_form=scenario.connect_form,
+                mouse_pos=mouse_pos,
+            )
+        case LobbyWorkbenchScenario():
+            return LobbyFrame.from_layout(
+                layout=layout,
+                state=scenario.state,
+                mouse_pos=mouse_pos,
+            )
+        case GameWorkbenchScenario():
+            return GameFrame.from_layout(
+                layout=layout,
+                state=scenario.state,
+                frame_count=frame_count,
+                presentation_frame_count=(
+                    frame_count
+                    if presentation_frame_count is None
+                    else presentation_frame_count
+                ),
+                last_action_summary=scenario.last_action_summary,
+                mouse_pos=mouse_pos,
+            )
+
+
 def render_scenario_frame(
     scenario: WorkbenchScenario,
     *,
@@ -49,7 +103,7 @@ def render_scenario_frame(
     surface: pygame.Surface | None = None,
     drawer: PrimitiveDrawer | None = None,
 ) -> RenderedWorkbenchFrame:
-    """Render one workbench frame through the production ``GameFrame`` only."""
+    """Render one scenario only through its production prepared frame."""
 
     resolved_size = scenario.default_size if size is None else size
     if resolved_size[0] <= 0 or resolved_size[1] <= 0:
@@ -62,21 +116,19 @@ def render_scenario_frame(
             f"surface size {surface.get_size()!r} does not match requested size {resolved_size!r}"
         )
 
-    layout = compute_layout(*resolved_size)
-    game_frame = GameFrame.from_layout(
-        layout=layout,
-        state=scenario.state,
+    prepared_screen = prepare_scenario_frame(
+        scenario,
+        size=resolved_size,
         frame_count=frame_count,
-        presentation_frame_count=(
-            frame_count
-            if presentation_frame_count is None
-            else presentation_frame_count
-        ),
-        last_action_summary=scenario.last_action_summary,
+        presentation_frame_count=presentation_frame_count,
         mouse_pos=mouse_pos,
     )
-    game_frame.render(surface, drawer=drawer or PrimitiveDrawer())
-    return RenderedWorkbenchFrame(surface=surface, game_frame=game_frame)
+    prepared_screen.render(surface, drawer=drawer or PrimitiveDrawer())
+    return RenderedWorkbenchFrame(
+        surface=surface,
+        prepared_screen=prepared_screen,
+    )
+
 
 
 def save_scenario_frame(
@@ -100,6 +152,7 @@ def save_scenario_frame(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     pygame.image.save(rendered.surface, str(output_path))
     return output_path
+
 
 
 def save_scenario_frames(
@@ -128,6 +181,7 @@ def save_scenario_frames(
     )
 
 
+
 def save_timeline_frames(
     timeline: WorkbenchTimeline,
     output_dir: Path,
@@ -136,7 +190,7 @@ def save_timeline_frames(
     size: tuple[int, int] | None = None,
     mouse_pos: tuple[int, int] = OFFSCREEN_MOUSE_POS,
 ) -> tuple[Path, ...]:
-    """Render every timeline step through the production renderer."""
+    """Render every game timeline step through the production renderer."""
 
     output_dir = output_dir.resolve()
     outputs: list[Path] = []
@@ -163,7 +217,7 @@ def save_timeline_frames(
 
 
 class WorkbenchApp:
-    """Interactive timing and resize host around the production game renderer."""
+    """Interactive resize and timing host around production prepared frames."""
 
     def __init__(
         self,
@@ -180,7 +234,9 @@ class WorkbenchApp:
 
         self._timeline = timeline
         self._timeline_step_index = 0
-        self._scenarios = (scenario,) if scenario is not None else timeline.steps
+        self._scenarios: tuple[WorkbenchScenario, ...] = (
+            (scenario,) if scenario is not None else timeline.steps
+        )
         initial_scenario = self._scenarios[0]
         self._initial_size = initial_scenario.default_size if size is None else size
         self._frame_count = frame_count
@@ -207,13 +263,12 @@ class WorkbenchApp:
                 if not self._running:
                     break
 
-                mouse_pos = pygame.mouse.get_pos()
                 render_scenario_frame(
                     self.current_scenario,
                     size=screen.get_size(),
                     frame_count=self._frame_count,
                     presentation_frame_count=self._presentation_frame_count,
-                    mouse_pos=mouse_pos,
+                    mouse_pos=pygame.mouse.get_pos(),
                     surface=screen,
                     drawer=drawer,
                 )
@@ -232,6 +287,7 @@ class WorkbenchApp:
             pygame.quit()
 
     def _handle_events(self, screen: pygame.Surface) -> None:
+        del screen
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self._running = False
@@ -310,7 +366,8 @@ class WorkbenchApp:
                 f"[{self._timeline_step_index + 1}/{len(self._scenarios)}] | "
             )
         return (
-            f"Row-Taker GUI-Workbench | {timeline_part}{self.current_scenario.name} | "
+            f"Row-Taker GUI-Workbench | {timeline_part}"
+            f"{scenario_category(self.current_scenario)}/{self.current_scenario.name} | "
             f"frame={self._frame_count} presentation={self._presentation_frame_count} | "
             f"{mode} | P Pause, Pfeile Frame, Bild auf/ab Zustand, "
             "Home Reset, S Screenshot"

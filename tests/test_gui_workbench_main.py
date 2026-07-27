@@ -13,6 +13,11 @@ def test_workbench_list_command(capsys) -> None:
     assert run(["--list"]) == 0
 
     output = capsys.readouterr().out
+    assert "[connect]" in output
+    assert "connect-error" in output
+    assert "[lobby]" in output
+    assert "lobby-bot-name-edit" in output
+    assert "[game]" in output
     assert "choose-card" in output
     assert "overflow-resolved" in output
     assert "frames: 0,8,16,24,32" in output

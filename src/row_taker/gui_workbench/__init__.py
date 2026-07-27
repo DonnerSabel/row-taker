@@ -1,6 +1,9 @@
-"""Deterministic host for inspecting the production Pygame game screen."""
+"""Deterministic host for inspecting all production Pygame screens."""
 
 from row_taker.gui_workbench.scenarios import (
+    ConnectWorkbenchScenario,
+    GameWorkbenchScenario,
+    LobbyWorkbenchScenario,
     WorkbenchScenario,
     get_scenario,
     scenario_names,
@@ -14,6 +17,9 @@ from row_taker.gui_workbench.timeline import (
 )
 
 __all__ = [
+    "ConnectWorkbenchScenario",
+    "GameWorkbenchScenario",
+    "LobbyWorkbenchScenario",
     "WorkbenchScenario",
     "WorkbenchTimeline",
     "get_scenario",

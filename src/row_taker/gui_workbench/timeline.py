@@ -23,7 +23,7 @@ from row_taker.gui.layout import compute_layout
 from row_taker.gui_workbench.scenarios import (
     ANIMATION_FRAMES,
     DEFAULT_SIZE,
-    WorkbenchScenario,
+    GameWorkbenchScenario,
 )
 from row_taker.hub.match_hub import MatchHub
 from row_taker.protocol.messages import (
@@ -45,7 +45,7 @@ class WorkbenchTimeline:
 
     name: str
     description: str
-    steps: tuple[WorkbenchScenario, ...]
+    steps: tuple[GameWorkbenchScenario, ...]
     expected_final_public_state: PublicState
     default_size: tuple[int, int] = DEFAULT_SIZE
 
@@ -68,10 +68,10 @@ def _step(
     label: str,
     description: str,
     state: ClientState,
-) -> WorkbenchScenario:
+) -> GameWorkbenchScenario:
     event = _front_event(state)
     frames = ANIMATION_FRAMES if event is not None else (0,)
-    return WorkbenchScenario(
+    return GameWorkbenchScenario(
         name=f"{timeline_name}-{index:02d}-{label}",
         description=description,
         state=state,
@@ -190,7 +190,7 @@ def _build_full_trick_timeline() -> WorkbenchTimeline:
         own_player_id=own_player_id,
     )
 
-    steps: list[WorkbenchScenario] = []
+    steps: list[GameWorkbenchScenario] = []
     steps.append(
         _step(
             timeline_name,
