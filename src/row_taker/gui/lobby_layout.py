@@ -5,35 +5,7 @@ from dataclasses import dataclass
 import pygame
 
 from row_taker.gui.layout import GuiLayout
-
-
-@dataclass(frozen=True, slots=True)
-class LobbyLayoutConfig:
-    group_max_width: int = 720
-    group_min_width: int = 610
-    group_margin_x: int = 48
-    group_center_y_offset: int = -14
-    panel_gap: int = 12
-    participant_width: int = 230
-    panel_padding_x: int = 22
-    panel_header_height: int = 64
-    panel_bottom_padding: int = 20
-    seat_row_height: int = 36
-    seat_row_gap: int = 8
-    action_button_width: int = 150
-    action_button_height: int = 44
-    action_button_gap: int = 10
-    bottom_bar_padding_x: int = 28
-    bottom_bar_padding_y: int = 18
-    bot_dialog_width: int = 470
-    bot_dialog_height: int = 205
-    bot_dialog_input_height: int = 48
-    bot_dialog_button_width: int = 138
-    bot_dialog_button_height: int = 42
-    bot_dialog_button_gap: int = 10
-
-
-DEFAULT_LOBBY_LAYOUT = LobbyLayoutConfig()
+from row_taker.gui.menu_layout import DEFAULT_MENU_LAYOUT, MenuLayoutConfig, content_rect
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,99 +13,95 @@ class LobbyPanelLayout:
     group_rect: pygame.Rect
     seats_rect: pygame.Rect
     participants_rect: pygame.Rect
-    seat_board_rect: pygame.Rect
-
-
-@dataclass(frozen=True, slots=True)
-class BotNameDialogLayout:
-    dialog_rect: pygame.Rect
-    input_rect: pygame.Rect
-    confirm_button_rect: pygame.Rect
-    cancel_button_rect: pygame.Rect
+    seat_list_rect: pygame.Rect
+    action_rect: pygame.Rect
 
 
 def compute_lobby_panel_layout(
     layout: GuiLayout,
     seat_count: int,
     *,
-    config: LobbyLayoutConfig = DEFAULT_LOBBY_LAYOUT,
+    config: MenuLayoutConfig = DEFAULT_MENU_LAYOUT,
 ) -> LobbyPanelLayout:
-    content_rect = layout.main_rect.union(layout.sidebar_rect)
-    group_width = min(config.group_max_width, max(config.group_min_width, content_rect.width - 2 * config.group_margin_x))
-    group_width = min(group_width, max(1, content_rect.width - 2 * config.group_margin_x))
-    participant_width = min(config.participant_width, max(190, group_width // 3))
-    seats_width = group_width - participant_width - config.panel_gap
+    area = content_rect(layout)
+    group_width = min(
+        config.lobby_group_max_width,
+        max(config.lobby_group_min_width, area.width - 2 * config.lobby_group_margin_x),
+    )
+    group_width = min(group_width, max(1, area.width - 2 * config.lobby_group_margin_x))
+    participants_width = min(config.lobby_participants_width, max(190, group_width // 3))
+    seats_width = group_width - participants_width - config.panel_gap
 
-    group_height = _group_height(max(1, seat_count), config=config)
-    max_height = max(240, content_rect.height - 88)
+    row_count = max(1, seat_count)
+    seat_list_height = row_count * config.control_height + max(
+        0, row_count - 1
+    ) * config.control_gap
+    group_height = (
+        config.lobby_panel_title_height
+        + seat_list_height
+        + config.lobby_action_gap
+        + config.control_height
+        + config.lobby_panel_bottom_padding
+    )
+    max_height = max(260, area.height - 80)
     group_height = min(group_height, max_height)
 
-    group_rect = pygame.Rect(0, 0, group_width, group_height)
-    group_rect.centerx = content_rect.centerx
-    group_rect.centery = content_rect.centery + config.group_center_y_offset
-    group_rect.clamp_ip(content_rect.inflate(-24, -24))
+    group = pygame.Rect(0, 0, group_width, group_height)
+    group.centerx = area.centerx
+    group.centery = area.centery + config.lobby_group_center_y_offset
+    group.clamp_ip(area.inflate(-24, -24))
 
-    seats_rect = pygame.Rect(group_rect.left, group_rect.top, seats_width, group_height)
-    participants_rect = pygame.Rect(seats_rect.right + config.panel_gap, group_rect.top, participant_width, group_height)
-    board_height = max(1, seat_count) * config.seat_row_height + max(0, seat_count - 1) * config.seat_row_gap
-    seat_board_rect = pygame.Rect(
-        seats_rect.left + config.panel_padding_x,
-        seats_rect.top + config.panel_header_height,
-        seats_rect.width - 2 * config.panel_padding_x,
-        board_height,
+    seats = pygame.Rect(group.left, group.top, seats_width, group.height)
+    participants = pygame.Rect(
+        seats.right + config.panel_gap,
+        group.top,
+        participants_width,
+        group.height,
+    )
+    seat_list = pygame.Rect(
+        seats.left + config.panel_padding_x,
+        seats.top + config.lobby_panel_title_height,
+        seats.width - 2 * config.panel_padding_x,
+        min(
+            seat_list_height,
+            max(
+                1,
+                seats.height
+                - config.lobby_panel_title_height
+                - config.lobby_action_gap
+                - config.control_height
+                - config.lobby_panel_bottom_padding,
+            ),
+        ),
+    )
+    action = pygame.Rect(
+        seats.left + config.panel_padding_x,
+        seats.bottom - config.lobby_panel_bottom_padding - config.control_height,
+        seats.width - 2 * config.panel_padding_x,
+        config.control_height,
     )
     return LobbyPanelLayout(
-        group_rect=group_rect,
-        seats_rect=seats_rect,
-        participants_rect=participants_rect,
-        seat_board_rect=seat_board_rect,
+        group_rect=group,
+        seats_rect=seats,
+        participants_rect=participants,
+        seat_list_rect=seat_list,
+        action_rect=action,
     )
 
 
-def compute_bot_name_dialog_layout(
-    layout: GuiLayout,
+def row_rects(
+    list_rect: pygame.Rect,
+    count: int,
     *,
-    config: LobbyLayoutConfig = DEFAULT_LOBBY_LAYOUT,
-) -> BotNameDialogLayout:
-    content_rect = layout.main_rect.union(layout.sidebar_rect)
-    dialog = pygame.Rect(0, 0, config.bot_dialog_width, config.bot_dialog_height)
-    dialog.center = content_rect.center
-    dialog.y += 8
-    input_rect = pygame.Rect(
-        dialog.left + 32,
-        dialog.top + 82,
-        dialog.width - 64,
-        config.bot_dialog_input_height,
-    )
-    button_y = dialog.bottom - 58
-    cancel = pygame.Rect(
-        dialog.right - 32 - config.bot_dialog_button_width,
-        button_y,
-        config.bot_dialog_button_width,
-        config.bot_dialog_button_height,
-    )
-    confirm = pygame.Rect(
-        cancel.left - config.bot_dialog_button_gap - config.bot_dialog_button_width,
-        button_y,
-        config.bot_dialog_button_width,
-        config.bot_dialog_button_height,
-    )
-    return BotNameDialogLayout(
-        dialog_rect=dialog,
-        input_rect=input_rect,
-        confirm_button_rect=confirm,
-        cancel_button_rect=cancel,
-    )
+    config: MenuLayoutConfig = DEFAULT_MENU_LAYOUT,
+) -> tuple[pygame.Rect, ...]:
+    rects: list[pygame.Rect] = []
+    for index in range(max(0, count)):
+        y = list_rect.top + index * (config.control_height + config.control_gap)
+        rects.append(
+            pygame.Rect(list_rect.left, y, list_rect.width, config.control_height)
+        )
+    return tuple(rects)
 
 
-def bottom_bar_inner_rect(
-    layout: GuiLayout,
-    *,
-    config: LobbyLayoutConfig = DEFAULT_LOBBY_LAYOUT,
-) -> pygame.Rect:
-    return layout.footer_rect.inflate(-2 * config.bottom_bar_padding_x, -2 * config.bottom_bar_padding_y)
-
-
-def _group_height(seat_count: int, *, config: LobbyLayoutConfig) -> int:
-    rows_height = seat_count * config.seat_row_height + max(0, seat_count - 1) * config.seat_row_gap
-    return config.panel_header_height + rows_height + config.panel_bottom_padding
+__all__ = ["LobbyPanelLayout", "compute_lobby_panel_layout", "row_rects"]

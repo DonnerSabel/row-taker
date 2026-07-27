@@ -8,11 +8,12 @@ pytest.importorskip("pygame")
 
 from row_taker.gui.connect_form_state import ConnectFormState
 from row_taker.gui.layout import compute_layout
+from row_taker.gui.lobby_interaction import LobbyScreenTargets
 from row_taker.gui.screen_result import NO_SCREEN_RESULT
-from row_taker.gui.screens import connect_screen, lobby_screen
+from row_taker.gui.screens import connect_screen, lobby_frame
 from row_taker.gui.screens.connect_screen import ConnectFrame, ConnectScreenTargets
 from row_taker.gui.screens.game_frame import GameFrame
-from row_taker.gui.screens.lobby_screen import LobbyFrame, LobbyScreenTargets
+from row_taker.gui.screens.lobby_frame import LobbyFrame
 from row_taker.gui.screens.prepared_screen import PreparedScreen
 from row_taker.gui_workbench.scenarios import get_scenario
 
@@ -69,7 +70,7 @@ def test_lobby_frame_prepares_and_owns_layout_and_targets(monkeypatch) -> None:
     state = get_scenario("choose-card").state
     targets = Mock(spec=LobbyScreenTargets)
     build_targets = Mock(return_value=targets)
-    monkeypatch.setattr(lobby_screen, "build_lobby_screen_targets", build_targets)
+    monkeypatch.setattr(lobby_frame, "build_lobby_screen_targets", build_targets)
 
     frame = LobbyFrame.from_layout(layout=layout, state=state, mouse_pos=(50, 60))
 
@@ -92,8 +93,8 @@ def test_lobby_frame_uses_its_own_prepared_data(monkeypatch) -> None:
     event = object()
     handle = Mock(return_value=NO_SCREEN_RESULT)
     render = Mock()
-    monkeypatch.setattr(lobby_screen, "handle_lobby_event", handle)
-    monkeypatch.setattr(lobby_screen, "render_lobby_screen", render)
+    monkeypatch.setattr(lobby_frame, "handle_lobby_event", handle)
+    monkeypatch.setattr(lobby_frame, "render_lobby_screen", render)
 
     assert frame.handle_event(event) is NO_SCREEN_RESULT
     surface = object()

@@ -263,6 +263,25 @@ Interaktionsziele selbst. `GuiApp` verarbeitet nur noch `handle_event(event)` un
 keine Layout- oder Target-Objekte zwischen Screens weiter. Nach jeder möglichen
 Zustandsänderung wird ein neuer unveränderlicher Frame vorbereitet.
 
+Die Lobby ist zusätzlich entlang ihrer tatsächlichen Verantwortlichkeiten
+geteilt:
+
+```text
+screens/lobby_frame.py
+    vorbereitet State, Layout und Targets
+        ├── lobby_layout.py
+        │       ausschließlich Lobby-Geometrie
+        ├── lobby_interaction.py
+        │       Targets, Klicks, Texteingabe und Client-Actions
+        └── lobby_renderer.py
+                ausschließlich Zeichnen
+```
+
+Der Lobby-Renderer erzeugt weder `ClientAction`-Objekte noch lokale
+Zustandsübergänge. Die Interaktionsschicht importiert umgekehrt keine
+Zeichenfunktionen. `LobbyFrame` ist der kleine, vorbereitete Adapter zwischen
+beiden Teilen.
+
 Die GUI-Workbench kontrolliert Fenstergröße, Mausposition, Zustände und
 Frame-Zähler. Sie bereitet abhängig vom Szenariotyp denselben `ConnectFrame`,
 `LobbyFrame` oder `GameFrame` vor wie die echte GUI und besitzt keine eigene
