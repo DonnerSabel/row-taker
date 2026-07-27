@@ -162,13 +162,20 @@ Nicht in Clients gehören:
 
 ### Produktionsframe und GUI-Workbench
 
-Die aktuelle Pygame-GUI fasst einen vollständig vorbereiteten sichtbaren
-Spiel-Frame in `GameFrame` zusammen. Ein `GameFrame` besitzt gemeinsam:
+Die aktuelle Pygame-GUI übersetzt den `ClientState` an der Frame-Grenze einmalig
+in einen pygame-unabhängigen `GameVisualState`. Ein vollständig vorbereiteter
+`GameFrame` besitzt gemeinsam:
 
-- den verwendeten `ClientState`
+- den verwendeten `GameVisualState`
+- vorübergehend noch `PresentationVisuals` für nicht migrierte Präsentationsschritte
 - die für die Fenstergröße berechnete `BoardGeometry`
 - die daraus und aus der Mausposition erzeugten `GameScreenTargets`
 - die allgemeinen und presentationsbezogenen Frame-Zähler
+
+`PresentationCardsRevealed` ist bereits vollständig in den `GameVisualState`
+migriert: aufgedeckte Karten, eigene Kartenhervorhebung und Panel-Inhalte werden
+vor dem Rendering erzeugt. Die Legacy-Schicht bleibt nur für die noch nicht
+migrierten Präsentationsereignisse bestehen.
 
 Geometrie und Interaktionsziele werden einmal gemeinsam vorbereitet und danach
 nicht unabhängig voneinander ausgetauscht. Bei einer Größenänderung wird ein

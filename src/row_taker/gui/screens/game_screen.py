@@ -88,9 +88,14 @@ class GameFrame:
             visual_state,
             mouse_pos=mouse_pos,
         )
+        presentation_visuals = (
+            PresentationVisuals()
+            if visual_state.presentation_panel is not None
+            else build_presentation_visuals(state)
+        )
         return cls(
             visual_state=visual_state,
-            presentation_visuals=build_presentation_visuals(state),
+            presentation_visuals=presentation_visuals,
             frame_count=frame_count,
             presentation_frame_count=presentation_frame_count,
             geometry=geometry,
@@ -614,12 +619,13 @@ def _draw_status_overlay(
         color=_status_message_color(visual_state.status.message_level),
     )
 
-    if presentation_visuals.has_event:
+    presentation_panel = visual_state.presentation_panel or presentation_visuals.panel
+    if presentation_panel is not None:
         draw_presentation_panel(
             screen,
             drawer,
             geometry,
-            presentation_visuals,
+            presentation_panel,
             assets,
             animation_clock,
         )

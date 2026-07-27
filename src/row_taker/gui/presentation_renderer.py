@@ -12,7 +12,7 @@ from row_taker.gui.board_layout import (
     row_card_placements,
 )
 from row_taker.gui.card import GuiCard
-from row_taker.gui.game_visual_state import GameVisualState
+from row_taker.gui.game_visual_state import GameVisualState, VisualPresentationPanel
 from row_taker.gui.presentation_visuals import PresentationVisuals
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_overlay_panel
@@ -72,7 +72,7 @@ def draw_presentation_panel(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
-    presentation_visuals: PresentationVisuals,
+    panel: VisualPresentationPanel,
     assets: GuiAssets,
     animation_clock: AnimationClock,
 ) -> None:
@@ -89,25 +89,25 @@ def draw_presentation_panel(
 
     drawer.draw_text(
         screen,
-        presentation_visuals.headline,
+        panel.headline,
         (events_rect.left + 12, events_rect.top + 10),
         role="small",
         color=animation_clock.pulsed_color(PALETTE.accent, PALETTE.accent_hover, period_frames=72),
     )
 
-    if presentation_visuals.focus_card_values:
+    if panel.card_values:
         _draw_presentation_card_strip(
             screen,
             drawer,
             events_rect,
-            card_values=presentation_visuals.focus_card_values,
+            card_values=panel.card_values,
             assets=assets,
         )
         text_top = events_rect.top + 74
     else:
         text_top = events_rect.top + 34
 
-    lines = list(presentation_visuals.details[:2])
+    lines = list(panel.details[:2])
     if lines:
         text_rect = pygame.Rect(events_rect.left + 12, text_top, events_rect.width - 24, events_rect.bottom - text_top - 6)
         drawer.draw_wrapped_lines(screen, lines, text_rect, role="tiny", color=PALETTE.text_primary)

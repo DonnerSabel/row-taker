@@ -38,7 +38,7 @@ def _frame(
 def test_game_frame_prepares_visual_state_geometry_and_targets_once(monkeypatch) -> None:
     layout = compute_layout(1280, 720)
     state = object()
-    visual_state = object()
+    visual_state = Mock(presentation_panel=None)
     presentation_visuals = PresentationVisuals()
     geometry = Mock(window_rect=layout.window_rect)
     targets = GameScreenTargets()
@@ -80,6 +80,42 @@ def test_game_frame_prepares_visual_state_geometry_and_targets_once(monkeypatch)
     assert frame.geometry is geometry
     assert frame.targets is targets
     assert frame.build_targets(layout) is targets
+
+
+def test_game_frame_skips_legacy_visuals_for_migrated_presentation(monkeypatch) -> None:
+    layout = compute_layout(1280, 720)
+    state = object()
+    visual_state = Mock(presentation_panel=object())
+    geometry = Mock(window_rect=layout.window_rect)
+    targets = GameScreenTargets()
+    build_presentation_visuals = Mock()
+    monkeypatch.setattr(
+        game_screen,
+        "build_game_visual_state",
+        Mock(return_value=visual_state),
+    )
+    monkeypatch.setattr(
+        game_screen,
+        "build_presentation_visuals",
+        build_presentation_visuals,
+    )
+    monkeypatch.setattr(game_screen, "_compute_geometry", Mock(return_value=geometry))
+    monkeypatch.setattr(
+        game_screen,
+        "build_game_screen_targets",
+        Mock(return_value=targets),
+    )
+
+    frame = GameFrame.from_layout(
+        layout=layout,
+        state=state,
+        frame_count=0,
+        presentation_frame_count=0,
+        last_action_summary="test",
+    )
+
+    build_presentation_visuals.assert_not_called()
+    assert frame.presentation_visuals == PresentationVisuals()
 
 
 def test_game_frame_render_uses_its_prepared_visual_state_and_targets(monkeypatch) -> None:

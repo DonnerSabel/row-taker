@@ -64,6 +64,13 @@ class VisualStatus:
 
 
 @dataclass(frozen=True, slots=True)
+class VisualPresentationPanel:
+    headline: str
+    details: tuple[str, ...]
+    card_values: tuple[int, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class GameVisualState:
     """Complete semantic input for one stable game-screen frame.
 
@@ -77,6 +84,7 @@ class GameVisualState:
     hand: tuple[VisualHandCard, ...]
     interaction: VisualInteraction
     status: VisualStatus
+    presentation_panel: VisualPresentationPanel | None = None
 
     @property
     def visible_hand(self) -> tuple[VisualHandCard, ...]:

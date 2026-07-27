@@ -5,8 +5,8 @@ from typing import Literal
 
 from row_taker.client.presentation_events import (
     PresentationCardPlaced,
-    PresentationCardsRevealed,
     PresentationEvent,
+    PresentationGameFinished,
     PresentationOverflowResolved,
     PresentationRoundFinished,
     PresentationRowChoiceRequired,
@@ -16,6 +16,7 @@ from row_taker.client.presentation_events import (
 )
 from row_taker.client.state import ClientState
 from row_taker.engine.game.models import PlayerID, RowID
+from row_taker.gui.game_visual_state import VisualPresentationPanel
 from row_taker.gui_common.ui.common_render import format_presentation_event
 
 RowEmphasis = Literal["none", "selectable", "placed", "choice", "taken", "overflow"]
@@ -54,6 +55,16 @@ class PresentationVisuals:
             return "none"
         return self.row_emphasis
 
+    @property
+    def panel(self) -> VisualPresentationPanel | None:
+        if not self.has_event:
+            return None
+        return VisualPresentationPanel(
+            headline=self.headline,
+            details=self.details,
+            card_values=self.focus_card_values,
+        )
+
 
 def build_presentation_visuals(state: ClientState) -> PresentationVisuals:
     if not state.pending_presentation_events:
@@ -61,16 +72,6 @@ def build_presentation_visuals(state: ClientState) -> PresentationVisuals:
 
     event = state.pending_presentation_events[0]
     details = tuple(format_presentation_event(item) for item in state.pending_presentation_events[:3])
-
-    if isinstance(event, PresentationCardsRevealed):
-        played = {play.player_id: play.card_value for play in event.plays}
-        return PresentationVisuals(
-            current_event=event,
-            played_card_values_by_player=played,
-            focus_card_values=tuple(play.card_value for play in event.plays),
-            headline="Karten aufgedeckt",
-            details=details,
-        )
 
     if isinstance(event, PresentationCardPlaced):
         return PresentationVisuals(
@@ -140,4 +141,9 @@ def build_presentation_visuals(state: ClientState) -> PresentationVisuals:
     if isinstance(event, PresentationRoundFinished):
         return PresentationVisuals(current_event=event, headline="Runde beendet", details=details)
 
-    return PresentationVisuals(current_event=event, headline="Spiel beendet", details=details)
+    if isinstance(event, PresentationGameFinished):
+        return PresentationVisuals(current_event=event, headline="Spiel beendet", details=details)
+
+    # Presentation types already migrated into GameVisualState deliberately
+    # leave this compatibility layer empty.
+    return PresentationVisuals()

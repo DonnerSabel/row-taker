@@ -152,3 +152,36 @@ def test_public_state_override_changes_visual_rows_without_changing_hand() -> No
     assert tuple(row.row_id for row in visual_state.rows) == (RowID("override"),)
     assert visual_state.status.primary_line.find("reveal_and_resolve") >= 0
     assert len(visual_state.hand) == len(state.player_state.hand)
+
+
+def test_cards_revealed_panel_and_own_card_selection_live_in_visual_state() -> None:
+    state = get_scenario("cards-revealed").state
+    visual_state = build_game_visual_state(state, last_action_summary="test")
+
+    assert visual_state.presentation_panel is not None
+    assert visual_state.presentation_panel.headline == "Karten aufgedeckt"
+    assert visual_state.presentation_panel.card_values == (44, 62, 71, 86)
+    assert len(visual_state.presentation_panel.details) == 3
+
+    selected = tuple(
+        card.card_value
+        for card in visual_state.hand
+        if card.emphasis == "selected"
+    )
+    assert selected == (44,)
+
+
+def test_revealed_trick_fallback_stages_cards_without_opening_panel() -> None:
+    state = get_scenario("card-placed").state
+    visual_state = build_game_visual_state(state, last_action_summary="test")
+
+    assert visual_state.presentation_panel is None
+    assert {
+        player.player_id: player.staged_card_value
+        for player in visual_state.players
+    } == {
+        play.player_id: play.card_value
+        for play in state.revealed_trick.plays
+    }
+    assert all(card.emphasis == "none" for card in visual_state.hand)
+
