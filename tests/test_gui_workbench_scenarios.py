@@ -66,8 +66,8 @@ def test_presentation_scenarios_put_expected_real_event_at_queue_front(
 ) -> None:
     scenario = get_scenario(scenario_name)
 
-    assert scenario.state.pending_presentation_events
-    assert isinstance(scenario.state.pending_presentation_events[0], event_type)
+    assert scenario.state.pending_presentation_steps
+    assert isinstance(scenario.state.pending_presentation_steps[0].event, event_type)
 
 
 def test_row_choice_required_scenario_includes_real_choose_row_request_state() -> None:

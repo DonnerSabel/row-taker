@@ -150,9 +150,10 @@ Jeder clientseitige Präsentationsschritt enthält zusätzlich zum
 Rein erklärende Ereignisse besitzen denselben Vorher- und Nachher-Zustand.
 Fachlich verändernde Ereignisse wie Kartenablage oder Reihenübernahme tragen
 den Zustand vor und nach dem zugehörigen Engine-Schritt. Der Client verwaltet
-intern Queues solcher `PresentationStep`-Objekte. Die bisherigen
-`presentation_events`-Properties bleiben vorübergehend als abgeleitete
-Kompatibilitätssicht erhalten.
+intern ausschließlich Queues solcher `PresentationStep`-Objekte. GUI, CLI und
+Workbench greifen direkt auf
+`presentation_steps`, `pending_presentation_steps` und
+`current_presentation_step` zu. Eine parallele Event-Queue existiert nicht.
 
 ---
 

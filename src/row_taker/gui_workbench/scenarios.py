@@ -172,8 +172,8 @@ def _advance_to_event(
     event_type: type[PresentationEvent],
 ) -> ClientState:
     current = state
-    while current.pending_presentation_events:
-        if isinstance(current.pending_presentation_events[0], event_type):
+    while current.pending_presentation_steps:
+        if isinstance(current.pending_presentation_steps[0].event, event_type):
             return current
         current = advance_presentation_queue(current)
     raise ValueError(f"scenario could not find pending event {event_type.__name__}")

@@ -3,8 +3,11 @@ from __future__ import annotations
 import pygame
 
 from row_taker.client.actions import ClientAction
+from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import ClientState
+from row_taker.gui.screens.connect_screen import ConnectScreen
 from row_taker.gui.screens.game_screen import GameFrame
+from row_taker.gui.screens.lobby_screen import LobbyScreen
 from row_taker.gui_common.layout import (
     MIN_WINDOW_HEIGHT,
     MIN_WINDOW_WIDTH,
@@ -13,8 +16,6 @@ from row_taker.gui_common.layout import (
 )
 from row_taker.gui_common.live_client import LiveGuiClient
 from row_taker.gui_common.primitives import PrimitiveDrawer
-from row_taker.gui.screens.connect_screen import ConnectScreen
-from row_taker.gui.screens.lobby_screen import LobbyScreen
 from row_taker.gui_common.ui.connect_form_state import ConnectFormState
 from row_taker.gui_common.ui.screen_result import ScreenResult
 from row_taker.protocol.transport import ClientTransport
@@ -26,12 +27,8 @@ FPS = 30
 class GuiApp:
     """Graphical Row-Taker client.
 
-    This app intentionally follows the same architecture as ``row_taker.gui_demo``:
-
-    GUI screen -> LiveGuiClient -> GameClientCore -> protocol/transport
-
-    The visual client can now diverge step by step from the demo client without
-    touching the stable demo reference implementation.
+    GUI screens delegate client semantics to ``LiveGuiClient`` and render game
+    states exclusively through the production ``GameVisualState`` path.
     """
 
     def __init__(self) -> None:
@@ -43,7 +40,7 @@ class GuiApp:
         self._last_action_summary = "Noch keine GUI-Aktion."
         self._live_client: LiveGuiClient | None = None
         self._client_state: ClientState | None = None
-        self._presentation_event_key: str | None = None
+        self._presentation_step: PresentationStep | None = None
         self._presentation_start_frame = 0
         self._connect_form = ConnectFormState()
 
@@ -124,7 +121,10 @@ class GuiApp:
             layout=layout,
             state=self._client_state,
             frame_count=self._frame_count,
-            presentation_frame_count=max(0, self._frame_count - self._presentation_start_frame),
+            presentation_frame_count=max(
+                0,
+                self._frame_count - self._presentation_start_frame,
+            ),
             last_action_summary=self._last_action_summary,
         )
 
@@ -197,17 +197,15 @@ class GuiApp:
         self._sync_presentation_clock()
 
     def _sync_presentation_clock(self) -> None:
-        key = self._front_presentation_event_key(self._client_state)
-        if key == self._presentation_event_key:
+        step = (
+            None
+            if self._client_state is None
+            else self._client_state.current_presentation_step
+        )
+        if step is self._presentation_step:
             return
-        self._presentation_event_key = key
+        self._presentation_step = step
         self._presentation_start_frame = self._frame_count
-
-    @staticmethod
-    def _front_presentation_event_key(state: ClientState | None) -> str | None:
-        if state is None or not state.pending_presentation_events:
-            return None
-        return repr(state.pending_presentation_events[0])
 
     def _current_layout(self):
         if self._screen is None:

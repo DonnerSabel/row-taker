@@ -11,6 +11,7 @@ from row_taker.client.actions import (
 )
 from row_taker.gui.board_layout import BoardGeometry, CardPlacement, hand_card_placements
 from row_taker.gui.card import GuiCard
+from row_taker.engine.game.models import RowID
 from row_taker.gui.game_visual_state import GameVisualState, VisualHandCard
 from row_taker.gui_common.ui.screen_result import NO_SCREEN_RESULT, ScreenResult
 
@@ -33,7 +34,7 @@ class CardTarget:
 
 @dataclass(frozen=True, slots=True)
 class RowTarget:
-    row_id: object
+    row_id: RowID
     rect: pygame.Rect
     hovered: bool = False
 

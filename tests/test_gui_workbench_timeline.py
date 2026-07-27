@@ -38,8 +38,8 @@ def initialized_pygame() -> None:
 
 
 def _front_event_type(step):
-    pending = step.state.pending_presentation_events
-    return None if not pending else type(pending[0])
+    pending = step.state.pending_presentation_steps
+    return None if not pending else type(pending[0].event)
 
 
 def test_timeline_catalog_is_stable() -> None:
@@ -74,7 +74,7 @@ def test_full_trick_uses_expected_real_state_sequence() -> None:
     assert choose_row.player_state is not None
     assert choose_row.player_state.phase_info.phase == Phase.CHOOSE_ROW
     assert final_state.pending_action == PendingAction.CHOOSE_CARD
-    assert final_state.pending_presentation_events == ()
+    assert final_state.pending_presentation_steps == ()
     assert final_state.public_state == timeline.expected_final_public_state
     assert final_state.public_state is not None
     assert final_state.public_state.phase_info.phase == Phase.CHOOSE_CARD

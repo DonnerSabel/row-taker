@@ -328,13 +328,22 @@ def render_game_overview(state: ClientState) -> str:
 
 
 def render_resolution_lines(state: ClientState) -> str | None:
-    if not state.presentation_events and not state.pending_presentation_events:
+    if not state.presentation_steps and not state.pending_presentation_steps:
         return None
     lines = ["Lokale Auflösung:"]
-    for event in state.presentation_events:
-        lines.extend(f"  {line}" for line in render_presentation_event(event, own_player_id=state.own_player_id))
-    if state.pending_presentation_events:
-        lines.append(f"  ... {len(state.pending_presentation_events)} weiterer Schritt(e) in der Warteschlange")
+    for step in state.presentation_steps:
+        lines.extend(
+            f"  {line}"
+            for line in render_presentation_event(
+                step.event,
+                own_player_id=state.own_player_id,
+            )
+        )
+    if state.pending_presentation_steps:
+        lines.append(
+            f"  ... {len(state.pending_presentation_steps)} "
+            "weiterer Schritt(e) in der Warteschlange"
+        )
     return "\n".join(lines)
 
 

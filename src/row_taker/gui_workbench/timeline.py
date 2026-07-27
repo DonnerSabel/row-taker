@@ -58,9 +58,8 @@ TimelineFactory = Callable[[], WorkbenchTimeline]
 
 
 def _front_event(state: ClientState) -> PresentationEvent | None:
-    if not state.pending_presentation_events:
-        return None
-    return state.pending_presentation_events[0]
+    step = state.current_presentation_step
+    return None if step is None else step.event
 
 
 def _step(
@@ -283,8 +282,8 @@ def _build_full_trick_timeline() -> WorkbenchTimeline:
         own_player_id=own_player_id,
     )
 
-    while core.state.pending_presentation_events:
-        event = core.state.pending_presentation_events[0]
+    while core.state.pending_presentation_steps:
+        event = core.state.pending_presentation_steps[0].event
         label = type(event).__name__.removeprefix("Presentation")
         kebab_label = "".join(
             ("-" + char.lower()) if char.isupper() else char

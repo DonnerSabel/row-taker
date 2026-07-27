@@ -141,7 +141,13 @@ class CliApp:
             state = set_flash(state, "error", update.local_messages[-1])
             core.state = state
         for message in update.applied_server_messages:
-            logger.debug("applying server message: type=%s inbox_remaining=%s pending_presentation=%s", type(message).__name__, len(core.server_inbox), len(core.state.pending_presentation_events))
+            logger.debug(
+                "applying server message: type=%s inbox_remaining=%s "
+                "pending_presentation=%s",
+                type(message).__name__,
+                len(core.server_inbox),
+                len(core.state.pending_presentation_steps),
+            )
         await self._render(console, core.state)
         self.own_client_id = core.state.own_client_id
         return core.state

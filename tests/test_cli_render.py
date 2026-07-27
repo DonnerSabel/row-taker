@@ -29,7 +29,7 @@ def test_pending_presentation_uses_enter_prompt_until_queue_is_empty() -> None:
     assert determine_prompt(state) == "Weiter mit Enter > "
 
 
-def test_render_resolution_lines_renders_from_presentation_events() -> None:
+def test_render_resolution_lines_renders_from_presentation_steps() -> None:
     state = ClientState(
         core_state=ClientCoreState(
             own_player_id="p1",

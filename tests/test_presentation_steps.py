@@ -13,6 +13,7 @@ from row_taker.client.presentation_events import (
     PresentationRowTaken,
     PresentationTrickFinished,
 )
+from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import ClientState
 from row_taker.client.trick_presentation_resolver import (
     apply_trick_row_choice,
@@ -78,7 +79,6 @@ def test_start_presentation_captures_unchanged_steps_until_row_choice() -> None:
         PresentationCardsRevealed,
         PresentationRowChoiceRequired,
     )
-    assert presentation.events == tuple(step.event for step in presentation.presentation_steps)
     for step in presentation.presentation_steps:
         assert step.public_state_before == public_state
         assert step.public_state_after == public_state
@@ -115,10 +115,9 @@ def test_row_choice_resumes_with_chained_before_after_snapshots() -> None:
 
     assert completed.shadow_state == completed.presentation_steps[-1].public_state_after
     assert len(completed.resolution_steps) == 4
-    assert completed.steps == completed.resolution_steps
 
 
-def test_client_queues_steps_and_exposes_event_compatibility_views() -> None:
+def test_client_queues_presentation_steps_directly() -> None:
     public_state = _public_state()
     state = reduce_server_message(
         ClientState(core_state=ClientCoreState(public_state=public_state)),
@@ -128,12 +127,8 @@ def test_client_queues_steps_and_exposes_event_compatibility_views() -> None:
     assert state.presentation_steps == ()
     assert state.pending_presentation_steps
     assert state.current_presentation_step == state.pending_presentation_steps[0]
-    assert state.pending_presentation_events == tuple(
-        step.event for step in state.pending_presentation_steps
-    )
 
     advanced = advance_presentation_queue(state)
 
     assert advanced.presentation_steps == (state.pending_presentation_steps[0],)
-    assert advanced.presentation_events == (state.pending_presentation_events[0],)
     assert advanced.pending_presentation_steps == state.pending_presentation_steps[1:]

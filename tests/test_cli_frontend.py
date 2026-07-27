@@ -41,8 +41,6 @@ def test_pending_presentation_enter_advances_queue() -> None:
 
     assert len(state.presentation_steps) == 1
     assert len(state.pending_presentation_steps) == 1
-    assert len(state.presentation_events) == 1
-    assert len(state.pending_presentation_events) == 1
 
 
 def test_non_enter_during_pending_presentation_shows_hint() -> None:

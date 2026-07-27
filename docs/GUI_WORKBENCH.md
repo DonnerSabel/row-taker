@@ -108,7 +108,8 @@ python -m row_taker.gui_workbench --timeline full-trick \
   --save screenshots/row-taken-016.png
 ```
 
-Die Timeline enthält auch den Zustand nach der geleerten Präsentationsqueue.
+Die Timeline navigiert direkt über `PresentationStep`-Objekte und enthält auch
+den Zustand nach der geleerten Präsentationsqueue.
 Dessen `PublicState` wird beim Aufbau gegen den tatsächlichen Endzustand des
 `MatchHub` geprüft.
 

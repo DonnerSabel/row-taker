@@ -29,18 +29,6 @@ class TrickPresentationState:
     resolution_steps: tuple[TrickResolutionStep, ...]
     presentation_steps: tuple[PresentationStep, ...]
 
-    @property
-    def steps(self) -> tuple[TrickResolutionStep, ...]:
-        """Compatibility view for the previous resolver field name."""
-
-        return self.resolution_steps
-
-    @property
-    def events(self) -> tuple[PresentationEvent, ...]:
-        """Compatibility view used by callers not migrated to snapshots yet."""
-
-        return tuple(step.event for step in self.presentation_steps)
-
 
 def start_trick_presentation(public_state: PublicState, revealed: CardsRevealed) -> TrickPresentationState:
     ordered = tuple(sorted(revealed.plays, key=lambda play: play.card_value))

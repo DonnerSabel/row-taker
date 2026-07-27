@@ -38,7 +38,7 @@ from row_taker.gui.game_visual_state import (
     VisualTransition,
 )
 from row_taker.gui.game_visual_transition import resolve_visual_step
-from row_taker.gui_common.ui.common_render import format_presentation_event
+from row_taker.client.presentation_text import format_presentation_event
 
 CARD_PLACEMENT_DURATION_FRAMES = 32
 ROW_REPLACEMENT_DURATION_FRAMES = 32
@@ -545,9 +545,10 @@ def _revealed_card_values_by_player(state: ClientState) -> dict[PlayerID, int]:
 def _current_cards_revealed_event(
     state: ClientState,
 ) -> PresentationCardsRevealed | None:
-    if not state.pending_presentation_events:
+    step = state.current_presentation_step
+    if step is None:
         return None
-    event = state.pending_presentation_events[0]
+    event = step.event
     return event if isinstance(event, PresentationCardsRevealed) else None
 
 
@@ -614,8 +615,8 @@ def _build_cards_revealed_panel(
 
 def _presentation_details(state: ClientState) -> tuple[str, ...]:
     return tuple(
-        format_presentation_event(item)
-        for item in state.pending_presentation_events[:3]
+        format_presentation_event(step.event)
+        for step in state.pending_presentation_steps[:3]
     )
 
 
@@ -623,7 +624,7 @@ def _build_interaction(
     state: ClientState,
     hand: tuple[VisualHandCard, ...],
 ) -> VisualInteraction:
-    if state.pending_presentation_events:
+    if state.pending_presentation_steps:
         return VisualInteraction(can_advance_presentation=True)
 
     if state.pending_action == PendingAction.CHOOSE_CARD:

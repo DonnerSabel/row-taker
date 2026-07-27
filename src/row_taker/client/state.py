@@ -9,7 +9,6 @@ from row_taker.client.core_state import (
     PendingAction,
     initial_client_core_state,
 )
-from row_taker.client.presentation_events import PresentationEvent
 from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.trick_presentation_resolver import TrickPresentationState
 from row_taker.engine.game.state import PlayerState, PublicState
@@ -92,14 +91,6 @@ class ClientState:
         if not self.pending_presentation_steps:
             return None
         return self.pending_presentation_steps[0]
-
-    @property
-    def presentation_events(self) -> tuple[PresentationEvent, ...]:
-        return tuple(step.event for step in self.presentation_steps)
-
-    @property
-    def pending_presentation_events(self) -> tuple[PresentationEvent, ...]:
-        return tuple(step.event for step in self.pending_presentation_steps)
 
     @property
     def received_game_revision(self) -> int | None:

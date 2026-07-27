@@ -68,7 +68,7 @@ def test_session_ended_exits_immediately() -> None:
     assert state.session_error == "Spiel abgebrochen"
 
 
-def test_cards_revealed_builds_trick_presentation_events() -> None:
+def test_cards_revealed_builds_trick_presentation_steps() -> None:
     player_state = player_state_for(0)
     revealed = CardsRevealed(
         plays=(
@@ -88,8 +88,8 @@ def test_cards_revealed_builds_trick_presentation_events() -> None:
     state = apply_server_message(ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
 
     assert state.trick_presentation_state is not None
-    assert state.pending_presentation_events
-    assert isinstance(state.pending_presentation_events[0], PresentationCardsRevealed)
+    assert state.pending_presentation_steps
+    assert isinstance(state.pending_presentation_steps[0].event, PresentationCardsRevealed)
 
 
 def test_row_choice_committed_advances_trick_presentation_state() -> None:
@@ -114,10 +114,13 @@ def test_row_choice_committed_advances_trick_presentation_state() -> None:
 
     assert state.trick_presentation_state is not None
     assert state.trick_presentation_state.pending_row_choice is None
-    assert any(isinstance(event, PresentationRowTaken) for event in state.pending_presentation_events)
+    assert any(
+        isinstance(step.event, PresentationRowTaken)
+        for step in state.pending_presentation_steps
+    )
 
 
-def test_cards_revealed_queues_presentation_events_before_display() -> None:
+def test_cards_revealed_queues_presentation_steps_before_display() -> None:
     player_state = player_state_for(0)
     revealed = CardsRevealed(
         plays=(
@@ -131,8 +134,8 @@ def test_cards_revealed_queues_presentation_events_before_display() -> None:
 
     state = apply_server_message(ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
 
-    assert state.presentation_events == ()
-    assert state.pending_presentation_events
+    assert state.presentation_steps == ()
+    assert state.pending_presentation_steps
 
 
 def test_choose_card_requested_clears_visible_and_pending_presentation() -> None:
@@ -164,5 +167,3 @@ def test_choose_card_requested_clears_visible_and_pending_presentation() -> None
 
     assert new_state.presentation_steps == ()
     assert new_state.pending_presentation_steps == ()
-    assert new_state.presentation_events == ()
-    assert new_state.pending_presentation_events == ()
