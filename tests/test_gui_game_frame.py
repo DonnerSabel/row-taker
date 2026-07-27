@@ -67,6 +67,7 @@ def test_game_frame_prepares_visual_state_geometry_and_targets_once(monkeypatch)
     build_visual_state.assert_called_once_with(
         state,
         last_action_summary="test",
+        presentation_frame_count=5,
     )
     build_presentation_visuals.assert_called_once_with(state)
     compute_geometry.assert_called_once_with(layout.window_rect, visual_state)

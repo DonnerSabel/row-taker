@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from row_taker.client.core_reducer import advance_presentation_queue
 from row_taker.client.core_state import PendingAction
+from row_taker.client.presentation_events import PresentationCardPlaced
 from row_taker.client.state import UiMessage
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import Row, RowID
 from row_taker.engine.game.phases import Phase, PhaseInfo
 from row_taker.engine.game.state import PublicState
 from row_taker.gui.game_visual_builder import build_game_visual_state
+from row_taker.gui.game_visual_state import PlayerPlayAnchor, RowCardAnchor
 from row_taker.gui_workbench.scenarios import get_scenario
 
 
@@ -171,17 +174,157 @@ def test_cards_revealed_panel_and_own_card_selection_live_in_visual_state() -> N
     assert selected == (44,)
 
 
-def test_revealed_trick_fallback_stages_cards_without_opening_panel() -> None:
+def test_card_placed_uses_before_and_after_snapshots_with_one_motion() -> None:
     state = get_scenario("card-placed").state
-    visual_state = build_game_visual_state(state, last_action_summary="test")
+    step = state.current_presentation_step
+    assert step is not None
+    assert isinstance(step.event, PresentationCardPlaced)
+    event = step.event
 
-    assert visual_state.presentation_panel is None
-    assert {
-        player.player_id: player.staged_card_value
+    before = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=0,
+    )
+    middle = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=16,
+    )
+    after = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=32,
+    )
+
+    before_row = before.row_by_id(event.row_id)
+    after_row = after.row_by_id(event.row_id)
+    assert before_row is not None
+    assert after_row is not None
+    assert before_row.card_values == tuple(
+        card.value
+        for card in step.public_state_before.rows[
+            step.public_state_before.get_row_index(event.row_id)
+        ].cards
+    )
+    assert after_row.card_values == event.row_cards_after
+    assert before_row.emphasis == "placed"
+    assert after_row.emphasis == "placed"
+
+    assert len(before.moving_cards) == 1
+    assert len(middle.moving_cards) == 1
+    motion = middle.moving_cards[0]
+    assert motion.card_value == event.card_value
+    assert motion.source == PlayerPlayAnchor(event.player_id, event.card_value)
+    assert motion.target == RowCardAnchor(event.row_id, len(event.row_cards_after) - 1)
+    assert motion.progress == 0.875
+    assert after.moving_cards == ()
+
+    active_player = next(
+        player for player in middle.players if player.player_id == event.player_id
+    )
+    assert active_player.emphasis == "active"
+    assert active_player.staged_card_value is None
+    if event.player_id == state.own_player_id:
+        own_card = next(card for card in middle.hand if card.card_value == event.card_value)
+        assert own_card.visible is False
+
+    assert middle.presentation_panel is not None
+    assert middle.presentation_panel.headline == f"{event.player_name} legt {event.card_value}"
+    assert middle.presentation_panel.card_values == (event.card_value,)
+
+
+def test_completed_card_placement_stays_hidden_in_following_step() -> None:
+    state = get_scenario("card-placed").state
+    first_step = state.current_presentation_step
+    assert first_step is not None
+    assert isinstance(first_step.event, PresentationCardPlaced)
+
+    following = advance_presentation_queue(state)
+    next_step = following.current_presentation_step
+    assert next_step is not None
+    assert isinstance(next_step.event, PresentationCardPlaced)
+
+    visual_state = build_game_visual_state(
+        following,
+        last_action_summary="test",
+        presentation_frame_count=0,
+    )
+    completed_player = next(
+        player
         for player in visual_state.players
-    } == {
-        play.player_id: play.card_value
-        for play in state.revealed_trick.plays
-    }
-    assert all(card.emphasis == "none" for card in visual_state.hand)
+        if player.player_id == first_step.event.player_id
+    )
+    assert completed_player.staged_card_value is None
+    if first_step.event.player_id == following.own_player_id:
+        completed_card = next(
+            card
+            for card in visual_state.hand
+            if card.card_value == first_step.event.card_value
+        )
+        assert completed_card.visible is False
 
+
+
+def test_card_placed_keeps_target_row_in_final_visual_column() -> None:
+    state = get_scenario("card-placed").state
+    current_step = state.current_presentation_step
+    assert current_step is not None
+    assert state.own_player_id is not None
+
+    target_row_id = RowID("target")
+    before_rows = (
+        Row(RowID("low"), (Card(10),)),
+        Row(target_row_id, (Card(20),)),
+        Row(RowID("middle"), (Card(30),)),
+        Row(RowID("high"), (Card(40),)),
+    )
+    after_rows = (
+        before_rows[0],
+        Row(target_row_id, (Card(20), Card(39))),
+        before_rows[2],
+        before_rows[3],
+    )
+    before_public = replace(current_step.public_state_before, rows=before_rows)
+    after_public = replace(current_step.public_state_after, rows=after_rows)
+    event = PresentationCardPlaced(
+        player_id=state.own_player_id,
+        player_name="Ada",
+        card_value=39,
+        row_id=target_row_id,
+        row_cards_after=(20, 39),
+    )
+    custom_step = replace(
+        current_step,
+        event=event,
+        public_state_before=before_public,
+        public_state_after=after_public,
+    )
+    state = replace(
+        state,
+        core_state=replace(
+            state.core_state,
+            pending_presentation_steps=(custom_step,),
+        ),
+    )
+
+    before = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=0,
+    )
+    after = build_game_visual_state(
+        state,
+        last_action_summary="test",
+        presentation_frame_count=32,
+    )
+
+    expected_order = (
+        RowID("low"),
+        RowID("middle"),
+        target_row_id,
+        RowID("high"),
+    )
+    assert tuple(row.row_id for row in before.rows) == expected_order
+    assert tuple(row.row_id for row in after.rows) == expected_order
+    assert before.moving_cards[0].target == RowCardAnchor(target_row_id, 1)

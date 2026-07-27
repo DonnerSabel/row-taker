@@ -12,7 +12,13 @@ from row_taker.gui.board_layout import (
     row_card_placements,
 )
 from row_taker.gui.card import GuiCard
-from row_taker.gui.game_visual_state import GameVisualState, VisualPresentationPanel
+from row_taker.gui.game_visual_state import (
+    GameVisualState,
+    PlayerPlayAnchor,
+    RowCardAnchor,
+    VisualMovingCard,
+    VisualPresentationPanel,
+)
 from row_taker.gui.presentation_visuals import PresentationVisuals
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_overlay_panel
@@ -33,8 +39,122 @@ def draw_presentation_card_motion(
     *,
     opponent_slots: tuple[Any, ...],
 ) -> None:
-    """Draw the animated card that belongs to the front-most presentation event."""
+    """Draw semantic visual-state motions, then legacy motions if necessary."""
 
+    if visual_state.moving_cards:
+        for moving_card in visual_state.moving_cards:
+            resolved = resolve_visual_card_motion_rects(
+                geometry,
+                visual_state,
+                moving_card,
+                opponent_slots=opponent_slots,
+            )
+            if resolved is None:
+                continue
+            source_rect, target_rect = resolved
+            _draw_moving_card(
+                screen,
+                drawer,
+                source_rect=source_rect,
+                target_rect=target_rect,
+                card_value=moving_card.card_value,
+                progress=moving_card.progress,
+                assets=assets,
+            )
+        return
+
+    _draw_legacy_presentation_card_motion(
+        screen,
+        drawer,
+        geometry,
+        visual_state,
+        presentation_visuals,
+        assets,
+        animation_clock,
+        opponent_slots=opponent_slots,
+    )
+
+
+def resolve_visual_card_motion_rects(
+    geometry: BoardGeometry,
+    visual_state: GameVisualState,
+    moving_card: VisualMovingCard,
+    *,
+    opponent_slots: tuple[Any, ...],
+) -> tuple[pygame.Rect, pygame.Rect] | None:
+    """Resolve semantic motion anchors through current production geometry."""
+
+    source_rect = _visual_motion_source_rect(
+        geometry,
+        visual_state,
+        moving_card.source,
+        opponent_slots=opponent_slots,
+    )
+    target_rect = _visual_motion_target_rect(
+        geometry,
+        visual_state,
+        moving_card.target,
+    )
+    if source_rect is None or target_rect is None:
+        return None
+    return source_rect, target_rect
+
+
+def _visual_motion_source_rect(
+    geometry: BoardGeometry,
+    visual_state: GameVisualState,
+    source: PlayerPlayAnchor,
+    *,
+    opponent_slots: tuple[Any, ...],
+) -> pygame.Rect | None:
+    if source.player_id == visual_state.own_player_id:
+        placements = hand_card_placements(
+            geometry,
+            card_count=len(visual_state.hand),
+        )
+        for card, placement in zip(visual_state.hand, placements, strict=False):
+            if card.card_value == source.card_value:
+                return placement.rect
+        return None
+
+    for slot in opponent_slots:
+        if slot.player_id == source.player_id:
+            return slot.geometry.staged_card.rect
+    return None
+
+
+def _visual_motion_target_rect(
+    geometry: BoardGeometry,
+    visual_state: GameVisualState,
+    target: RowCardAnchor,
+) -> pygame.Rect | None:
+    for row_index, row in enumerate(visual_state.rows):
+        if row.row_id != target.row_id:
+            continue
+        if target.card_index < 0:
+            return None
+        placements = row_card_placements(
+            geometry,
+            row_index=row_index,
+            card_count=max(len(row.cards), target.card_index + 1),
+        )
+        if target.card_index >= len(placements):
+            return None
+        return placements[target.card_index].rect
+    return None
+
+
+def _draw_legacy_presentation_card_motion(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
+    geometry: BoardGeometry,
+    visual_state: GameVisualState,
+    presentation_visuals: PresentationVisuals,
+    assets: GuiAssets,
+    animation_clock: AnimationClock,
+    *,
+    opponent_slots: tuple[Any, ...],
+) -> None:
     if not presentation_visuals.has_event:
         return
     if presentation_visuals.active_row_id is None:
@@ -42,30 +162,66 @@ def draw_presentation_card_motion(
     if not presentation_visuals.focus_card_values:
         return
 
-    card_value = presentation_visuals.replacement_card_value or presentation_visuals.focus_card_values[0]
-    source_rect = _presentation_motion_source_rect(
+    card_value = (
+        presentation_visuals.replacement_card_value
+        or presentation_visuals.focus_card_values[0]
+    )
+    source_rect = _legacy_motion_source_rect(
         geometry,
         visual_state,
         presentation_visuals,
         card_value=card_value,
         opponent_slots=opponent_slots,
     )
-    target_rect = _presentation_motion_target_rect(geometry, visual_state, presentation_visuals)
+    target_rect = _legacy_motion_target_rect(
+        geometry,
+        visual_state,
+        presentation_visuals,
+    )
     if source_rect is None or target_rect is None:
         return
 
-    progress = animation_clock.ease_out_cubic(duration_frames=32)
+    _draw_moving_card(
+        screen,
+        drawer,
+        source_rect=source_rect,
+        target_rect=target_rect,
+        card_value=card_value,
+        progress=animation_clock.ease_out_cubic(duration_frames=32),
+        assets=assets,
+    )
+
+
+def _draw_moving_card(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
+    *,
+    source_rect: pygame.Rect,
+    target_rect: pygame.Rect,
+    card_value: int,
+    progress: float,
+    assets: GuiAssets,
+) -> None:
     current_rect = lerp_rect(source_rect, target_rect, progress)
     shadow_rect = current_rect.inflate(12, 12).move(4, 5)
     shadow = pygame.Surface(shadow_rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(shadow, pygame.Color(0, 0, 0, 80), shadow.get_rect(), border_radius=THEME.spacing.card_radius + 4)
+    pygame.draw.rect(
+        shadow,
+        pygame.Color(0, 0, 0, 80),
+        shadow.get_rect(),
+        border_radius=THEME.spacing.card_radius + 4,
+    )
     screen.blit(shadow, shadow_rect)
 
     path_color = pygame.Color(PALETTE.accent_hover)
     path_color.a = max(35, 120 - round(progress * 70))
     _draw_motion_path(screen, source_rect.center, target_rect.center, path_color)
 
-    GuiCard.from_card_value(card_value, current_rect, selected=True).draw(screen, drawer=drawer, assets=assets)
+    GuiCard.from_card_value(card_value, current_rect, selected=True).draw(
+        screen,
+        drawer=drawer,
+        assets=assets,
+    )
 
 
 def draw_presentation_panel(
@@ -92,7 +248,11 @@ def draw_presentation_panel(
         panel.headline,
         (events_rect.left + 12, events_rect.top + 10),
         role="small",
-        color=animation_clock.pulsed_color(PALETTE.accent, PALETTE.accent_hover, period_frames=72),
+        color=animation_clock.pulsed_color(
+            PALETTE.accent,
+            PALETTE.accent_hover,
+            period_frames=72,
+        ),
     )
 
     if panel.card_values:
@@ -109,11 +269,22 @@ def draw_presentation_panel(
 
     lines = list(panel.details[:2])
     if lines:
-        text_rect = pygame.Rect(events_rect.left + 12, text_top, events_rect.width - 24, events_rect.bottom - text_top - 6)
-        drawer.draw_wrapped_lines(screen, lines, text_rect, role="tiny", color=PALETTE.text_primary)
+        text_rect = pygame.Rect(
+            events_rect.left + 12,
+            text_top,
+            events_rect.width - 24,
+            events_rect.bottom - text_top - 6,
+        )
+        drawer.draw_wrapped_lines(
+            screen,
+            lines,
+            text_rect,
+            role="tiny",
+            color=PALETTE.text_primary,
+        )
 
 
-def _presentation_motion_source_rect(
+def _legacy_motion_source_rect(
     geometry: BoardGeometry,
     visual_state: GameVisualState,
     presentation_visuals: PresentationVisuals,
@@ -122,7 +293,7 @@ def _presentation_motion_source_rect(
     opponent_slots: tuple[Any, ...],
 ) -> pygame.Rect | None:
     if presentation_visuals.active_player_id == visual_state.own_player_id:
-        hand_cards = visual_state.visible_hand
+        hand_cards = visual_state.hand
         placements = hand_card_placements(geometry, card_count=len(hand_cards))
         for card, placement in zip(hand_cards, placements, strict=False):
             if card.card_value == card_value:
@@ -138,7 +309,7 @@ def _presentation_motion_source_rect(
     return None
 
 
-def _presentation_motion_target_rect(
+def _legacy_motion_target_rect(
     geometry: BoardGeometry,
     visual_state: GameVisualState,
     presentation_visuals: PresentationVisuals,
@@ -193,9 +364,18 @@ def _draw_presentation_accent(
         PALETTE.accent_hover,
         period_frames=72,
     )
-    accent_color.a = animation_clock.pulse_alpha(period_frames=72, low=120, high=235)
+    accent_color.a = animation_clock.pulse_alpha(
+        period_frames=72,
+        low=120,
+        high=235,
+    )
     accent_surface = pygame.Surface(accent_rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(accent_surface, accent_color, accent_surface.get_rect(), border_radius=3)
+    pygame.draw.rect(
+        accent_surface,
+        accent_color,
+        accent_surface.get_rect(),
+        border_radius=3,
+    )
     screen.blit(accent_surface, accent_rect)
 
 
@@ -214,12 +394,22 @@ def _draw_presentation_card_strip(
     y = rect.top + 34
     for value in card_values[:max_cards]:
         card_rect = pygame.Rect(x, y, card_size[0], card_size[1])
-        GuiCard.from_card_value(value, card_rect, selected=True).draw(screen, drawer=drawer, assets=assets)
+        GuiCard.from_card_value(value, card_rect, selected=True).draw(
+            screen,
+            drawer=drawer,
+            assets=assets,
+        )
         x += card_width + 8
 
     remaining = len(card_values) - max_cards
     if remaining > 0:
-        drawer.draw_text(screen, f"+{remaining}", (x + 2, y + 18), role="small", color=PALETTE.text_muted)
+        drawer.draw_text(
+            screen,
+            f"+{remaining}",
+            (x + 2, y + 18),
+            role="small",
+            color=PALETTE.text_muted,
+        )
 
 
 def _draw_overlay_box(screen: pygame.Surface, rect: pygame.Rect) -> None:

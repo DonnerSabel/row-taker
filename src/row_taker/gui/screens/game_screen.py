@@ -81,6 +81,7 @@ class GameFrame:
         visual_state = build_game_visual_state(
             state,
             last_action_summary=last_action_summary,
+            presentation_frame_count=presentation_frame_count,
         )
         geometry = _compute_geometry(layout.window_rect, visual_state)
         targets = build_game_screen_targets(
@@ -233,7 +234,7 @@ def _compute_geometry(
     return compute_board_geometry(
         window_rect.size,
         row_count=len(visual_state.rows) or 4,
-        hand_card_count=len(visual_state.visible_hand),
+        hand_card_count=len(visual_state.hand),
         opponent_count=len(visual_state.opponents),
     )
 
@@ -506,11 +507,13 @@ def _draw_hand(
     assets: GuiAssets,
     presentation_visuals: PresentationVisuals,
 ) -> None:
-    hand_cards = visual_state.visible_hand
+    hand_cards = visual_state.hand
     placements = hand_card_placements(geometry, card_count=len(hand_cards))
     target_by_value = {target.card_value: target for target in game_targets.card_targets}
 
     for card, placement in zip(hand_cards, placements, strict=False):
+        if not card.visible:
+            continue
         target = target_by_value.get(card.card_value)
         selected = (
             card.emphasis == "selected"

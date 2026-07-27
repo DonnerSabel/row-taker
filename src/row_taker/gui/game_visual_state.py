@@ -71,6 +71,45 @@ class VisualPresentationPanel:
 
 
 @dataclass(frozen=True, slots=True)
+class PlayerPlayAnchor:
+    """Semantic source position of a played card at one player."""
+
+    player_id: PlayerID
+    card_value: int
+
+
+@dataclass(frozen=True, slots=True)
+class RowCardAnchor:
+    """Semantic position of one card in a row, independent of pixel layout."""
+
+    row_id: RowID
+    card_index: int
+
+
+@dataclass(frozen=True, slots=True)
+class VisualCardMotion:
+    card_value: int
+    source: PlayerPlayAnchor
+    target: RowCardAnchor
+
+
+@dataclass(frozen=True, slots=True)
+class VisualTransition:
+    card_motions: tuple[VisualCardMotion, ...] = ()
+    duration_frames: int = 32
+
+
+@dataclass(frozen=True, slots=True)
+class VisualMovingCard:
+    """One currently visible card motion with already resolved progress."""
+
+    card_value: int
+    source: PlayerPlayAnchor
+    target: RowCardAnchor
+    progress: float
+
+
+@dataclass(frozen=True, slots=True)
 class GameVisualState:
     """Complete semantic input for one stable game-screen frame.
 
@@ -85,6 +124,7 @@ class GameVisualState:
     interaction: VisualInteraction
     status: VisualStatus
     presentation_panel: VisualPresentationPanel | None = None
+    moving_cards: tuple[VisualMovingCard, ...] = ()
 
     @property
     def visible_hand(self) -> tuple[VisualHandCard, ...]:
@@ -105,3 +145,12 @@ class GameVisualState:
 
     def row_by_id(self, row_id: RowID) -> VisualRow | None:
         return next((row for row in self.rows if row.row_id == row_id), None)
+
+
+@dataclass(frozen=True, slots=True)
+class GameVisualStep:
+    """Stable visual states before and after one semantic transition."""
+
+    before: GameVisualState
+    after: GameVisualState
+    transition: VisualTransition

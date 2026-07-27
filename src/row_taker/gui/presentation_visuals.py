@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Literal
 
 from row_taker.client.presentation_events import (
-    PresentationCardPlaced,
     PresentationEvent,
     PresentationGameFinished,
     PresentationOverflowResolved,
@@ -72,18 +71,6 @@ def build_presentation_visuals(state: ClientState) -> PresentationVisuals:
 
     event = state.pending_presentation_events[0]
     details = tuple(format_presentation_event(item) for item in state.pending_presentation_events[:3])
-
-    if isinstance(event, PresentationCardPlaced):
-        return PresentationVisuals(
-            current_event=event,
-            active_row_id=event.row_id,
-            active_player_id=event.player_id,
-            played_card_values_by_player={event.player_id: event.card_value},
-            focus_card_values=(event.card_value,),
-            row_emphasis="placed",
-            headline=f"{event.player_name} legt {event.card_value}",
-            details=details,
-        )
 
     if isinstance(event, PresentationRowChoiceRequired):
         return PresentationVisuals(

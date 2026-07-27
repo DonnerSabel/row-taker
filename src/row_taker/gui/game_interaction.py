@@ -141,13 +141,13 @@ def _build_card_targets(
     *,
     mouse_pos: tuple[int, int],
 ) -> tuple[CardTarget, ...]:
-    cards = visual_state.visible_hand
+    cards = visual_state.hand
     placements = hand_card_placements(geometry, card_count=len(cards))
     selectable = visual_state.interaction.selectable_card_values
     selectable_cards_with_placements = tuple(
         (card, placement)
         for card, placement in zip(cards, placements, strict=False)
-        if card.card_value in selectable
+        if card.visible and card.card_value in selectable
     )
     hovered_value = _hovered_hand_card_value(selectable_cards_with_placements, mouse_pos)
     return tuple(

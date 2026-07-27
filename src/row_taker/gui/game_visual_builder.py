@@ -1,38 +1,188 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from row_taker.client.core_state import PendingAction
-from row_taker.client.presentation_events import PresentationCardsRevealed
+from row_taker.client.presentation_events import (
+    PresentationCardPlaced,
+    PresentationCardsRevealed,
+    PresentationOverflowResolved,
+    PresentationRowTaken,
+)
 from row_taker.client.state import ClientState
-from row_taker.engine.game.models import PlayerID
+from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game.state import PublicState
 from row_taker.gui.game_visual_state import (
     GameVisualState,
+    GameVisualStep,
+    PlayerPlayAnchor,
+    RowCardAnchor,
+    RowEmphasis,
     VisualCard,
+    VisualCardMotion,
     VisualHandCard,
     VisualInteraction,
     VisualPlayer,
     VisualPresentationPanel,
     VisualRow,
     VisualStatus,
+    VisualTransition,
 )
+from row_taker.gui.game_visual_transition import resolve_visual_step
 from row_taker.gui_common.ui.common_render import format_presentation_event
+
+CARD_PLACEMENT_DURATION_FRAMES = 32
 
 
 def build_game_visual_state(
     state: ClientState,
     *,
     last_action_summary: str,
+    presentation_frame_count: int = 0,
     public_state_override: PublicState | None = None,
 ) -> GameVisualState:
-    """Translate client semantics into the complete stable game-screen model."""
+    """Translate client semantics into the complete game-screen model."""
 
-    public_state = public_state_override or state.public_state
-    rows = _build_rows(public_state)
+    if public_state_override is None:
+        current_step = state.current_presentation_step
+        if current_step is not None and isinstance(
+            current_step.event,
+            PresentationCardPlaced,
+        ):
+            visual_step = _build_card_placed_visual_step(
+                state,
+                last_action_summary=last_action_summary,
+            )
+            return resolve_visual_step(
+                visual_step,
+                presentation_frame_count=presentation_frame_count,
+            )
+
+    return _build_stable_game_visual_state(
+        state,
+        public_state=public_state_override or state.public_state,
+        last_action_summary=last_action_summary,
+        presentation_panel=_build_cards_revealed_panel(state),
+    )
+
+
+def _build_card_placed_visual_step(
+    state: ClientState,
+    *,
+    last_action_summary: str,
+) -> GameVisualStep:
+    presentation_step = state.current_presentation_step
+    if presentation_step is None or not isinstance(
+        presentation_step.event,
+        PresentationCardPlaced,
+    ):
+        raise ValueError("current presentation step is not PresentationCardPlaced")
+
+    event = presentation_step.event
+    completed_cards = _completed_card_values_by_player(state)
+    hidden_player_ids = frozenset((*completed_cards, event.player_id))
+    hidden_hand_card_values = frozenset(
+        card_value
+        for player_id, card_value in (
+            *completed_cards.items(),
+            (event.player_id, event.card_value),
+        )
+        if player_id == state.own_player_id
+    )
+    panel = VisualPresentationPanel(
+        headline=f"{event.player_name} legt {event.card_value}",
+        details=_presentation_details(state),
+        card_values=(event.card_value,),
+    )
+    row_emphasis = {event.row_id: "placed"}
+
+    after = _build_stable_game_visual_state(
+        state,
+        public_state=presentation_step.public_state_after,
+        last_action_summary=last_action_summary,
+        hidden_staged_player_ids=hidden_player_ids,
+        hidden_hand_card_values=hidden_hand_card_values,
+        active_player_id=event.player_id,
+        row_emphasis_by_id=row_emphasis,
+        presentation_panel=panel,
+    )
+    visual_row_order = tuple(row.row_id for row in after.rows)
+    before = _build_stable_game_visual_state(
+        state,
+        public_state=presentation_step.public_state_before,
+        last_action_summary=last_action_summary,
+        hidden_staged_player_ids=hidden_player_ids,
+        hidden_hand_card_values=hidden_hand_card_values,
+        active_player_id=event.player_id,
+        row_emphasis_by_id=row_emphasis,
+        visual_row_order=visual_row_order,
+        presentation_panel=panel,
+    )
+
+    target_row = after.row_by_id(event.row_id)
+    if target_row is None or not target_row.cards:
+        raise ValueError(f"card placement target row {event.row_id!r} is missing")
+    if target_row.cards[-1].card_value != event.card_value:
+        raise ValueError(
+            "card placement snapshot does not end with the presented card: "
+            f"row={event.row_id!r}, card={event.card_value}"
+        )
+
+    return GameVisualStep(
+        before=before,
+        after=after,
+        transition=VisualTransition(
+            card_motions=(
+                VisualCardMotion(
+                    card_value=event.card_value,
+                    source=PlayerPlayAnchor(
+                        player_id=event.player_id,
+                        card_value=event.card_value,
+                    ),
+                    target=RowCardAnchor(
+                        row_id=event.row_id,
+                        card_index=len(target_row.cards) - 1,
+                    ),
+                ),
+            ),
+            duration_frames=CARD_PLACEMENT_DURATION_FRAMES,
+        ),
+    )
+
+
+def _build_stable_game_visual_state(
+    state: ClientState,
+    *,
+    public_state: PublicState | None,
+    last_action_summary: str,
+    hidden_staged_player_ids: frozenset[PlayerID] = frozenset(),
+    hidden_hand_card_values: frozenset[int] = frozenset(),
+    active_player_id: PlayerID | None = None,
+    row_emphasis_by_id: Mapping[RowID, RowEmphasis] | None = None,
+    visual_row_order: tuple[RowID, ...] | None = None,
+    presentation_panel: VisualPresentationPanel | None = None,
+) -> GameVisualState:
     revealed_values = _revealed_card_values_by_player(state)
-    players = _build_players(state, public_state, revealed_values=revealed_values)
+    staged_values = {
+        player_id: card_value
+        for player_id, card_value in revealed_values.items()
+        if player_id not in hidden_staged_player_ids
+    }
+    rows = _build_rows(
+        public_state,
+        emphasis_by_id=row_emphasis_by_id or {},
+        visual_row_order=visual_row_order,
+    )
+    players = _build_players(
+        state,
+        public_state,
+        revealed_values=staged_values,
+        active_player_id=active_player_id,
+    )
     hand = _build_hand(
         state,
         selected_card_value=_own_revealed_card_value(state, revealed_values),
+        hidden_card_values=hidden_hand_card_values,
     )
     interaction = _build_interaction(state, hand)
     status = _build_status(
@@ -47,11 +197,16 @@ def build_game_visual_state(
         hand=hand,
         interaction=interaction,
         status=status,
-        presentation_panel=_build_presentation_panel(state),
+        presentation_panel=presentation_panel,
     )
 
 
-def _build_rows(public_state: PublicState | None) -> tuple[VisualRow, ...]:
+def _build_rows(
+    public_state: PublicState | None,
+    *,
+    emphasis_by_id: Mapping[RowID, RowEmphasis],
+    visual_row_order: tuple[RowID, ...] | None,
+) -> tuple[VisualRow, ...]:
     if public_state is None:
         return ()
 
@@ -62,10 +217,18 @@ def _build_rows(public_state: PublicState | None) -> tuple[VisualRow, ...]:
                 VisualCard(card_value=card.value, bullheads=card.bullheads)
                 for card in row.cards
             ),
+            emphasis=emphasis_by_id.get(row.row_id, "none"),
         )
         for row in public_state.rows
     )
-    return tuple(sorted(rows, key=_visual_row_sort_key))
+    sorted_rows = tuple(sorted(rows, key=_visual_row_sort_key))
+    if visual_row_order is None:
+        return sorted_rows
+
+    rows_by_id = {row.row_id: row for row in sorted_rows}
+    if set(rows_by_id) != set(visual_row_order):
+        raise ValueError("visual row order does not match public-state row ids")
+    return tuple(rows_by_id[row_id] for row_id in visual_row_order)
 
 
 def _visual_row_sort_key(row: VisualRow) -> tuple[int, str]:
@@ -78,6 +241,7 @@ def _build_players(
     public_state: PublicState | None,
     *,
     revealed_values: dict[PlayerID, int],
+    active_player_id: PlayerID | None,
 ) -> tuple[VisualPlayer, ...]:
     if public_state is None:
         return ()
@@ -90,6 +254,7 @@ def _build_players(
             hand_count=player.hand_count,
             is_self=player.player_id == state.own_player_id,
             staged_card_value=revealed_values.get(player.player_id),
+            emphasis="active" if player.player_id == active_player_id else "none",
         )
         for player in public_state.players
     )
@@ -127,10 +292,22 @@ def _own_revealed_card_value(
     return revealed_values.get(own_player_id)
 
 
+def _completed_card_values_by_player(state: ClientState) -> dict[PlayerID, int]:
+    completed: dict[PlayerID, int] = {}
+    for step in state.presentation_steps:
+        event = step.event
+        if isinstance(event, PresentationCardPlaced | PresentationOverflowResolved):
+            completed[event.player_id] = event.card_value
+        elif isinstance(event, PresentationRowTaken):
+            completed[event.player_id] = event.replacement_card_value
+    return completed
+
+
 def _build_hand(
     state: ClientState,
     *,
     selected_card_value: int | None,
+    hidden_card_values: frozenset[int],
 ) -> tuple[VisualHandCard, ...]:
     player_state = state.player_state
     if player_state is None:
@@ -139,13 +316,18 @@ def _build_hand(
         VisualHandCard(
             card_value=card.value,
             bullheads=card.bullheads,
-            emphasis="selected" if card.value == selected_card_value else "none",
+            visible=card.value not in hidden_card_values,
+            emphasis=(
+                "selected"
+                if card.value == selected_card_value and card.value not in hidden_card_values
+                else "none"
+            ),
         )
         for card in player_state.hand
     )
 
 
-def _build_presentation_panel(
+def _build_cards_revealed_panel(
     state: ClientState,
 ) -> VisualPresentationPanel | None:
     event = _current_cards_revealed_event(state)
@@ -154,11 +336,15 @@ def _build_presentation_panel(
 
     return VisualPresentationPanel(
         headline="Karten aufgedeckt",
-        details=tuple(
-            format_presentation_event(item)
-            for item in state.pending_presentation_events[:3]
-        ),
+        details=_presentation_details(state),
         card_values=tuple(play.card_value for play in event.plays),
+    )
+
+
+def _presentation_details(state: ClientState) -> tuple[str, ...]:
+    return tuple(
+        format_presentation_event(item)
+        for item in state.pending_presentation_events[:3]
     )
 
 
@@ -171,7 +357,9 @@ def _build_interaction(
 
     if state.pending_action == PendingAction.CHOOSE_CARD:
         return VisualInteraction(
-            selectable_card_values=frozenset(card.card_value for card in hand if card.visible)
+            selectable_card_values=frozenset(
+                card.card_value for card in hand if card.visible
+            )
         )
 
     if state.pending_action == PendingAction.CHOOSE_ROW and state.player_state is not None:
