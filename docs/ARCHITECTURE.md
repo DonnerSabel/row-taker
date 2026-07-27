@@ -159,6 +159,27 @@ Nicht in Clients gehören:
 - zweite Trickauflösung
 - lokale Sonderlogik, die der Engine widerspricht
 
+
+### Produktionsframe und GUI-Workbench
+
+Die aktuelle Pygame-GUI fasst einen vollständig vorbereiteten sichtbaren
+Spiel-Frame in `GameFrame` zusammen. Ein `GameFrame` besitzt gemeinsam:
+
+- den verwendeten `ClientState`
+- die für die Fenstergröße berechnete `BoardGeometry`
+- die daraus und aus der Mausposition erzeugten `GameScreenTargets`
+- die allgemeinen und presentationsbezogenen Frame-Zähler
+
+Geometrie und Interaktionsziele werden einmal gemeinsam vorbereitet und danach
+nicht unabhängig voneinander ausgetauscht. Bei einer Größenänderung wird ein
+neuer `GameFrame` erzeugt.
+
+Die geplante GUI-Workbench darf Fenstergröße, Mausposition, Zustände und
+Frame-Zähler kontrollieren. Sie muss aber denselben `GameFrame`, dieselbe
+Target-Erzeugung und denselben Produktionsrenderer wie die echte GUI benutzen.
+Eigene Karten-, Reihen- oder Animationsdarstellung in der Workbench wäre ein
+Architekturfehler.
+
 ---
 
 ## Debugging

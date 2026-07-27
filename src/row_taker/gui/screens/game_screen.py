@@ -67,9 +67,14 @@ class GameFrame:
         frame_count: int,
         presentation_frame_count: int,
         last_action_summary: str,
+        mouse_pos: tuple[int, int] | None = None,
     ) -> GameFrame:
         geometry = _compute_geometry(layout.window_rect, state)
-        targets = build_game_screen_targets(geometry, state)
+        targets = build_game_screen_targets(
+            geometry,
+            state,
+            mouse_pos=mouse_pos,
+        )
         return cls(
             state=state,
             frame_count=frame_count,
@@ -79,36 +84,66 @@ class GameFrame:
             targets=targets,
         )
 
-    def build_targets(self, layout: DemoLayout) -> GameScreenTargets:
-        # GuiApp uses one common screen protocol. This frame was already
-        # prepared from the same layout, so target creation must not be repeated.
+    def build_targets(self, layout: DemoLayout | None = None) -> GameScreenTargets:
+        """Return the targets prepared together with this frame.
+
+        ``layout`` remains part of the common screen API used by ``GuiApp``.
+        Workbench callers can omit it. When supplied, it is checked so stale
+        frames cannot accidentally be rendered after a window-size change.
+        """
+
+        self._require_matching_layout(layout)
         return self.targets
 
     def handle_event(
         self,
         event: pygame.event.Event,
-        targets: GameScreenTargets | None,
+        targets: GameScreenTargets | None = None,
     ) -> ScreenResult:
-        return handle_game_event(event, state=self.state, game_targets=targets)
+        """Handle an event against this frame's own prepared targets."""
+
+        self._require_matching_targets(targets)
+        return handle_game_event(
+            event,
+            state=self.state,
+            game_targets=self.targets,
+        )
 
     def render(
         self,
         screen: pygame.Surface,
         *,
         drawer: PrimitiveDrawer,
-        layout: DemoLayout,
-        targets: GameScreenTargets,
+        layout: DemoLayout | None = None,
+        targets: GameScreenTargets | None = None,
     ) -> None:
+        """Render this complete frame through the production game renderer."""
+
+        self._require_matching_layout(layout)
+        self._require_matching_targets(targets)
         render_game_screen(
             screen,
             drawer=drawer,
             geometry=self.geometry,
             client_state=self.state,
-            game_targets=targets,
+            game_targets=self.targets,
             frame_count=self.frame_count,
             presentation_frame_count=self.presentation_frame_count,
             last_action_summary=self.last_action_summary,
         )
+
+    def _require_matching_layout(self, layout: DemoLayout | None) -> None:
+        if layout is not None and layout.window_rect != self.geometry.window_rect:
+            raise ValueError(
+                "GameFrame was prepared for a different window layout; "
+                "create a new frame before handling or rendering it."
+            )
+
+    def _require_matching_targets(self, targets: GameScreenTargets | None) -> None:
+        if targets is not None and targets is not self.targets:
+            raise ValueError(
+                "GameFrame received targets from a different prepared frame."
+            )
 
 
 def render_game_screen(

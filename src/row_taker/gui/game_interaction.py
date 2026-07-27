@@ -53,12 +53,36 @@ class GameScreenTargets:
     continue_target: ContinueTarget | None = None
 
 
-def build_game_screen_targets(geometry: BoardGeometry, state: ClientState) -> GameScreenTargets:
-    mouse_pos = pygame.mouse.get_pos()
+def build_game_screen_targets(
+    geometry: BoardGeometry,
+    state: ClientState,
+    *,
+    mouse_pos: tuple[int, int] | None = None,
+) -> GameScreenTargets:
+    """Build all interactive targets for one game frame.
+
+    The live GUI leaves ``mouse_pos`` unset and therefore uses the real pygame
+    pointer position. Deterministic hosts such as the GUI workbench pass an
+    explicit position while still using this exact production function.
+    """
+
+    resolved_mouse_pos = pygame.mouse.get_pos() if mouse_pos is None else mouse_pos
     return GameScreenTargets(
-        card_targets=_build_card_targets(geometry, state, mouse_pos=mouse_pos),
-        row_targets=_build_row_targets(geometry, state, mouse_pos=mouse_pos),
-        continue_target=_build_continue_target(geometry, state, mouse_pos=mouse_pos),
+        card_targets=_build_card_targets(
+            geometry,
+            state,
+            mouse_pos=resolved_mouse_pos,
+        ),
+        row_targets=_build_row_targets(
+            geometry,
+            state,
+            mouse_pos=resolved_mouse_pos,
+        ),
+        continue_target=_build_continue_target(
+            geometry,
+            state,
+            mouse_pos=resolved_mouse_pos,
+        ),
     )
 
 
