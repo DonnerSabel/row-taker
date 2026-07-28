@@ -34,7 +34,7 @@ def test_game_renderer_is_a_short_orchestrator() -> None:
         "draw_opponent_tiles(",
         "draw_own_player_tile(",
         "draw_presentation_card_motion(",
-        "draw_status_overlay(",
+        "draw_sidebar_status(",
     ):
         assert call in source
     assert "draw_opponent_slots(" not in source
@@ -69,12 +69,23 @@ def test_game_renderer_uses_flat_background_instead_of_board_artwork() -> None:
     assert "_draw_game_background(" in source
 
 
-def test_sidebar_debug_frame_is_drawn_after_all_game_content() -> None:
+def test_game_renderer_uses_explicit_readable_layer_order() -> None:
     source = _source("rendering/game_renderer.py")
     render_body = source.split("def _draw_game_background", maxsplit=1)[0]
-    assert render_body.rfind("_draw_sidebar_debug_frame(") > render_body.rfind(
-        "draw_own_player_tile("
+    calls = (
+        "_draw_game_background(",
+        "draw_rows(",
+        "draw_opponent_tiles(",
+        "draw_own_player_tile(",
+        "draw_hand(",
+        "draw_presentation_card_motion(",
+        "draw_sidebar_status(",
+        "_draw_sidebar_debug_frame(",
     )
+    positions = tuple(render_body.find(call) for call in calls)
+
+    assert all(position >= 0 for position in positions)
+    assert positions == tuple(sorted(positions))
 
 
 def test_old_opponent_circles_and_separate_score_list_are_removed() -> None:

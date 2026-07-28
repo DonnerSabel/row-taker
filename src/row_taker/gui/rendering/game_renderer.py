@@ -14,7 +14,7 @@ from row_taker.gui.rendering.game_hud_renderer import (
     draw_hand,
     draw_opponent_tiles,
     draw_own_player_tile,
-    draw_status_overlay,
+    draw_sidebar_status,
     player_staged_card_rects,
 )
 from row_taker.gui.theme import DEFAULT_THEME
@@ -38,6 +38,7 @@ def render_game_screen(
     presentation_clock = AnimationClock(presentation_elapsed_frames)
 
     _draw_game_background(screen, geometry)
+    # Stable board content forms the back layer.
     draw_rows(
         screen,
         drawer,
@@ -47,21 +48,8 @@ def render_game_screen(
         assets,
         presentation_clock,
     )
-    draw_hand(
-        screen,
-        drawer,
-        geometry,
-        visual_state,
-        game_targets,
-        assets,
-    )
-    draw_status_overlay(
-        screen,
-        drawer,
-        geometry,
-        visual_state,
-        presentation_clock,
-    )
+
+    # Player tiles belong behind the hand and every animated card.
     draw_opponent_tiles(
         screen,
         drawer,
@@ -76,6 +64,17 @@ def render_game_screen(
         visual_state,
         assets,
     )
+    draw_hand(
+        screen,
+        drawer,
+        geometry,
+        visual_state,
+        game_targets,
+        assets,
+    )
+
+    # Motion is transient game content. Sidebar text is deliberately drawn
+    # afterwards so a flight path can never make instructions unreadable.
     draw_presentation_card_motion(
         screen,
         drawer,
@@ -87,6 +86,16 @@ def render_game_screen(
             geometry,
         ),
     )
+    draw_sidebar_status(
+        screen,
+        drawer,
+        geometry,
+        visual_state,
+        presentation_clock,
+    )
+
+    # Keep this last while the new layout is being developed: anything that
+    # escapes the sidebar remains visible as an overflow over the frame.
     _draw_sidebar_debug_frame(screen, geometry.sidebar_rect)
 
 

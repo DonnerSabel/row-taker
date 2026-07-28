@@ -289,14 +289,14 @@ def draw_hand(
         ).draw(screen, drawer=drawer, assets=assets)
 
 
-def draw_status_overlay(
+def draw_sidebar_status(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
     visual_state: GameVisualState,
     animation_clock: AnimationClock,
 ) -> None:
-    """Draw global status and presentation text inside the new sidebar."""
+    """Draw the final readable status layer inside the new sidebar."""
 
     _draw_sidebar_header(screen, drawer, geometry, visual_state)
 
