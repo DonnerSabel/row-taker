@@ -15,7 +15,8 @@ from row_taker.protocol.messages import (
     LeaveSession,
 )
 from row_taker.protocol.transport import ServerTransport
-from row_taker.server.local_server import LocalServer, OutgoingEnvelope
+from row_taker.server.local_server import LocalServer
+from row_taker.server.outgoing import OutgoingEnvelope
 from row_taker.server.server_handle import ServerHandle
 
 

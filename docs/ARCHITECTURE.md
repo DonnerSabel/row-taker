@@ -351,6 +351,35 @@ Wichtig:
   wie `card_value -> GuiCard`
 - die CLI rendert dieselbe Schicht nur in Textform
 
+## Server-Orchestrierung
+
+Der lokale Server ist in drei Verantwortlichkeiten gegliedert:
+
+```text
+LocalServer
+    ├── Lobby, Teilnehmer und Sitzplätze
+    ├── Start-/Abbruchkoordination
+    ├── LocalBotManager
+    │     ├── reservierte Bot-Sitze
+    │     ├── Bot-Prozessstarts
+    │     └── laufende Bot-Prozesshandles
+    └── MatchSessionRouter
+          ├── aktiver MatchHub
+          ├── Client-/Player-Zuordnung
+          ├── Spielnachrichtenvalidierung
+          ├── Revisionsvergabe
+          └── zielgerichtetes Outbox-Routing
+```
+
+`LocalServer` bleibt der Orchestrator. Er entscheidet, wann Bots gestartet, eine
+Partie begonnen oder eine Sitzung abgebrochen wird. Prozesshandle-Details und
+das eigentliche Match-Nachrichtenrouting liegen dagegen in den jeweils
+zuständigen Komponenten.
+
+`OutgoingEnvelope` ist ein gemeinsamer Server-Datentyp für Broadcasts und
+zielgerichtete Nachrichten. Netzwerkserver und Match-Router verwenden denselben
+Typ, ohne voneinander abhängig zu sein.
+
 ## SessionEnded und Server-Shutdown
 
 Wenn ein Teilnehmer die Sitzung beendet, verschickt der Server eine

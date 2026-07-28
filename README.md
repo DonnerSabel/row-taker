@@ -98,7 +98,7 @@ aus **`.venv`** auswählen.
 - `src/row_taker/hub/` – Match-Hub und Message-Orchestrierung
 - `src/row_taker/client/` – Clientzustand, Dispatcher, fachliche Transitionen und Präsentationsqueue
 - `src/row_taker/protocol/` – Nachrichten, Codec, Framing und Transport
-- `src/row_taker/server/` – Lobby, lokale Bots und Netzwerkserver
+- `src/row_taker/server/` – Lobby-Orchestrierung, Bot-Prozessverwaltung, Match-Routing und Netzwerkserver
 - `src/row_taker/cli/` – Terminaldarstellung und CLI-Eingabe
 - `src/row_taker/gui/` – Pygame-GUI, Layout, Interaktion und Renderer
 - `src/row_taker/bots/` – Bot-Clients
