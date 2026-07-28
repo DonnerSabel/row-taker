@@ -20,13 +20,13 @@ THEME = DEFAULT_THEME
 PALETTE = THEME.palette
 
 
-def opponent_staged_card_rects(
+def player_staged_card_rects(
     visual_state: GameVisualState,
     geometry: BoardGeometry,
 ) -> Mapping[PlayerID, pygame.Rect]:
-    """Map semantic opponent ids to their prepared staged-card rectangles."""
+    """Map every visible player id to the staged-card slot in its tile."""
 
-    return {
+    rects = {
         player.player_id: tile.card_placement.rect
         for player, tile in zip(
             visual_state.opponents,
@@ -34,6 +34,10 @@ def opponent_staged_card_rects(
             strict=False,
         )
     }
+    own_player = visual_state.own_player
+    if own_player is not None:
+        rects[own_player.player_id] = geometry.own_player_tile.card_placement.rect
+    return rects
 
 
 def draw_opponent_tiles(

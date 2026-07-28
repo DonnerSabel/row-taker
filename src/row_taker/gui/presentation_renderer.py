@@ -7,11 +7,7 @@ import pygame
 from row_taker.engine.game.models import PlayerID
 from row_taker.gui.animation import AnimationClock, lerp_rect
 from row_taker.gui.assets import GuiAssets
-from row_taker.gui.board_layout import (
-    BoardGeometry,
-    hand_card_placements,
-    row_card_placements,
-)
+from row_taker.gui.board_layout import BoardGeometry, row_card_placements
 from row_taker.gui.card import GuiCard
 from row_taker.gui.game_visual_state import (
     GameVisualState,
@@ -35,7 +31,7 @@ def draw_presentation_card_motion(
     visual_state: GameVisualState,
     assets: GuiAssets,
     *,
-    opponent_staged_card_rects: Mapping[PlayerID, pygame.Rect],
+    player_staged_card_rects: Mapping[PlayerID, pygame.Rect],
 ) -> None:
     """Draw all semantic card motions from the resolved visual state."""
 
@@ -44,7 +40,7 @@ def draw_presentation_card_motion(
             geometry,
             visual_state,
             moving_card,
-            opponent_staged_card_rects=opponent_staged_card_rects,
+            player_staged_card_rects=player_staged_card_rects,
         )
         if resolved is None:
             continue
@@ -65,15 +61,13 @@ def resolve_visual_card_motion_rects(
     visual_state: GameVisualState,
     moving_card: VisualMovingCard,
     *,
-    opponent_staged_card_rects: Mapping[PlayerID, pygame.Rect],
+    player_staged_card_rects: Mapping[PlayerID, pygame.Rect],
 ) -> tuple[pygame.Rect, pygame.Rect] | None:
     """Resolve semantic motion anchors through current production geometry."""
 
     source_rect = _visual_motion_source_rect(
-        geometry,
-        visual_state,
         moving_card.source,
-        opponent_staged_card_rects=opponent_staged_card_rects,
+        player_staged_card_rects=player_staged_card_rects,
     )
     target_rect = _visual_motion_target_rect(
         geometry,
@@ -86,25 +80,11 @@ def resolve_visual_card_motion_rects(
 
 
 def _visual_motion_source_rect(
-    geometry: BoardGeometry,
-    visual_state: GameVisualState,
     source: PlayerPlayAnchor,
     *,
-    opponent_staged_card_rects: Mapping[PlayerID, pygame.Rect],
+    player_staged_card_rects: Mapping[PlayerID, pygame.Rect],
 ) -> pygame.Rect | None:
-    if source.player_id == visual_state.own_player_id:
-        placements = hand_card_placements(
-            geometry,
-            card_count=len(visual_state.hand),
-        )
-        for card, placement in zip(visual_state.hand, placements, strict=False):
-            if card.card_value == source.card_value:
-                return placement.rect
-        fallback = pygame.Rect(0, 0, *geometry.staged_card_size)
-        fallback.center = geometry.hand_rect.center
-        return fallback
-
-    return opponent_staged_card_rects.get(source.player_id)
+    return player_staged_card_rects.get(source.player_id)
 
 
 def _visual_motion_target_rect(

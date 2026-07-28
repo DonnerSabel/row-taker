@@ -15,7 +15,7 @@ from row_taker.gui.rendering.game_hud_renderer import (
     draw_opponent_tiles,
     draw_own_player_tile,
     draw_status_overlay,
-    opponent_staged_card_rects,
+    player_staged_card_rects,
 )
 from row_taker.gui.theme import DEFAULT_THEME
 
@@ -84,7 +84,7 @@ def render_game_screen(
         geometry,
         visual_state,
         assets,
-        opponent_staged_card_rects=opponent_staged_card_rects(
+        player_staged_card_rects=player_staged_card_rects(
             visual_state,
             geometry,
         ),

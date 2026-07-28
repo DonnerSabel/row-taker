@@ -12,7 +12,7 @@ import pytest
 from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui.rendering.game_hud_renderer import (
     _fit_text_to_width,
-    opponent_staged_card_rects,
+    player_staged_card_rects,
 )
 from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui_workbench.app import prepare_headless_pygame, prepare_scenario_frame
@@ -26,11 +26,11 @@ def initialized_pygame() -> None:
     pygame.quit()
 
 
-def test_staged_card_mapping_uses_each_opponents_new_tile() -> None:
+def test_staged_card_mapping_uses_every_players_tile() -> None:
     frame = prepare_scenario_frame(get_scenario("cards-revealed"))
     assert isinstance(frame, GameFrame)
 
-    mapping = opponent_staged_card_rects(frame.visual_state, frame.geometry)
+    mapping = player_staged_card_rects(frame.visual_state, frame.geometry)
 
     expected = {
         player.player_id: tile.card_placement.rect
@@ -40,6 +40,11 @@ def test_staged_card_mapping_uses_each_opponents_new_tile() -> None:
             strict=False,
         )
     }
+    own_player = frame.visual_state.own_player
+    assert own_player is not None
+    expected[own_player.player_id] = (
+        frame.geometry.own_player_tile.card_placement.rect
+    )
     assert mapping == expected
 
 

@@ -5,10 +5,10 @@ import pytest
 pygame = pytest.importorskip("pygame")
 
 from row_taker.client.core_reducer import advance_presentation_queue
-from row_taker.gui.board_layout import hand_card_placements, row_card_placements
+from row_taker.gui.board_layout import row_card_placements
 from row_taker.gui.layout import compute_layout
 from row_taker.gui.presentation_renderer import resolve_visual_card_motion_rects
-from row_taker.gui.rendering.game_hud_renderer import opponent_staged_card_rects
+from row_taker.gui.rendering.game_hud_renderer import player_staged_card_rects
 from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui_workbench.scenarios import get_scenario
 from row_taker.gui_workbench.timeline import get_timeline
@@ -34,7 +34,7 @@ def test_semantic_card_motion_anchors_resolve_to_real_layout(
         frame.geometry,
         frame.visual_state,
         moving_card,
-        opponent_staged_card_rects=opponent_staged_card_rects(
+        player_staged_card_rects=player_staged_card_rects(
             frame.visual_state,
             frame.geometry,
         ),
@@ -42,17 +42,11 @@ def test_semantic_card_motion_anchors_resolve_to_real_layout(
 
     assert resolved is not None
     source_rect, target_rect = resolved
-    if moving_card.source.player_id == frame.visual_state.own_player_id:
-        hand_index = next(
-            index
-            for index, card in enumerate(frame.visual_state.hand)
-            if card.card_value == moving_card.source.card_value
-        )
-        expected_source = hand_card_placements(
-            frame.geometry,
-            card_count=len(frame.visual_state.hand),
-        )[hand_index].rect
-        assert source_rect == expected_source
+    staged_rects = player_staged_card_rects(
+        frame.visual_state,
+        frame.geometry,
+    )
+    assert source_rect == staged_rects[moving_card.source.player_id]
 
     row_index = next(
         index
@@ -81,13 +75,13 @@ def test_opponent_card_motion_starts_at_real_staged_card_slot() -> None:
     )
     moving_card = frame.visual_state.moving_cards[0]
     assert moving_card.source.player_id != frame.visual_state.own_player_id
-    staged_rects = opponent_staged_card_rects(frame.visual_state, frame.geometry)
+    staged_rects = player_staged_card_rects(frame.visual_state, frame.geometry)
 
     resolved = resolve_visual_card_motion_rects(
         frame.geometry,
         frame.visual_state,
         moving_card,
-        opponent_staged_card_rects=staged_rects,
+        player_staged_card_rects=staged_rects,
     )
 
     assert resolved is not None
@@ -95,7 +89,7 @@ def test_opponent_card_motion_starts_at_real_staged_card_slot() -> None:
     assert source_rect == staged_rects[moving_card.source.player_id]
 
 
-def test_own_card_motion_uses_hand_area_fallback_after_server_removed_card() -> None:
+def test_own_card_motion_starts_at_own_player_tile() -> None:
     timeline = get_timeline("full-trick")
     state = timeline.steps[5].state
     frame = GameFrame.from_layout(
@@ -116,7 +110,7 @@ def test_own_card_motion_uses_hand_area_fallback_after_server_removed_card() -> 
         frame.geometry,
         frame.visual_state,
         moving_card,
-        opponent_staged_card_rects=opponent_staged_card_rects(
+        player_staged_card_rects=player_staged_card_rects(
             frame.visual_state,
             frame.geometry,
         ),
@@ -124,5 +118,4 @@ def test_own_card_motion_uses_hand_area_fallback_after_server_removed_card() -> 
 
     assert resolved is not None
     source_rect, _target_rect = resolved
-    assert source_rect.size == frame.geometry.staged_card_size
-    assert source_rect.center == frame.geometry.hand_rect.center
+    assert source_rect == frame.geometry.own_player_tile.card_placement.rect
