@@ -31,6 +31,7 @@ def test_game_renderer_is_a_short_orchestrator() -> None:
     for call in (
         "draw_rows(",
         "draw_hand(",
+        "draw_opponent_tiles(",
         "draw_presentation_card_motion(",
         "draw_stats_field(",
         "draw_status_overlay(",
@@ -83,3 +84,17 @@ def test_old_opponent_circles_and_separate_score_list_are_removed() -> None:
     assert "def _initials" not in source
     assert "def _player_color" not in source
     assert "for player in visual_state.players" not in source
+
+
+def test_opponent_tiles_use_new_sidebar_geometry() -> None:
+    hud_source = _source("rendering/game_hud_renderer.py")
+    assert "geometry.opponent_tiles" in hud_source
+    assert "geometry.opponent_slots" not in hud_source
+    assert "def draw_opponent_tiles" in hud_source
+    assert "tile.card_placement.rect" in hud_source
+
+
+def test_opponent_tile_names_are_fitted_to_pixel_width() -> None:
+    source = _source("rendering/game_hud_renderer.py")
+    assert "def _fit_text_to_width" in source
+    assert "font.size(candidate)[0] <= max_width" in source
