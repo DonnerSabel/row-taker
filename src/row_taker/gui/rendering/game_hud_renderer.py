@@ -182,10 +182,10 @@ def _draw_player_tile_text(
         role=name_role,
     )
     score_text = f"{score} Hornochsen"
-    name_font = drawer._font_for_role(name_role)
-    score_font = drawer._font_for_role(score_role)
+    name_line_height = drawer.line_height(role=name_role)
+    score_line_height = drawer.line_height(role=score_role)
     line_gap = 3
-    content_height = name_font.get_linesize() + line_gap + score_font.get_linesize()
+    content_height = name_line_height + line_gap + score_line_height
     top = info_rect.centery - content_height // 2
 
     drawer.draw_text(
@@ -195,7 +195,7 @@ def _draw_player_tile_text(
         role=name_role,
         color=PALETTE.accent_hover if active else PALETTE.text_primary,
     )
-    score_top = top + name_font.get_linesize() + line_gap
+    score_top = top + name_line_height + line_gap
     drawer.draw_text(
         screen,
         score_text,
@@ -228,10 +228,10 @@ def _draw_own_player_tile_text(
         max_width=info_rect.width,
         role=name_role,
     )
-    name_font = drawer._font_for_role(name_role)
-    detail_font = drawer._font_for_role(detail_role)
+    name_line_height = drawer.line_height(role=name_role)
+    detail_line_height = drawer.line_height(role=detail_role)
 
-    fixed_height = name_font.get_linesize() + line_gap + detail_font.get_linesize()
+    fixed_height = name_line_height + line_gap + detail_line_height
     text_top = info_rect.top + max(0, (info_rect.height - fixed_height) // 2)
     if action_line is not None or message_line is not None:
         text_top = info_rect.top
@@ -243,7 +243,7 @@ def _draw_own_player_tile_text(
         role=name_role,
         color=PALETTE.accent_hover if active else PALETTE.text_primary,
     )
-    score_top = text_top + name_font.get_linesize() + line_gap
+    score_top = text_top + name_line_height + line_gap
     drawer.draw_text(
         screen,
         f"{score} Hornochsen",
@@ -252,7 +252,7 @@ def _draw_own_player_tile_text(
         color=PALETTE.gold,
     )
 
-    content_top = score_top + detail_font.get_linesize() + line_gap
+    content_top = score_top + detail_line_height + line_gap
     content_bottom = info_rect.bottom
     if action_line is not None and content_top < content_bottom:
         action_rect = pygame.Rect(
@@ -303,14 +303,13 @@ def _fit_text_to_width(
 ) -> str:
     """Shorten one line with an ellipsis so it stays inside its rectangle."""
 
-    font = drawer._font_for_role(role)
     if max_width <= 0:
         return ""
-    if font.size(text)[0] <= max_width:
+    if drawer.text_size(text, role=role)[0] <= max_width:
         return text
 
     ellipsis = "…"
-    if font.size(ellipsis)[0] > max_width:
+    if drawer.text_size(ellipsis, role=role)[0] > max_width:
         return ""
 
     low = 0
@@ -318,7 +317,7 @@ def _fit_text_to_width(
     while low < high:
         middle = (low + high + 1) // 2
         candidate = f"{text[:middle].rstrip()}{ellipsis}"
-        if font.size(candidate)[0] <= max_width:
+        if drawer.text_size(candidate, role=role)[0] <= max_width:
             low = middle
         else:
             high = middle - 1
@@ -373,8 +372,7 @@ def _draw_sidebar_header(
 ) -> None:
     rect = geometry.sidebar_header_rect
     _draw_overlay_box(screen, rect)
-    font = drawer._font_for_role("small")
-    text_y = rect.centery - font.get_linesize() // 2
+    text_y = rect.centery - drawer.line_height(role="small") // 2
     drawer.draw_text(
         screen,
         visual_state.status.game_line,

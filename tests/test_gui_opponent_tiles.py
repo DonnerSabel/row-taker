@@ -61,7 +61,7 @@ def test_long_player_name_is_shortened_to_available_pixel_width() -> None:
 
     assert shortened.endswith("…")
     assert shortened != original
-    assert drawer._font_for_role("small").size(shortened)[0] <= 120
+    assert drawer.text_size(shortened, role="small")[0] <= 120
 
 
 def test_short_player_name_is_not_changed() -> None:

@@ -28,8 +28,8 @@ def test_packaged_resources_contain_cards_and_backgrounds() -> None:
     assert asset_root.joinpath("cards", "karte_001.png").is_file()
     assert asset_root.joinpath("cards", "karte_104.png").is_file()
     assert asset_root.joinpath("connect_bg.png").is_file()
-    assert asset_root.joinpath("board.png").is_file()
-    assert asset_root.joinpath("titel.png").is_file()
+    assert not asset_root.joinpath("board.png").is_file()
+    assert not asset_root.joinpath("titel.png").is_file()
 
 
 def test_default_assets_load_and_scale_packaged_card() -> None:

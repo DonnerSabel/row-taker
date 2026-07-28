@@ -111,21 +111,3 @@ def _card_border_color(*, selected: bool, hovered: bool, theme: GuiTheme) -> pyg
     if hovered:
         return theme.palette.accent_hover
     return theme.palette.panel_border
-
-
-def draw_card_back(
-    surface: pygame.Surface,
-    rect: pygame.Rect,
-    *,
-    theme: GuiTheme = DEFAULT_THEME,
-) -> None:
-    """Draw a neutral face-down card placeholder."""
-
-    palette = theme.palette
-    spacing = theme.spacing
-    back = pygame.Surface(rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(
-        back, palette.card_back_fill, back.get_rect(), border_radius=spacing.card_radius
-    )
-    surface.blit(back, rect)
-    pygame.draw.rect(surface, palette.card_back_border, rect, 1, border_radius=spacing.card_radius)

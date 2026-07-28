@@ -15,7 +15,6 @@ from row_taker.engine.game import (
     trick_resolution_finished,
 )
 from row_taker.engine.game.models import PlayerID
-from row_taker.engine.game.phases import Phase
 from row_taker.engine.game.state import (
     GameState,
     PlayerState,
@@ -68,9 +67,6 @@ class MatchHub:
         drained = list(self.outbox)
         self.outbox.clear()
         return drained
-
-    def is_finished(self) -> bool:
-        return self.state.phase_info.phase == Phase.GAME_OVER
 
     def build_public_state(self) -> PublicState:
         return build_public_state(self.state)

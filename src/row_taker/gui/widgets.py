@@ -148,8 +148,7 @@ def centered_text_position(
     *,
     role: str,
 ) -> tuple[int, int]:
-    font = drawer._font_for_role(role)
-    width, height = font.size(text)
+    width, height = drawer.text_size(text, role=role)
     return (rect.centerx - width // 2, rect.centery - height // 2)
 
 

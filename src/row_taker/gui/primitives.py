@@ -2,16 +2,7 @@ from __future__ import annotations
 
 import pygame
 
-from row_taker.gui.layout import PANEL_PADDING
-
-PANEL_FILL = pygame.Color(32, 36, 41)
-PANEL_BORDER = pygame.Color(135, 145, 156)
-WINDOW_BACKGROUND = pygame.Color(20, 22, 25)
 TEXT_PRIMARY = pygame.Color(236, 239, 244)
-TEXT_MUTED = pygame.Color(175, 180, 187)
-ACCENT = pygame.Color(102, 163, 255)
-CARD_FILL = pygame.Color(43, 49, 56)
-CARD_SELECTED = pygame.Color(72, 88, 108)
 
 
 class PrimitiveDrawer:
@@ -21,27 +12,6 @@ class PrimitiveDrawer:
         self._body_font = pygame.font.SysFont(None, 24)
         self._small_font = pygame.font.SysFont(None, 20)
         self._tiny_font = pygame.font.SysFont(None, 17)
-
-    def draw_panel(
-        self,
-        surface: pygame.Surface,
-        rect: pygame.Rect,
-        *,
-        title: str | None = None,
-    ) -> pygame.Rect:
-        pygame.draw.rect(surface, PANEL_FILL, rect)
-        pygame.draw.rect(surface, PANEL_BORDER, rect, width=1)
-
-        content_rect = rect.inflate(-2 * PANEL_PADDING, -2 * PANEL_PADDING)
-        if title is not None:
-            self.draw_text(surface, title, (content_rect.left, content_rect.top), role="title")
-            content_rect = pygame.Rect(
-                content_rect.left,
-                content_rect.top + 28,
-                content_rect.width,
-                max(0, content_rect.height - 28),
-            )
-        return content_rect
 
     def draw_text(
         self,
@@ -56,15 +26,11 @@ class PrimitiveDrawer:
         rendered = font.render(text, True, color or TEXT_PRIMARY)
         surface.blit(rendered, position)
 
-    def draw_key_value(
-        self,
-        surface: pygame.Surface,
-        key: str,
-        value: str,
-        position: tuple[int, int],
-    ) -> None:
-        self.draw_text(surface, key, position, role="small", color=TEXT_MUTED)
-        self.draw_text(surface, value, (position[0] + 120, position[1]), role="body")
+    def text_size(self, text: str, *, role: str = "body") -> tuple[int, int]:
+        return self._font_for_role(role).size(text)
+
+    def line_height(self, *, role: str = "body") -> int:
+        return self._font_for_role(role).get_linesize()
 
     def draw_wrapped_lines(
         self,
@@ -87,40 +53,6 @@ class PrimitiveDrawer:
                 if y > rect.bottom:
                     return y
         return y
-
-    def draw_card(
-        self,
-        surface: pygame.Surface,
-        rect: pygame.Rect,
-        *,
-        value: int,
-        bullheads: int,
-        selected: bool = False,
-    ) -> None:
-        fill = CARD_SELECTED if selected else CARD_FILL
-        pygame.draw.rect(surface, fill, rect)
-        pygame.draw.rect(surface, PANEL_BORDER if not selected else ACCENT, rect, width=1)
-
-        self.draw_text(surface, str(value), (rect.left + 8, rect.top + 6), role="body")
-        self.draw_text(
-            surface,
-            f"{bullheads} bh",
-            (rect.left + 8, rect.top + 30),
-            role="small",
-            color=TEXT_MUTED,
-        )
-
-    def draw_badge(
-        self,
-        surface: pygame.Surface,
-        rect: pygame.Rect,
-        *,
-        text: str,
-        active: bool = False,
-    ) -> None:
-        pygame.draw.rect(surface, CARD_SELECTED if active else CARD_FILL, rect)
-        pygame.draw.rect(surface, ACCENT if active else PANEL_BORDER, rect, width=1)
-        self.draw_text(surface, text, (rect.left + 8, rect.top + 6), role="small")
 
     def measure_wrapped_lines(
         self,

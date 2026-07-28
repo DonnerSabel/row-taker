@@ -143,8 +143,7 @@ def _draw_text_selection(
     rect: pygame.Rect,
     text: str,
 ) -> None:
-    font = drawer._font_for_role("body")
-    text_width, text_height = font.size(text)
+    text_width, text_height = drawer.text_size(text, role="body")
     selection_rect = pygame.Rect(
         rect.left + 12, rect.top + 8, text_width + 10, max(30, text_height + 8)
     )
@@ -161,8 +160,7 @@ def _draw_text_cursor(
     *,
     theme: GuiTheme,
 ) -> None:
-    font = drawer._font_for_role("body")
-    text_width = font.size(text)[0]
+    text_width = drawer.text_size(text, role="body")[0]
     cursor_x = min(rect.right - 16, rect.left + 16 + text_width + 2)
     cursor_rect = pygame.Rect(cursor_x, rect.top + 10, 2, rect.height - 20)
     pygame.draw.rect(screen, theme.palette.accent_hover, cursor_rect)

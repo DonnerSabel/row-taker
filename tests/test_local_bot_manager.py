@@ -3,6 +3,8 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
+import pytest
+
 from row_taker.engine.lobby.rules import assign_client_to_seat
 from row_taker.engine.lobby.state import LobbyState
 from row_taker.server.local_bot_manager import LocalBotManager
@@ -99,3 +101,25 @@ def test_abort_startup_closes_all_pending_processes() -> None:
 
     assert all(handle.closed for *_prefix, handle in server_handle.spawned)
     assert not manager.has_pending_starts
+
+
+def test_duplicate_reservation_name_is_rejected_but_same_seat_can_keep_it() -> None:
+    from row_taker.server.errors import ClientRequestRejected
+
+    manager = LocalBotManager(rng=random.Random(1234))
+    manager.reserve(0, "Bot_A")
+
+    same_seat = manager.reserve(0, " bot_a ")
+    assert same_seat.display_name == "bot_a"
+
+    with pytest.raises(ClientRequestRejected, match="duplicate participant display name"):
+        manager.reserve(1, "BOT_A")
+
+
+def test_clearing_reservation_releases_display_name() -> None:
+    manager = LocalBotManager(rng=random.Random(1234))
+    manager.reserve(0, "Bot_A")
+    manager.clear_reservation(0)
+
+    spec = manager.reserve(1, "Bot_A")
+    assert spec.display_name == "Bot_A"

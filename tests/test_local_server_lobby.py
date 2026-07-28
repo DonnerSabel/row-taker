@@ -7,10 +7,12 @@ from row_taker.protocol.messages import (
     CardsRevealed,
     ChooseCardRequested,
     ChooseRowRequested,
+    ClearSeat,
     CreateLocalBotOnSeat,
     GameStarting,
     JoinLobby,
     LeaveSession,
+    LobbyActionRejected,
     RequestStartGame,
     SessionEnded,
     SessionEndReason,
@@ -72,7 +74,7 @@ def test_local_server_can_plan_bot_on_selected_seat_without_registering_it() -> 
     seat = next(seat for seat in lobby.seats if seat.seat_index == 1)
     assert seat.occupant_client_id is not None
     assert seat.occupant_display_name == "Bot_Bob"
-    assert len(server.registry.records) == 1
+    assert len(server.registry.list_participants()) == 1
 
 
 def test_local_server_spawns_pending_bot_only_when_game_starts() -> None:
@@ -249,3 +251,87 @@ def test_match_abort_does_not_broadcast_lobby_state_during_session_teardown() ->
     envelopes = server.drain_outbox()
 
     assert not any(hasattr(envelope.message, "lobby") for envelope in envelopes)
+
+
+def _last_rejection(server: LocalServer) -> LobbyActionRejected:
+    messages = [envelope.message for envelope in server.drain_outbox()]
+    rejection = next(message for message in messages if isinstance(message, LobbyActionRejected))
+    return rejection
+
+
+def test_duplicate_pending_bot_name_is_rejected_case_insensitively() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=3)
+    server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
+    server.drain_outbox()
+
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob")
+    )
+    server.drain_outbox()
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=2, display_name=" bot_bob ")
+    )
+
+    rejection = _last_rejection(server)
+    assert "duplicate participant display name" in rejection.message
+    assert server.bot_manager.pending_display_names() == {1: "Bot_Bob"}
+
+
+def test_pending_bot_name_must_not_conflict_with_connected_participant() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=2)
+    server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
+    server.drain_outbox()
+
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name=" alice ")
+    )
+
+    rejection = _last_rejection(server)
+    assert "duplicate participant display name" in rejection.message
+    assert server.bot_manager.pending_display_names() == {}
+
+
+def test_human_join_and_rename_must_not_conflict_with_pending_bot() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=3)
+    server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob")
+    )
+    server.drain_outbox()
+
+    server.handle_client_message("client-1", JoinLobby(display_name="bot_bob"))
+    join_rejection = _last_rejection(server)
+    assert "duplicate participant display name" in join_rejection.message
+    assert not server.registry.has("client-1")
+
+    server.handle_client_message("client-1", JoinLobby(display_name="Clara"))
+    server.drain_outbox()
+    server.handle_client_message("client-1", SetDisplayName(display_name="BOT_BOB"))
+    rename_rejection = _last_rejection(server)
+    assert "duplicate participant display name" in rename_rejection.message
+    assert server.registry.get_participant("client-1").display_name == "Clara"
+
+
+def test_same_pending_bot_seat_may_keep_name_and_clearing_releases_it() -> None:
+    server = LocalServer(rng=random.Random(1234), seat_count=3)
+    server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_Bob")
+    )
+    server.drain_outbox()
+
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name=" bot_bob ")
+    )
+    messages = [envelope.message for envelope in server.drain_outbox()]
+    assert not any(isinstance(message, LobbyActionRejected) for message in messages)
+    assert server.bot_manager.pending_display_names() == {1: "bot_bob"}
+
+    server.handle_client_message("client-0", ClearSeat(seat_index=1))
+    server.drain_outbox()
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=2, display_name="Bot_Bob")
+    )
+    messages = [envelope.message for envelope in server.drain_outbox()]
+    assert not any(isinstance(message, LobbyActionRejected) for message in messages)
+    assert server.bot_manager.pending_display_names() == {2: "Bot_Bob"}

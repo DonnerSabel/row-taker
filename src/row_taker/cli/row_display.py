@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from row_taker.engine.game.phases import StepAction
-from row_taker.engine.game.public_state_ops import apply_resolution_step
-from row_taker.engine.game.state import PublicState, TrickResolutionStep
+from row_taker.engine.game.state import PublicState
 
 
 @dataclass(slots=True, frozen=True)
@@ -39,37 +37,3 @@ def build_row_display_mapping(state: PublicState) -> RowDisplayMapping:
         cli_to_state=cli_to_state,
         state_to_cli=state_to_cli,
     )
-
-
-def format_resolution_steps_for_cli(
-    before_state: PublicState, steps: list[TrickResolutionStep] | tuple[TrickResolutionStep, ...]
-) -> list[str]:
-    shadow_state = before_state
-    lines: list[str] = []
-
-    for step in steps:
-        row_index = shadow_state.get_row_index(step.affected_row_id)
-        mapping = build_row_display_mapping(shadow_state)
-        cli_row = mapping.to_cli_row(row_index)
-        player = next(
-            player for player in shadow_state.players if player.player_id == step.player_id
-        )
-
-        if step.action == StepAction.PLACED:
-            lines.append(f"- {player.name} legt {step.played_card.value} an Reihe {cli_row}.")
-        elif step.action == StepAction.TOOK_ROW_SMALL:
-            lines.append(
-                f"- {player.name} nimmt Reihe {cli_row} ({step.points_gained} Hornochsen) "
-                f"und startet mit {step.played_card.value}."
-            )
-        elif step.action == StepAction.TOOK_ROW_OVERFLOW:
-            lines.append(
-                f"- {player.name} füllt Reihe {cli_row} (nimmt {step.points_gained} Hornochsen) "
-                f"und startet mit {step.played_card.value}."
-            )
-        else:
-            raise ValueError(f"Unbekannte Schritt-Klassifikation: {step.action}")
-
-        shadow_state = apply_resolution_step(shadow_state, step)
-
-    return lines

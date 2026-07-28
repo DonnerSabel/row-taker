@@ -136,10 +136,6 @@ def has_pending_presentation(state: ClientState) -> bool:
     return bool(state.core_state.pending_presentation_steps)
 
 
-def has_visible_presentation(state: ClientState) -> bool:
-    return bool(state.core_state.presentation_steps)
-
-
 def assign_identity(state: ClientState, client_id: str) -> ClientState:
     return replace(state, core_state=replace(state.core_state, own_client_id=client_id))
 

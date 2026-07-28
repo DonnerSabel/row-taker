@@ -108,7 +108,7 @@ def test_opponent_tiles_use_new_sidebar_geometry() -> None:
 def test_opponent_tile_names_are_fitted_to_pixel_width() -> None:
     source = _source("rendering/game_hud_renderer.py")
     assert "def _fit_text_to_width" in source
-    assert "font.size(candidate)[0] <= max_width" in source
+    assert "drawer.text_size(candidate, role=role)[0] <= max_width" in source
 
 
 def test_own_player_uses_dedicated_sidebar_tile_instead_of_legacy_stats_field() -> None:

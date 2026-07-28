@@ -11,9 +11,9 @@ import zipfile
 from pathlib import Path
 
 _CARD_PREFIX = "row_taker/assets/cards/karte_"
-_REQUIRED_ASSETS = {
+_REQUIRED_ASSETS = {"row_taker/assets/connect_bg.png"}
+_REMOVED_ASSETS = {
     "row_taker/assets/board.png",
-    "row_taker/assets/connect_bg.png",
     "row_taker/assets/titel.png",
 }
 
@@ -53,6 +53,10 @@ def _verify_wheel_contents(wheel_path: Path) -> None:
     missing = sorted(_REQUIRED_ASSETS - names)
     if missing:
         raise RuntimeError(f"wheel is missing packaged GUI assets: {missing}")
+
+    obsolete = sorted(_REMOVED_ASSETS & names)
+    if obsolete:
+        raise RuntimeError(f"wheel still contains unused GUI assets: {obsolete}")
 
     cards = sorted(
         name for name in names if name.startswith(_CARD_PREFIX) and name.endswith(".png")

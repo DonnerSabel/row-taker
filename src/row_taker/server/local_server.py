@@ -192,7 +192,7 @@ class LocalServer:
 
         if self.match_router.is_active or self._start_in_progress:
             raise ClientRequestRejected("cannot join after game start")
-        display_name = message.display_name.strip()
+        display_name = self._validate_display_name(message.display_name)
         self.registry.register_participant(
             Participant(
                 client_id=client_id,
@@ -216,7 +216,11 @@ class LocalServer:
             raise ClientRequestRejected("cannot change display name after game start")
         self._assert_known_client(client_id)
         old_name = self.registry.get_participant(client_id).display_name
-        self.registry.set_display_name(client_id, message.display_name)
+        display_name = self._validate_display_name(
+            message.display_name,
+            exclude_client_id=client_id,
+        )
+        self.registry.set_display_name(client_id, display_name)
         new_name = self.registry.get_participant(client_id).display_name
         self._log(f"display name changed: client_id={client_id} old={old_name!r} new={new_name!r}")
         self._broadcast_lobby_state()
@@ -239,7 +243,10 @@ class LocalServer:
         if self.match_router.is_active or self._start_in_progress:
             raise ClientRequestRejected("cannot edit seats after game start")
         self._validate_seat_index(message.seat_index)
-        display_name = self._validate_pending_bot_display_name(message.display_name)
+        display_name = self._validate_display_name(
+            message.display_name,
+            exclude_pending_seat_index=message.seat_index,
+        )
         current_occupant = self.lobby_state.occupant_client_id_for_seat(message.seat_index)
         if current_occupant is not None:
             self.lobby_state = clear_seat(self.lobby_state, message.seat_index)
@@ -337,7 +344,7 @@ class LocalServer:
             if self._start_in_progress and participant.kind == ParticipantKind.BOT:
                 self._abort_startup()
             if self._match_abort_in_progress:
-                if not self.registry.records:
+                if self.registry.is_empty:
                     self._match_abort_in_progress = False
                 return
             self._broadcast_lobby_state()
@@ -369,7 +376,9 @@ class LocalServer:
             endpoint_display=endpoint_display,
         )
         remaining_client_ids = tuple(
-            client_id for client_id in self.registry.records if client_id != departing_client_id
+            client_id
+            for client_id in self.registry.client_ids()
+            if client_id != departing_client_id
         )
         self._log(
             "active match aborted: "
@@ -407,7 +416,7 @@ class LocalServer:
             self._session_ended
             and not self.match_router.is_active
             and not self._start_in_progress
-            and not self.registry.records
+            and self.registry.is_empty
             and not self.bot_manager.has_pending_starts
             and not self.bot_manager.has_running_bots
         )
@@ -433,9 +442,21 @@ class LocalServer:
             )
         )
 
-    def _validate_pending_bot_display_name(self, display_name: str) -> str:
-        value = self.registry._validate_display_name(display_name)
-        return self.bot_manager.normalize_pending_display_name(value)
+    def _validate_display_name(
+        self,
+        display_name: str,
+        *,
+        exclude_client_id: str | None = None,
+        exclude_pending_seat_index: int | None = None,
+    ) -> str:
+        value = self.registry.validate_display_name(
+            display_name,
+            exclude_client_id=exclude_client_id,
+        )
+        return self.bot_manager.validate_display_name(
+            value,
+            exclude_seat_index=exclude_pending_seat_index,
+        )
 
     def _remove_participant(self, client_id: str) -> None:
         logger.debug(

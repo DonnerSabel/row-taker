@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from row_taker.engine.lobby.state import LobbyState
 from row_taker.server.bot_process_handle import BotProcessHandle
+from row_taker.server.errors import ClientRequestRejected
 from row_taker.server.server_handle import ServerHandle
 
 logger = logging.getLogger("row_taker.server.local_bots")
@@ -36,9 +37,13 @@ class LocalBotManager:
     _running_by_client_id: dict[str, BotProcessHandle] = field(default_factory=dict)
 
     def reserve(self, seat_index: int, display_name: str) -> PendingBotSpec:
+        value = self.validate_display_name(
+            display_name,
+            exclude_seat_index=seat_index,
+        )
         spec = PendingBotSpec(
             seat_index=seat_index,
-            display_name=display_name,
+            display_name=value,
             seed=self.rng.randrange(2**63),
         )
         self._pending_by_seat[seat_index] = spec
@@ -50,12 +55,21 @@ class LocalBotManager:
     def pending_display_names(self) -> dict[int, str]:
         return {seat_index: spec.display_name for seat_index, spec in self._pending_by_seat.items()}
 
-    def normalize_pending_display_name(self, display_name: str) -> str:
+    def validate_display_name(
+        self,
+        display_name: str,
+        *,
+        exclude_seat_index: int | None = None,
+    ) -> str:
         value = display_name.strip()
+        if not value:
+            raise ClientRequestRejected("display name must not be empty")
         normalized = value.casefold()
-        for spec in self._pending_by_seat.values():
-            if spec.display_name.casefold() == normalized:
-                return spec.display_name
+        for seat_index, spec in self._pending_by_seat.items():
+            if exclude_seat_index is not None and seat_index == exclude_seat_index:
+                continue
+            if spec.display_name.strip().casefold() == normalized:
+                raise ClientRequestRejected(f"duplicate participant display name: {value!r}")
         return value
 
     def can_complete_lobby(self, lobby_state: LobbyState) -> bool:

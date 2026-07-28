@@ -37,10 +37,6 @@ def build_view(state: ClientState) -> ScreenView:
     return ScreenView(body=body, prompt=determine_prompt(state))
 
 
-def get_prompt(state: ClientState) -> str | None:
-    return build_view(state).prompt
-
-
 def render_screen(state: ClientState) -> str:
     return build_view(state).body
 

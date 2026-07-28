@@ -48,22 +48,6 @@ class AnimationClock:
     ) -> int:
         return round(self.pulse(period_frames=period_frames, low=0, high=max_pixels))
 
-    def pulsed_color(
-        self,
-        base: pygame.Color,
-        highlight: pygame.Color,
-        *,
-        period_frames: int = 60,
-        strength_low: float = 0.25,
-        strength_high: float = 0.75,
-    ) -> pygame.Color:
-        strength = self.pulse(
-            period_frames=period_frames,
-            low=strength_low,
-            high=strength_high,
-        )
-        return base.lerp(highlight, strength)
-
     def progress(self, *, duration_frames: int = 36) -> float:
         """Return a one-shot progress value from 0.0 to 1.0.
 
@@ -74,10 +58,6 @@ class AnimationClock:
 
         duration = max(1, duration_frames)
         return max(0.0, min(1.0, self.elapsed_frames / duration))
-
-    def ease_out_cubic(self, *, duration_frames: int = 36) -> float:
-        progress = self.progress(duration_frames=duration_frames)
-        return 1.0 - (1.0 - progress) ** 3
 
 
 def lerp_rect(start: pygame.Rect, end: pygame.Rect, progress: float) -> pygame.Rect:
