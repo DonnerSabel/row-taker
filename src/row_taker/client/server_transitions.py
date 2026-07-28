@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from row_taker.client.core_state import PendingAction
 from row_taker.client.presentation_queue import append_pending_presentation_steps
+from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import (
     ClientState,
     UiMessage,
@@ -68,7 +69,7 @@ def update_public_game_state(state: ClientState, message: StateUpdated) -> Clien
 
 def reveal_cards(state: ClientState, message: CardsRevealed) -> ClientState:
     presentation_state = None
-    queued_steps = ()
+    queued_steps: tuple[PresentationStep, ...] = ()
     if state.public_state is not None:
         presentation_state = start_trick_presentation(state.public_state, message)
         queued_steps = presentation_state.presentation_steps
@@ -83,7 +84,7 @@ def reveal_cards(state: ClientState, message: CardsRevealed) -> ClientState:
 
 def commit_row_choice(state: ClientState, message: RowChoiceCommitted) -> ClientState:
     presentation_state = state.trick_presentation_state
-    new_steps = ()
+    new_steps: tuple[PresentationStep, ...] = ()
     if presentation_state is not None and presentation_state.pending_row_choice is not None:
         previous_count = len(presentation_state.presentation_steps)
         presentation_state = apply_trick_row_choice(presentation_state, message.row_id)

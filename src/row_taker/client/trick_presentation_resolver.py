@@ -14,7 +14,7 @@ from row_taker.client.presentation_builder import (
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.client.presentation_steps import PresentationStep
 from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import RowID
+from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game.phases import StepAction
 from row_taker.engine.game.public_state_ops import apply_resolution_step
 from row_taker.engine.game.rules import place_card, take_row, target_row_index
@@ -111,7 +111,7 @@ def _advance_until_blocked(state: TrickPresentationState) -> TrickPresentationSt
         player_names = _player_names_for_state(current.shadow_state)
 
         if row_index is None:
-            event = build_presentation_row_choice_required(
+            row_choice_required_event = build_presentation_row_choice_required(
                 player_id=play.player_id,
                 player_names=player_names,
                 card_value=card.value,
@@ -122,7 +122,12 @@ def _advance_until_blocked(state: TrickPresentationState) -> TrickPresentationSt
                 pending_row_choice=play,
                 resolution_steps=current.resolution_steps,
                 presentation_steps=current.presentation_steps
-                + (_unchanged_presentation_step(event, current.shadow_state),),
+                + (
+                    _unchanged_presentation_step(
+                        row_choice_required_event,
+                        current.shadow_state,
+                    ),
+                ),
             )
 
         row = current.shadow_state.rows[row_index]
@@ -145,8 +150,9 @@ def _advance_until_blocked(state: TrickPresentationState) -> TrickPresentationSt
             new_row_cards=next_row_cards,
         )
         next_shadow_state = apply_resolution_step(current.shadow_state, resolution_step)
+        presentation_event: PresentationEvent
         if taken is None:
-            event: PresentationEvent = build_presentation_card_placed(
+            presentation_event = build_presentation_card_placed(
                 player_id=play.player_id,
                 player_names=player_names,
                 card_value=card.value,
@@ -154,7 +160,7 @@ def _advance_until_blocked(state: TrickPresentationState) -> TrickPresentationSt
                 row_cards_after=tuple(item.value for item in next_row_cards),
             )
         else:
-            event = build_presentation_overflow_resolved(
+            presentation_event = build_presentation_overflow_resolved(
                 player_id=play.player_id,
                 player_names=player_names,
                 row_id=row.row_id,
@@ -169,17 +175,28 @@ def _advance_until_blocked(state: TrickPresentationState) -> TrickPresentationSt
             pending_row_choice=None,
             resolution_steps=current.resolution_steps + (resolution_step,),
             presentation_steps=current.presentation_steps
-            + (_changed_presentation_step(event, current.shadow_state, next_shadow_state),),
+            + (
+                _changed_presentation_step(
+                    presentation_event,
+                    current.shadow_state,
+                    next_shadow_state,
+                ),
+            ),
         )
     if current.pending_row_choice is None and not current.remaining_plays:
-        event = build_presentation_trick_finished()
+        trick_finished_event = build_presentation_trick_finished()
         return TrickPresentationState(
             shadow_state=current.shadow_state,
             remaining_plays=current.remaining_plays,
             pending_row_choice=None,
             resolution_steps=current.resolution_steps,
             presentation_steps=current.presentation_steps
-            + (_unchanged_presentation_step(event, current.shadow_state),),
+            + (
+                _unchanged_presentation_step(
+                    trick_finished_event,
+                    current.shadow_state,
+                ),
+            ),
         )
     return current
 
@@ -212,5 +229,5 @@ def _clone_public_state(public_state: PublicState) -> PublicState:
     return EnginePublicState.from_public_state(public_state).to_public_state()
 
 
-def _player_names_for_state(public_state: PublicState) -> dict[str, str]:
+def _player_names_for_state(public_state: PublicState) -> dict[PlayerID, str]:
     return {player.player_id: player.name for player in public_state.players}

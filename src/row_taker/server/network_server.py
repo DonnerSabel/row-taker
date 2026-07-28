@@ -227,21 +227,24 @@ def run_network_server(
         )
         local_server = LocalServer(rng=rng, seat_count=seat_count, server_handle=server_handle)
         network_server = NetworkServer(server=local_server)
-        while True:
-            if network_server.should_shutdown():
-                logger.info(
-                    "session ended and no participants connected anymore; server shutting down"
+        try:
+            while True:
+                if network_server.should_shutdown():
+                    logger.info(
+                        "session ended and no participants connected anymore; server shutting down"
+                    )
+                    break
+                try:
+                    conn, addr = listener.accept()
+                except TimeoutError:
+                    continue
+                thread = threading.Thread(
+                    target=_serve_connection,
+                    args=(conn, network_server, _format_endpoint(addr)),
+                    daemon=True,
                 )
-                break
-            try:
-                conn, addr = listener.accept()
-            except TimeoutError:
-                continue
-            thread = threading.Thread(
-                target=_serve_connection,
-                args=(conn, network_server, _format_endpoint(addr)),
-                daemon=True,
-            )
-            thread.start()
+                thread.start()
+        finally:
+            local_server.close()
 
         logger.info("network server main loop finished")

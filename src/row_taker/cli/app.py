@@ -28,7 +28,7 @@ class CliApp:
         own_client_id: str | None = None,
         *,
         interactive: bool = True,
-        console_factory: type[CliConsole] = CliConsole,
+        console_factory: Callable[[], CliConsole] = CliConsole,
         initial_state_factory: Callable[[str | None], ClientState] = initial_client_state,
     ) -> None:
         self.transport = transport

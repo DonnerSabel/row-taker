@@ -10,6 +10,7 @@ from row_taker.protocol.codec import (
 )
 from row_taker.protocol.errors import MessageDecodeError, MessageEncodeError
 from row_taker.protocol.messages import ClientToServerMessage, ServerToClientMessage
+from row_taker.serialization.json_values import require_object
 
 
 def encode_client_message(message: ClientToServerMessage) -> bytes:
@@ -22,9 +23,8 @@ def encode_client_message(message: ClientToServerMessage) -> bytes:
 
 def decode_client_message(data: bytes) -> ClientToServerMessage:
     try:
-        payload = json.loads(data.decode("utf-8"))
-        if not isinstance(payload, dict):
-            raise TypeError(f"client payload must decode to dict, got {type(payload)!r}")
+        raw_payload: object = json.loads(data.decode("utf-8"))
+        payload = require_object(raw_payload, context="client payload")
         return client_message_from_dict(payload)
     except MessageDecodeError:
         raise
@@ -42,9 +42,8 @@ def encode_server_message(message: ServerToClientMessage) -> bytes:
 
 def decode_server_message(data: bytes) -> ServerToClientMessage:
     try:
-        payload = json.loads(data.decode("utf-8"))
-        if not isinstance(payload, dict):
-            raise TypeError(f"server payload must decode to dict, got {type(payload)!r}")
+        raw_payload: object = json.loads(data.decode("utf-8"))
+        payload = require_object(raw_payload, context="server payload")
         return server_message_from_dict(payload)
     except MessageDecodeError:
         raise

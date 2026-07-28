@@ -62,6 +62,11 @@ class LocalServer:
         self.lobby_state = LobbyState(seat_count=self.seat_count)
         self.bot_manager = LocalBotManager(rng=self.rng)
 
+    def close(self) -> None:
+        """Release all local child processes owned by this server."""
+
+        self.bot_manager.close_all()
+
     @property
     def active_match(self) -> MatchHub | None:
         return self.match_router.active_match

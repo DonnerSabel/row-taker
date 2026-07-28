@@ -97,24 +97,28 @@ def _handle_left_click(
     state: ClientState,
     lobby_targets: LobbyScreenTargets,
 ) -> ScreenResult:
-    for target in lobby_targets.seat_targets:
-        if target.rect.collidepoint(position):
-            seat = _seat_by_index(state, target.seat_index)
+    for seat_target in lobby_targets.seat_targets:
+        if seat_target.rect.collidepoint(position):
+            seat = _seat_by_index(state, seat_target.seat_index)
             if seat is not None and seat.occupant_kind == ParticipantKind.BOT:
                 return ScreenResult(
                     next_state=_enter_bot_name_editor(
-                        state, target.seat_index, seat.occupant_display_name
+                        state,
+                        seat_target.seat_index,
+                        seat.occupant_display_name,
                     )
                 )
             return ScreenResult(
                 next_state=enter_lobby_submenu(
-                    state, "seat_edit", selected_seat_index=target.seat_index
+                    state,
+                    "seat_edit",
+                    selected_seat_index=seat_target.seat_index,
                 )
             )
 
-    for target in lobby_targets.button_targets:
-        if target.rect.collidepoint(position):
-            return _map_lobby_button(target.button_id, state)
+    for button_target in lobby_targets.button_targets:
+        if button_target.rect.collidepoint(position):
+            return _map_lobby_button(button_target.button_id, state)
 
     return NO_SCREEN_RESULT
 

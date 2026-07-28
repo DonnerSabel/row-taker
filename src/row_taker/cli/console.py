@@ -13,7 +13,7 @@ class InputAborted(Exception):
 
 class CliConsole:
     def __init__(self) -> None:
-        self._session = PromptSession()
+        self._session: PromptSession[str] = PromptSession()
         self._screen = ""
         self._prompt: str | None = None
         self._render_lock = asyncio.Lock()
@@ -34,7 +34,10 @@ class CliConsole:
         self._input_active = True
         try:
             try:
-                return await self._session.prompt_async(self._prompt)
+                value: object = await self._session.prompt_async(self._prompt)
+                if not isinstance(value, str):
+                    raise TypeError("prompt session returned a non-string value")
+                return value
             except KeyboardInterrupt as exc:
                 raise InputAborted() from exc
         finally:

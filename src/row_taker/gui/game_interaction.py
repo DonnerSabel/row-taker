@@ -107,13 +107,15 @@ def _handle_left_click(
     game_targets: GameScreenTargets,
 ) -> ScreenResult:
     # Hand cards overlap. Check front-to-back.
-    for target in reversed(game_targets.card_targets):
-        if target.contains_point(position):
-            return ScreenResult(client_action=ClientActionChooseCard(card_value=target.card_value))
+    for card_target in reversed(game_targets.card_targets):
+        if card_target.contains_point(position):
+            return ScreenResult(
+                client_action=ClientActionChooseCard(card_value=card_target.card_value)
+            )
 
-    for target in game_targets.row_targets:
-        if target.rect.collidepoint(position):
-            return ScreenResult(client_action=ClientActionChooseRow(row_id=target.row_id))
+    for row_target in game_targets.row_targets:
+        if row_target.rect.collidepoint(position):
+            return ScreenResult(client_action=ClientActionChooseRow(row_id=row_target.row_id))
 
     return NO_SCREEN_RESULT
 

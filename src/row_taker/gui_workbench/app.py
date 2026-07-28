@@ -215,9 +215,13 @@ class WorkbenchApp:
 
         self._timeline = timeline
         self._timeline_step_index = 0
-        self._scenarios: tuple[WorkbenchScenario, ...] = (
-            (scenario,) if scenario is not None else timeline.steps
-        )
+        self._scenarios: tuple[WorkbenchScenario, ...]
+        if scenario is not None:
+            self._scenarios = (scenario,)
+        else:
+            if timeline is None:
+                raise RuntimeError("timeline unexpectedly missing")
+            self._scenarios = timeline.steps
         initial_scenario = self._scenarios[0]
         self._initial_size = initial_scenario.default_size if size is None else size
         self._presentation_elapsed_frames = presentation_elapsed_frames

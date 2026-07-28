@@ -12,6 +12,7 @@ from row_taker.gui.connect_form_state import ConnectFormState
 from row_taker.gui.layout import (
     MIN_WINDOW_HEIGHT,
     MIN_WINDOW_WIDTH,
+    GuiLayout,
     compute_layout,
 )
 from row_taker.gui.live_client import LiveGuiClient
@@ -212,7 +213,7 @@ class GuiApp:
         self._presentation_step = step
         self._presentation_elapsed_frames = 0
 
-    def _current_layout(self):
+    def _current_layout(self) -> GuiLayout:
         if self._screen is None:
             raise RuntimeError("GuiApp not initialized")
         return compute_layout(*self._screen.get_size())

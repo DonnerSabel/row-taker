@@ -20,7 +20,7 @@ from row_taker.gui.menu_shell import (
 )
 from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui.theme import DEFAULT_THEME
-from row_taker.gui.widgets import draw_button, draw_panel
+from row_taker.gui.widgets import ButtonVariant, draw_button, draw_panel
 from row_taker.participants import ParticipantKind
 from row_taker.protocol.messages import LobbyParticipantView, LobbySeatView
 
@@ -139,7 +139,7 @@ def _draw_action_buttons(
 ) -> None:
     for target in targets.button_targets:
         hovered = target.rect.collidepoint(mouse_pos)
-        variant = "success" if target.button_id == "start_game" else "neutral"
+        variant: ButtonVariant = "success" if target.button_id == "start_game" else "neutral"
         if target.button_id == "create_bot":
             variant = "primary"
         draw_button(

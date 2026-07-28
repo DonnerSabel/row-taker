@@ -47,10 +47,8 @@ def test_mypy_is_part_of_dev_checks_and_has_explicit_scope() -> None:
     assert any(dependency.startswith("mypy") for dependency in dev_dependencies)
 
     mypy_config = config["tool"]["mypy"]
-    checked_files = set(mypy_config["files"])
-    assert "src/row_taker/client/actions.py" in checked_files
-    assert "src/row_taker/protocol/transport.py" in checked_files
-    assert "src/row_taker/server/network_server.py" in checked_files
+    assert mypy_config["files"] == ["src/row_taker"]
+    assert mypy_config["disallow_any_generics"] is True
     assert mypy_config["disallow_untyped_defs"] is True
     assert mypy_config["warn_unused_ignores"] is True
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TypeGuard
 
 from row_taker.engine.game import GameState, PlayerID, PlayerState, PublicState, RowID
 from row_taker.participants import ParticipantKind
@@ -197,29 +198,35 @@ ServerToClientMessage = (
 )
 
 GameClientMessage = SubmitCard | SubmitRowChoice
-GameServerMessage = (
+RevisionedGameServerMessage = (
     StateUpdated
     | CardsRevealed
     | RowChoiceCommitted
     | ChooseCardRequested
     | ChooseRowRequested
     | DebugStateSnapshot
-    | SessionEnded
-    | ServerError
 )
+TerminalGameServerMessage = SessionEnded | ServerError
+GameServerMessage = RevisionedGameServerMessage | TerminalGameServerMessage
 
 
-def get_game_message_revision(message: GameServerMessage) -> int | None:
-    if isinstance(message, StateUpdated):
-        return message.revision
-    if isinstance(message, CardsRevealed):
-        return message.revision
-    if isinstance(message, RowChoiceCommitted):
-        return message.revision
-    if isinstance(message, ChooseCardRequested):
-        return message.revision
-    if isinstance(message, ChooseRowRequested):
-        return message.revision
-    if isinstance(message, DebugStateSnapshot):
+def is_revisioned_game_message(
+    message: ServerToClientMessage,
+) -> TypeGuard[RevisionedGameServerMessage]:
+    return isinstance(
+        message,
+        (
+            StateUpdated,
+            CardsRevealed,
+            RowChoiceCommitted,
+            ChooseCardRequested,
+            ChooseRowRequested,
+            DebugStateSnapshot,
+        ),
+    )
+
+
+def get_game_message_revision(message: ServerToClientMessage) -> int | None:
+    if is_revisioned_game_message(message):
         return message.revision
     return None

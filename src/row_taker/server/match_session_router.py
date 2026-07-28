@@ -12,13 +12,18 @@ from row_taker.engine.game.player_state_ops import (
 from row_taker.engine.game.state import GameState, PublicState
 from row_taker.hub.match_hub import MatchHub
 from row_taker.protocol.messages import (
+    CardsRevealed,
     ChooseCardRequested,
     ChooseRowRequested,
     GameServerMessage,
+    RevisionedGameServerMessage,
+    RowChoiceCommitted,
     SessionEnded,
     SessionEndReason,
+    StateUpdated,
     SubmitCard,
     SubmitRowChoice,
+    is_revisioned_game_message,
 )
 from row_taker.server.errors import ClientRequestRejected
 from row_taker.server.match_participants import MatchParticipants
@@ -147,30 +152,47 @@ class MatchSessionRouter:
                 self._route_match_message(message)
 
     def _route_match_message(self, message: GameServerMessage) -> None:
-        stamped_message = self._stamp_game_message_revision(message)
-        if isinstance(stamped_message, ChooseCardRequested | ChooseRowRequested):
-            target_client_id = self.player_to_client_id[stamped_message.player_id]
+        routed_message: GameServerMessage
+        if is_revisioned_game_message(message):
+            routed_message = self._stamp_game_message_revision(message)
+        else:
+            routed_message = message
+        if isinstance(routed_message, ChooseCardRequested | ChooseRowRequested):
+            target_client_id = self.player_to_client_id[routed_message.player_id]
             logger.debug(
                 "route match message: type=%s revision=%s target_client_id=%s",
-                type(stamped_message).__name__,
-                stamped_message.revision,
+                type(routed_message).__name__,
+                routed_message.revision,
                 target_client_id,
             )
             self._outbox.append(
                 OutgoingEnvelope(
-                    message=stamped_message,
+                    message=routed_message,
                     target_client_id=target_client_id,
                 )
             )
             return
+        revision = routed_message.revision if is_revisioned_game_message(routed_message) else None
         logger.debug(
             "route broadcast match message: type=%s revision=%s",
-            type(stamped_message).__name__,
-            stamped_message.revision,
+            type(routed_message).__name__,
+            revision,
         )
-        self._outbox.append(OutgoingEnvelope(message=stamped_message))
+        self._outbox.append(OutgoingEnvelope(message=routed_message))
 
-    def _stamp_game_message_revision(self, message: GameServerMessage) -> GameServerMessage:
+    def _stamp_game_message_revision(
+        self, message: RevisionedGameServerMessage
+    ) -> RevisionedGameServerMessage:
         revision = self._next_game_revision
         self._next_game_revision += 1
+        if isinstance(message, StateUpdated):
+            return replace(message, revision=revision)
+        if isinstance(message, CardsRevealed):
+            return replace(message, revision=revision)
+        if isinstance(message, RowChoiceCommitted):
+            return replace(message, revision=revision)
+        if isinstance(message, ChooseCardRequested):
+            return replace(message, revision=revision)
+        if isinstance(message, ChooseRowRequested):
+            return replace(message, revision=revision)
         return replace(message, revision=revision)

@@ -237,9 +237,11 @@ def _build_status(
         game_line = f"Runde {public_state.round_no} · Stich {public_state.trick_no}"
 
     flash = state.flash_message
+    message_line: str | None
+    message_level: MessageLevel
     if flash is not None:
         message_line = flash.text
-        message_level: MessageLevel = flash.level
+        message_level = flash.level
     elif state.session_error is not None:
         message_line = state.session_error
         message_level = "error"

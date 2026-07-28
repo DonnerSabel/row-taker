@@ -229,7 +229,7 @@ def build_card_placed_visual_step(
         )
         if player_id == state.own_player_id
     )
-    row_emphasis = {event.row_id: "placed"}
+    row_emphasis: dict[RowID, RowEmphasis] = {event.row_id: "placed"}
 
     after = build_stable_game_visual_state(
         state,

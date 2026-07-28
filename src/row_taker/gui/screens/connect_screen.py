@@ -219,17 +219,17 @@ def handle_connect_event(
             return ScreenResult(next_connect_form=next_form)
 
     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and connect_targets is not None:
-        for target in connect_targets.field_targets:
-            if target.rect.collidepoint(event.pos):
+        for field_target in connect_targets.field_targets:
+            if field_target.rect.collidepoint(event.pos):
                 return ScreenResult(
-                    next_connect_form=activate_field(connect_form, target.field_name)
+                    next_connect_form=activate_field(connect_form, field_target.field_name)
                 )
-        for target in connect_targets.button_targets:
-            if not target.rect.collidepoint(event.pos):
+        for button_target in connect_targets.button_targets:
+            if not button_target.rect.collidepoint(event.pos):
                 continue
-            if target.button_id == "connect":
+            if button_target.button_id == "connect":
                 return ScreenResult(connect_requested=True)
-            if target.button_id == "quit":
+            if button_target.button_id == "quit":
                 return ScreenResult(request_quit=True)
 
     return NO_SCREEN_RESULT
@@ -320,14 +320,14 @@ def _draw_connect_panel(
             line_gap=4,
         )
 
-    for target in targets.button_targets:
-        hovered = target.rect.collidepoint(mouse_pos)
+    for button_target in targets.button_targets:
+        hovered = button_target.rect.collidepoint(mouse_pos)
         draw_button(
             screen,
             drawer,
-            target.rect,
-            target.label,
-            variant="success" if target.button_id == "connect" else "neutral",
+            button_target.rect,
+            button_target.label,
+            variant="success" if button_target.button_id == "connect" else "neutral",
             hovered=hovered,
             theme=THEME,
         )

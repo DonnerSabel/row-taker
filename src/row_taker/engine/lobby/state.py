@@ -29,16 +29,6 @@ class LobbyState:
         elif len(self.seats) != self.seat_count:
             raise ValueError("len(seats) must equal seat_count")
 
-    @property
-    def is_configured(self) -> bool:
-        return True
-
-    def seat_for_client(self, client_id: str) -> LobbySeat | None:
-        for seat in self.seats:
-            if seat.occupant_client_id == client_id:
-                return seat
-        return None
-
     def occupant_client_id_for_seat(self, seat_index: int) -> str | None:
         return self.seats[seat_index].occupant_client_id
 
