@@ -143,18 +143,15 @@ def _draw_moving_card(
 def draw_presentation_panel(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
-    geometry: BoardGeometry,
+    rect: pygame.Rect,
     panel: VisualPresentationPanel,
     animation_clock: AnimationClock,
+    *,
+    reserved_bottom: int = 0,
 ) -> None:
-    """Draw the text-only panel for the current presentation step."""
+    """Draw the text-only panel in the prepared sidebar rectangle."""
 
-    events_rect = pygame.Rect(
-        geometry.stats_rect.left,
-        geometry.stats_rect.bottom - 174,
-        geometry.stats_rect.width,
-        128,
-    )
+    events_rect = rect
     _draw_overlay_box(screen, events_rect)
     _draw_presentation_accent(screen, events_rect, animation_clock)
 
@@ -177,7 +174,7 @@ def draw_presentation_panel(
             events_rect.left + 12,
             text_top,
             events_rect.width - 24,
-            events_rect.bottom - text_top - 6,
+            max(1, events_rect.bottom - text_top - 6 - reserved_bottom),
         )
         drawer.draw_wrapped_lines(
             screen,

@@ -122,6 +122,7 @@ def draw_own_player_tile(
         player_name=player.name,
         score=player.score,
         active=active,
+        status_line=visual_state.status.action_line,
     )
 
 
@@ -171,9 +172,11 @@ def _draw_player_tile_text(
     player_name: str,
     score: int,
     active: bool,
+    status_line: str | None = None,
 ) -> None:
     name_role = "small"
     score_role = "tiny"
+    status_role = "tiny"
     name = _fit_text_to_width(
         drawer,
         player_name,
@@ -181,15 +184,24 @@ def _draw_player_tile_text(
         role=name_role,
     )
     score_text = f"{score} Hornochsen"
+    fitted_status = (
+        _fit_text_to_width(
+            drawer,
+            status_line,
+            max_width=info_rect.width,
+            role=status_role,
+        )
+        if status_line is not None
+        else None
+    )
 
     name_font = drawer._font_for_role(name_role)
     score_font = drawer._font_for_role(score_role)
+    status_font = drawer._font_for_role(status_role)
     line_gap = 3
-    content_height = (
-        name_font.get_linesize()
-        + line_gap
-        + score_font.get_linesize()
-    )
+    content_height = name_font.get_linesize() + line_gap + score_font.get_linesize()
+    if fitted_status:
+        content_height += line_gap + status_font.get_linesize()
     top = info_rect.centery - content_height // 2
 
     drawer.draw_text(
@@ -199,13 +211,22 @@ def _draw_player_tile_text(
         role=name_role,
         color=PALETTE.accent_hover if active else PALETTE.text_primary,
     )
+    score_top = top + name_font.get_linesize() + line_gap
     drawer.draw_text(
         screen,
         score_text,
-        (info_rect.left, top + name_font.get_linesize() + line_gap),
+        (info_rect.left, score_top),
         role=score_role,
         color=PALETTE.gold,
     )
+    if fitted_status:
+        drawer.draw_text(
+            screen,
+            fitted_status,
+            (info_rect.left, score_top + score_font.get_linesize() + line_gap),
+            role=status_role,
+            color=PALETTE.accent,
+        )
 
 
 def _fit_text_to_width(
@@ -269,22 +290,6 @@ def draw_hand(
             hovered=hovered,
         ).draw(screen, drawer=drawer, assets=assets)
 
-    if visual_state.status.hand_prompt is not None and placements:
-        pending_rect = pygame.Rect(
-            24,
-            max(60, placements[0].rect.top - 42),
-            270,
-            34,
-        )
-        _draw_overlay_box(screen, pending_rect)
-        drawer.draw_text(
-            screen,
-            visual_state.status.hand_prompt,
-            (pending_rect.left + 10, pending_rect.top + 8),
-            role="small",
-            color=PALETTE.accent,
-        )
-
 
 
 def draw_status_overlay(
@@ -295,43 +300,88 @@ def draw_status_overlay(
     game_targets: GameScreenTargets,
     animation_clock: AnimationClock,
 ) -> None:
-    """Draw status text, presentation panel, and continue interaction."""
+    """Draw global status and presentation text inside the new sidebar."""
 
-    _draw_overlay_box(screen, geometry.overlay_rect)
+    _draw_sidebar_header(screen, drawer, geometry, visual_state)
 
-    drawer.draw_text(
-        screen,
-        visual_state.status.primary_line,
-        (geometry.overlay_rect.left + 10, geometry.overlay_rect.top + 8),
-        role="small",
-    )
-    drawer.draw_text(
-        screen,
-        visual_state.status.secondary_line,
-        (geometry.overlay_rect.left + 10, geometry.overlay_rect.top + 30),
-        role="tiny",
-        color=_status_message_color(visual_state.status.message_level),
-    )
-
+    continue_target = game_targets.continue_target
+    reserved_bottom = 46 if continue_target is not None else 0
     if visual_state.presentation_panel is not None:
         draw_presentation_panel(
             screen,
             drawer,
-            geometry,
+            geometry.presentation_rect,
             visual_state.presentation_panel,
             animation_clock,
+            reserved_bottom=reserved_bottom,
+        )
+    else:
+        _draw_sidebar_message(
+            screen,
+            drawer,
+            geometry.presentation_rect,
+            visual_state.status.message_line,
+            visual_state.status.message_level,
+            reserved_bottom=reserved_bottom,
         )
 
-    if game_targets.continue_target is not None:
+    if continue_target is not None:
         draw_button(
             screen,
             drawer,
-            game_targets.continue_target.rect,
+            continue_target.rect,
             "Weiter [Leertaste]",
             variant="primary",
-            hovered=game_targets.continue_target.hovered,
+            hovered=continue_target.hovered,
             theme=THEME,
         )
+
+
+def _draw_sidebar_header(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
+    geometry: BoardGeometry,
+    visual_state: GameVisualState,
+) -> None:
+    rect = geometry.sidebar_header_rect
+    _draw_overlay_box(screen, rect)
+    font = drawer._font_for_role("small")
+    text_y = rect.centery - font.get_linesize() // 2
+    drawer.draw_text(
+        screen,
+        visual_state.status.game_line,
+        (rect.left + 12, text_y),
+        role="small",
+        color=PALETTE.text_primary,
+    )
+
+
+def _draw_sidebar_message(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
+    rect: pygame.Rect,
+    message: str | None,
+    level: MessageLevel,
+    *,
+    reserved_bottom: int,
+) -> None:
+    _draw_overlay_box(screen, rect)
+    if not message:
+        return
+
+    content_rect = pygame.Rect(
+        rect.left + 12,
+        rect.top + 10,
+        max(1, rect.width - 24),
+        max(1, rect.height - 20 - reserved_bottom),
+    )
+    drawer.draw_wrapped_lines(
+        screen,
+        (message,),
+        content_rect,
+        role="tiny",
+        color=_status_message_color(level),
+    )
 
 
 def _status_message_color(level: MessageLevel) -> pygame.Color:

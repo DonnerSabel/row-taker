@@ -78,7 +78,6 @@ def build_stable_game_visual_state(
     status = _build_status(
         state,
         public_state=public_state,
-        players=players,
         last_action_summary=last_action_summary,
     )
     visual_state = GameVisualState(
@@ -239,27 +238,46 @@ def _build_status(
     state: ClientState,
     *,
     public_state: PublicState | None,
-    players: tuple[VisualPlayer, ...],
     last_action_summary: str,
 ) -> VisualStatus:
-    own_player = next((player for player in players if player.is_self), None)
-    player_name = own_player.name if own_player is not None else "-"
-    phase = public_state.phase_info.phase.value if public_state is not None else "-"
-    primary_line = (
-        f"{player_name}  |  Phase: {phase}  |  Aktion: {state.pending_action.value}"
-    )
+    if public_state is None:
+        game_line = "Spielstatus"
+    else:
+        game_line = f"Runde {public_state.round_no} · Stich {public_state.trick_no}"
 
     flash = state.flash_message
-    secondary_line = flash.text if flash is not None else last_action_summary
+    message_line = flash.text if flash is not None else last_action_summary
     message_level = flash.level if flash is not None else "normal"
 
-    hand_prompt = None
-    if public_state is not None and public_state.phase_info.pending_card is not None:
-        hand_prompt = f"Reihe für Karte {public_state.phase_info.pending_card.value} wählen"
-
     return VisualStatus(
-        primary_line=primary_line,
-        secondary_line=secondary_line,
+        game_line=game_line,
+        action_line=_status_action_line(state, public_state),
+        message_line=message_line or None,
         message_level=message_level,
-        hand_prompt=hand_prompt,
     )
+
+
+def _status_action_line(
+    state: ClientState,
+    public_state: PublicState | None,
+) -> str | None:
+    if state.pending_presentation_steps:
+        return "Präsentation läuft"
+
+    if state.pending_action == PendingAction.CHOOSE_CARD:
+        return "Karte auswählen"
+
+    if state.pending_action == PendingAction.CHOOSE_ROW:
+        pending_card = (
+            public_state.phase_info.pending_card
+            if public_state is not None
+            else None
+        )
+        if pending_card is not None:
+            return f"Reihe für Karte {pending_card.value} wählen"
+        return "Reihe auswählen"
+
+    if state.pending_action == PendingAction.NONE:
+        return "Warte auf die anderen Spieler"
+
+    return None

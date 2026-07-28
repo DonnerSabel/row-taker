@@ -203,9 +203,9 @@ def _build_continue_target(
         return None
 
     rect = pygame.Rect(
-        geometry.stats_rect.left + 12,
-        geometry.stats_rect.bottom - 46,
-        max(1, geometry.stats_rect.width - 24),
+        geometry.presentation_rect.left + 10,
+        geometry.presentation_rect.bottom - 42,
+        max(1, geometry.presentation_rect.width - 20),
         34,
     )
     return ContinueTarget(rect=rect, hovered=rect.collidepoint(mouse_pos))

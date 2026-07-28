@@ -99,7 +99,7 @@ def test_choose_card_interaction_contains_only_visible_hand_cards() -> None:
     assert visual_state.interaction.can_advance_presentation is False
 
 
-def test_choose_row_interaction_and_prompt_come_from_client_semantics() -> None:
+def test_choose_row_interaction_and_action_line_come_from_client_semantics() -> None:
     state = get_scenario("choose-row").state
     visual_state = build_game_visual_state(state, last_action_summary="test")
 
@@ -107,7 +107,7 @@ def test_choose_row_interaction_and_prompt_come_from_client_semantics() -> None:
     assert visual_state.interaction.selectable_row_ids == frozenset(
         row.row_id for row in state.public_state.rows
     )
-    assert visual_state.status.hand_prompt == "Reihe für Karte 7 wählen"
+    assert visual_state.status.action_line == "Reihe für Karte 7 wählen"
 
 
 def test_presentation_interaction_suppresses_game_choices() -> None:
@@ -118,6 +118,7 @@ def test_presentation_interaction_suppresses_game_choices() -> None:
     assert visual_state.interaction.selectable_card_values == frozenset()
     assert visual_state.interaction.selectable_row_ids == frozenset()
     assert visual_state.interaction.can_advance_presentation is True
+    assert visual_state.status.action_line == "Präsentation läuft"
 
 
 def test_status_text_and_message_level_are_built_before_rendering() -> None:
@@ -134,10 +135,9 @@ def test_status_text_and_message_level_are_built_before_rendering() -> None:
         last_action_summary="wird durch Flash ersetzt",
     )
 
-    assert "Ada" in visual_state.status.primary_line
-    assert f"Phase: {Phase.CHOOSE_CARD.value}" in visual_state.status.primary_line
-    assert "Aktion: choose_card" in visual_state.status.primary_line
-    assert visual_state.status.secondary_line == "Ungültige Karte"
+    assert visual_state.status.game_line == "Runde 2 · Stich 4"
+    assert visual_state.status.action_line == "Karte auswählen"
+    assert visual_state.status.message_line == "Ungültige Karte"
     assert visual_state.status.message_level == "error"
 
 
@@ -160,7 +160,10 @@ def test_stable_builder_uses_supplied_public_state_without_changing_hand() -> No
     )
 
     assert tuple(row.row_id for row in visual_state.rows) == (RowID("override"),)
-    assert visual_state.status.primary_line.find("reveal_and_resolve") >= 0
+    assert visual_state.status.game_line == (
+        f"Runde {override.round_no} · Stich {override.trick_no}"
+    )
+    assert visual_state.status.action_line == "Karte auswählen"
     assert len(visual_state.hand) == len(state.player_state.hand)
 
 

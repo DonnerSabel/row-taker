@@ -57,10 +57,10 @@ class VisualInteraction:
 
 @dataclass(frozen=True, slots=True)
 class VisualStatus:
-    primary_line: str
-    secondary_line: str
+    game_line: str
+    action_line: str | None
+    message_line: str | None
     message_level: MessageLevel = "normal"
-    hand_prompt: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

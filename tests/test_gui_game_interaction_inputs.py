@@ -8,6 +8,9 @@ pytest.importorskip("pygame")
 
 from row_taker.gui import game_interaction
 from row_taker.gui.game_interaction import GameScreenTargets, build_game_screen_targets
+from row_taker.gui.screens.game_frame import GameFrame
+from row_taker.gui_workbench.app import OFFSCREEN_MOUSE_POS, prepare_scenario_frame
+from row_taker.gui_workbench.scenarios import get_scenario
 
 
 def _replace_target_builders(monkeypatch, *, card_targets, row_targets, continue_target) -> tuple[Mock, Mock, Mock]:
@@ -70,3 +73,17 @@ def test_build_game_screen_targets_uses_explicit_mouse_without_reading_pygame(mo
     card_builder.assert_called_once_with(geometry, state, mouse_pos=mouse_pos)
     row_builder.assert_called_once_with(geometry, state, mouse_pos=mouse_pos)
     continue_builder.assert_called_once_with(geometry, state, mouse_pos=mouse_pos)
+
+def test_continue_target_stays_inside_new_presentation_region() -> None:
+    frame = prepare_scenario_frame(
+        get_scenario("cards-revealed"),
+        size=(980, 720),
+        mouse_pos=OFFSCREEN_MOUSE_POS,
+    )
+
+    assert isinstance(frame, GameFrame)
+    assert frame.targets.continue_target is not None
+    assert frame.geometry.presentation_rect.contains(
+        frame.targets.continue_target.rect
+    )
+

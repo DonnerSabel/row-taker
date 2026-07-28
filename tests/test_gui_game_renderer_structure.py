@@ -130,3 +130,18 @@ def test_player_tiles_render_visual_active_emphasis() -> None:
     assert "selected=active" in source
     assert "for active_layer in (False, True)" in source
 
+def test_status_and_presentation_use_only_new_sidebar_regions() -> None:
+    hud_source = _source("rendering/game_hud_renderer.py")
+    presentation_source = _source("presentation_renderer.py")
+    interaction_source = _source("game_interaction.py")
+
+    assert "geometry.sidebar_header_rect" in hud_source
+    assert "geometry.presentation_rect" in hud_source
+    assert "visual_state.status.action_line" in hud_source
+    assert "geometry.overlay_rect" not in hud_source
+    assert "status.primary_line" not in hud_source
+    assert "status.secondary_line" not in hud_source
+    assert "status.hand_prompt" not in hud_source
+    assert "geometry.stats_rect" not in presentation_source
+    assert "geometry.presentation_rect" in interaction_source
+
