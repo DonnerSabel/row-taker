@@ -101,3 +101,25 @@ def test_invariant_rejects_duplicate_visible_card() -> None:
 
     with pytest.raises(AssertionError, match="duplicated"):
         assert_no_visible_game_card_is_duplicated(broken)
+
+
+def test_invariant_counts_staged_card_of_own_player() -> None:
+    state = build_game_visual_state(
+        get_scenario("cards-revealed").state,
+        last_action_summary="test",
+    )
+    own_player = state.own_player
+    assert own_player is not None
+    assert own_player.staged_card_value is not None
+    broken = replace(
+        state,
+        hand=tuple(
+            replace(card, visible=True)
+            if card.card_value == own_player.staged_card_value
+            else card
+            for card in state.hand
+        ),
+    )
+
+    with pytest.raises(AssertionError, match="duplicated"):
+        assert_no_visible_game_card_is_duplicated(broken)

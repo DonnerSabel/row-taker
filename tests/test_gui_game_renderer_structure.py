@@ -32,8 +32,8 @@ def test_game_renderer_is_a_short_orchestrator() -> None:
         "draw_rows(",
         "draw_hand(",
         "draw_opponent_tiles(",
+        "draw_own_player_tile(",
         "draw_presentation_card_motion(",
-        "draw_stats_field(",
         "draw_status_overlay(",
     ):
         assert call in source
@@ -73,7 +73,7 @@ def test_sidebar_debug_frame_is_drawn_after_all_game_content() -> None:
     source = _source("rendering/game_renderer.py")
     render_body = source.split("def _draw_game_background", maxsplit=1)[0]
     assert render_body.rfind("_draw_sidebar_debug_frame(") > render_body.rfind(
-        "draw_status_overlay("
+        "draw_own_player_tile("
     )
 
 
@@ -98,3 +98,13 @@ def test_opponent_tile_names_are_fitted_to_pixel_width() -> None:
     source = _source("rendering/game_hud_renderer.py")
     assert "def _fit_text_to_width" in source
     assert "font.size(candidate)[0] <= max_width" in source
+
+
+def test_own_player_uses_dedicated_sidebar_tile_instead_of_legacy_stats_field() -> None:
+    hud_source = _source("rendering/game_hud_renderer.py")
+    renderer_source = _source("rendering/game_renderer.py")
+
+    assert "def draw_own_player_tile" in hud_source
+    assert "geometry.own_player_tile" in hud_source
+    assert "def draw_stats_field" not in hud_source
+    assert "draw_stats_field(" not in renderer_source

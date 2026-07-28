@@ -53,17 +53,7 @@ def draw_opponent_tiles(
     # Draw all tile backgrounds first. Cards are a separate layer because
     # neighbouring cards may intentionally overlap vertically.
     for _player, tile in prepared:
-        tile_rect = tile.tile_rect.inflate(-2, -4)
-        draw_panel(
-            screen,
-            tile_rect,
-            radius=8,
-            fill=PALETTE.panel_fill_soft,
-            border=PALETTE.panel_border,
-            border_width=1,
-            alpha=150,
-            theme=THEME,
-        )
+        _draw_player_tile_background(screen, tile.tile_rect)
 
     for player, tile in prepared:
         if player.staged_card_value is None:
@@ -85,6 +75,55 @@ def draw_opponent_tiles(
             player_name=player.name,
             score=player.score,
         )
+
+
+def draw_own_player_tile(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
+    geometry: BoardGeometry,
+    visual_state: GameVisualState,
+    assets: GuiAssets,
+) -> None:
+    """Draw the local player in the dedicated lower sidebar tile."""
+
+    player = visual_state.own_player
+    if player is None:
+        return
+
+    tile = geometry.own_player_tile
+    _draw_player_tile_background(screen, tile.tile_rect)
+    if player.staged_card_value is not None:
+        GuiCard.from_card_value(
+            player.staged_card_value,
+            tile.card_placement.rect,
+        ).draw(
+            screen,
+            drawer=drawer,
+            assets=assets,
+        )
+    _draw_player_tile_text(
+        screen,
+        drawer,
+        info_rect=tile.info_rect,
+        player_name=player.name,
+        score=player.score,
+    )
+
+
+def _draw_player_tile_background(
+    screen: pygame.Surface,
+    tile_rect: pygame.Rect,
+) -> None:
+    draw_panel(
+        screen,
+        tile_rect.inflate(-2, -4),
+        radius=8,
+        fill=PALETTE.panel_fill_soft,
+        border=PALETTE.panel_border,
+        border_width=1,
+        alpha=150,
+        theme=THEME,
+    )
 
 
 def _draw_player_tile_text(
@@ -208,43 +247,6 @@ def draw_hand(
             color=PALETTE.accent,
         )
 
-
-def draw_stats_field(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    geometry: BoardGeometry,
-    visual_state: GameVisualState,
-) -> None:
-    """Draw the local score summary and compact player score list."""
-
-    rect = geometry.stats_rect
-    draw_overlay_panel(screen, rect, radius=12, alpha=35, theme=THEME)
-
-    own_player = visual_state.own_player
-    own_score = str(own_player.score) if own_player is not None else "-"
-    own_name = own_player.name if own_player is not None else "-"
-
-    drawer.draw_text(
-        screen,
-        own_name,
-        (rect.left + 12, rect.top + 14),
-        role="small",
-        color=PALETTE.text_muted,
-    )
-    drawer.draw_text(
-        screen,
-        "Hornochsen",
-        (rect.left + 12, rect.top + 42),
-        role="small",
-        color=PALETTE.text_muted,
-    )
-    drawer.draw_text(
-        screen,
-        own_score,
-        (rect.left + 12, rect.top + 66),
-        role="title",
-        color=PALETTE.accent,
-    )
 
 
 def draw_status_overlay(

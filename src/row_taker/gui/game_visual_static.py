@@ -56,6 +56,15 @@ def build_stable_game_visual_state(
         revealed_values=staged_values,
         active_player_id=active_player_id,
     )
+    own_staged_card_value = (
+        staged_values.get(state.own_player_id)
+        if state.own_player_id is not None
+        else None
+    )
+    if own_staged_card_value is not None:
+        hidden_hand_card_values = hidden_hand_card_values | frozenset(
+            (own_staged_card_value,)
+        )
     hand = _build_hand(
         state,
         selected_card_value=(

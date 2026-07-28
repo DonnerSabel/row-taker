@@ -13,7 +13,7 @@ from row_taker.gui.rendering.board_renderer import draw_rows
 from row_taker.gui.rendering.game_hud_renderer import (
     draw_hand,
     draw_opponent_tiles,
-    draw_stats_field,
+    draw_own_player_tile,
     draw_status_overlay,
     opponent_staged_card_rects,
 )
@@ -55,7 +55,6 @@ def render_game_screen(
         game_targets,
         assets,
     )
-    draw_stats_field(screen, drawer, geometry, visual_state)
     draw_status_overlay(
         screen,
         drawer,
@@ -66,6 +65,13 @@ def render_game_screen(
         presentation_clock,
     )
     draw_opponent_tiles(
+        screen,
+        drawer,
+        geometry,
+        visual_state,
+        assets,
+    )
+    draw_own_player_tile(
         screen,
         drawer,
         geometry,

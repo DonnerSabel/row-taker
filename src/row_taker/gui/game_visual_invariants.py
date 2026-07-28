@@ -108,7 +108,7 @@ def assert_no_visible_game_card_is_duplicated(
     )
     visible_values.extend(
         player.staged_card_value
-        for player in visual_state.opponents
+        for player in visual_state.players
         if player.staged_card_value is not None
     )
     visible_values.extend(card.card_value for card in visual_state.moving_cards)

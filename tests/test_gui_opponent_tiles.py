@@ -71,3 +71,21 @@ def test_short_player_name_is_not_changed() -> None:
         )
         == "Ben"
     )
+
+
+def test_revealed_own_card_moves_from_hand_to_own_tile() -> None:
+    frame = prepare_scenario_frame(get_scenario("cards-revealed"))
+    assert isinstance(frame, GameFrame)
+    own_player = frame.visual_state.own_player
+
+    assert own_player is not None
+    assert own_player.staged_card_value is not None
+    own_hand_card = next(
+        card
+        for card in frame.visual_state.hand
+        if card.card_value == own_player.staged_card_value
+    )
+    assert own_hand_card.visible is False
+    assert frame.geometry.own_player_rect.contains(
+        frame.geometry.own_player_tile.card_placement.rect
+    )

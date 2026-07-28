@@ -164,7 +164,7 @@ def test_stable_builder_uses_supplied_public_state_without_changing_hand() -> No
     assert len(visual_state.hand) == len(state.player_state.hand)
 
 
-def test_cards_revealed_panel_and_own_card_selection_live_in_visual_state() -> None:
+def test_cards_revealed_panel_and_own_card_staging_live_in_visual_state() -> None:
     state = get_scenario("cards-revealed").state
     visual_state = build_game_visual_state(state, last_action_summary="test")
 
@@ -173,12 +173,14 @@ def test_cards_revealed_panel_and_own_card_selection_live_in_visual_state() -> N
     assert visual_state.presentation_panel.card_values == (44, 62, 71, 86)
     assert len(visual_state.presentation_panel.details) == 3
 
-    selected = tuple(
-        card.card_value
-        for card in visual_state.hand
-        if card.emphasis == "selected"
+    own_player = visual_state.own_player
+    assert own_player is not None
+    assert own_player.staged_card_value == 44
+    own_hand_card = next(
+        card for card in visual_state.hand if card.card_value == 44
     )
-    assert selected == (44,)
+    assert own_hand_card.visible is False
+    assert own_hand_card.emphasis == "none"
 
 
 def test_card_placed_uses_before_and_after_snapshots_with_one_motion() -> None:
@@ -363,7 +365,7 @@ def test_row_choice_required_lives_in_visual_state() -> None:
         own_card = next(
             card for card in visual_state.hand if card.card_value == event.card_value
         )
-        assert own_card.emphasis == "selected"
+        assert own_card.visible is False
 
 
 def test_row_chosen_lives_in_visual_state_and_marks_stable_row_id() -> None:
