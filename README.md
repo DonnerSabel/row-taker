@@ -106,7 +106,7 @@ aus **`.venv`** auswählen.
 - `src/row_taker/bots/` – Bot-Clients
 - `src/row_taker/gui_workbench/` – reproduzierbare GUI-Szenen und Timelines
 - `tests/` – Unit-, Architektur- und Render-Tests mit pytest
-- `mypy` – statischer Typecheck für das vollständige Paket unter `src/row_taker`
+- `mypy` – strikter statischer Typecheck für das vollständige Paket unter `src/row_taker`
 - `docs/` – Architektur, Regeln, Workflow und Unterrichtsmaterial
 
 ## Zentrale Datenstrukturen

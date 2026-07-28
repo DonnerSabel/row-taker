@@ -101,6 +101,11 @@ class NetworkServer:
             logger.debug("outbox drain: envelopes=%s", len(envelopes))
             self._dispatch_locked(envelopes)
 
+    def poll(self) -> None:
+        with self._lock:
+            self.server.poll()
+            self._drain_and_dispatch_locked()
+
     def should_shutdown(self) -> bool:
         with self._lock:
             return (
@@ -229,6 +234,7 @@ def run_network_server(
         network_server = NetworkServer(server=local_server)
         try:
             while True:
+                network_server.poll()
                 if network_server.should_shutdown():
                     logger.info(
                         "session ended and no participants connected anymore; server shutting down"

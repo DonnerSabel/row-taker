@@ -376,6 +376,13 @@ Partie begonnen oder eine Sitzung abgebrochen wird. Prozesshandle-Details und
 das eigentliche Match-Nachrichtenrouting liegen dagegen in den jeweils
 zuständigen Komponenten.
 
+Der Start lokaler Bots ist transaktional. Scheitert ein Prozessstart, beendet
+sich ein Bot vor dem Verbindungsaufbau oder läuft die Verbindungsfrist ab, wird
+der vollständige Startversuch zurückgerollt. Das schließt auch Bots ein, die in
+diesem Startversuch bereits verbunden waren. Ihre Sitze werden wieder als
+reservierte Bot-Sitze hergestellt und die Lobby bleibt erneut startfähig.
+`NetworkServer.poll()` prüft diesen Zustand regelmäßig während des Accept-Loops.
+
 `OutgoingEnvelope` ist ein gemeinsamer Server-Datentyp für Broadcasts und
 zielgerichtete Nachrichten. Netzwerkserver und Match-Router verwenden denselben
 Typ, ohne voneinander abhängig zu sein.

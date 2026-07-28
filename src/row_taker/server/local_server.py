@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import random
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from row_taker.engine.game import setup_game
@@ -15,6 +17,7 @@ from row_taker.engine.lobby.rules import (
 )
 from row_taker.engine.lobby.state import LobbyState
 from row_taker.hub.match_hub import MatchHub
+from row_taker.participants import ParticipantKind, ParticipantLocation
 from row_taker.protocol.messages import (
     AssignSeatToClient,
     ClearSeat,
@@ -33,11 +36,11 @@ from row_taker.protocol.messages import (
 from row_taker.server.client_registry import ClientRegistry
 from row_taker.server.errors import ClientRequestRejected
 from row_taker.server.lobby_view import build_lobby_state_updated, build_lobby_view
-from row_taker.server.local_bot_manager import LocalBotManager
+from row_taker.server.local_bot_manager import BotSpawnError, LocalBotManager
 from row_taker.server.match_participants import build_match_participants
 from row_taker.server.match_session_router import MatchSessionRouter
 from row_taker.server.outgoing import OutgoingEnvelope
-from row_taker.server.participants import Participant, ParticipantKind, ParticipantLocation
+from row_taker.server.participants import Participant
 from row_taker.server.server_handle import ServerHandle
 
 logger = logging.getLogger("row_taker.server.local")
@@ -52,8 +55,11 @@ class LocalServer:
     outbox: list[OutgoingEnvelope] = field(default_factory=list)
     registry: ClientRegistry = field(default_factory=ClientRegistry)
     match_router: MatchSessionRouter = field(default_factory=MatchSessionRouter)
+    bot_start_timeout_seconds: float = 10.0
+    monotonic: Callable[[], float] = time.monotonic
     bot_manager: LocalBotManager = field(init=False)
     _start_in_progress: bool = False
+    _start_request_client_id: str | None = None
     _connection_endpoints: dict[str, str | None] = field(default_factory=dict)
     _match_abort_in_progress: bool = False
     _session_ended: bool = False
@@ -114,7 +120,7 @@ class LocalServer:
                 self._handle_clear_seat(message)
                 return None
             if isinstance(message, RequestStartGame):
-                self._handle_start_game()
+                self._handle_start_game(client_id)
                 return None
             if isinstance(message, LeaveSession):
                 self._handle_departure(client_id, reason=SessionEndReason.QUIT)
@@ -268,7 +274,7 @@ class LocalServer:
         self._log(f"seat cleared: seat={message.seat_index}")
         self._broadcast_lobby_state()
 
-    def _handle_start_game(self) -> None:
+    def _handle_start_game(self, requesting_client_id: str) -> None:
         if self.match_router.is_active or self._start_in_progress:
             raise ClientRequestRejected("game already started")
         if not self.bot_manager.can_complete_lobby(self.lobby_state):
@@ -279,11 +285,17 @@ class LocalServer:
         if self.server_handle is None:
             raise ClientRequestRejected("cannot start local bots without server handle")
         self._start_in_progress = True
+        self._start_request_client_id = requesting_client_id
         self._log("starting game: spawning pending local bots")
-        self.bot_manager.spawn_pending(
-            self.server_handle,
-            client_id_in_use=self.registry.has,
-        )
+        try:
+            self.bot_manager.spawn_pending(
+                self.server_handle,
+                client_id_in_use=self.registry.has,
+                started_at=self.monotonic(),
+            )
+        except BotSpawnError as exc:
+            self._abort_startup()
+            raise ClientRequestRejected("could not start local bots") from exc
         self._try_finish_start_game()
 
     def _try_finish_start_game(self) -> None:
@@ -296,6 +308,8 @@ class LocalServer:
     def _start_match_now(self) -> None:
         self.lobby_state = mark_game_started(self.lobby_state)
         self._start_in_progress = False
+        self._start_request_client_id = None
+        self.bot_manager.complete_startup()
         lobby_view = build_lobby_view(
             self.lobby_state,
             self.registry,
@@ -344,10 +358,11 @@ class LocalServer:
             f"endpoint={endpoint or '-'}"
         )
         if not self.match_router.is_active:
-            self._remove_participant(client_id)
-            self._connection_endpoints.pop(client_id, None)
-            if self._start_in_progress and participant.kind == ParticipantKind.BOT:
+            if self._start_in_progress:
                 self._abort_startup()
+            if self.registry.has(client_id):
+                self._remove_participant(client_id)
+            self._connection_endpoints.pop(client_id, None)
             if self._match_abort_in_progress:
                 if self.registry.is_empty:
                     self._match_abort_in_progress = False
@@ -362,9 +377,32 @@ class LocalServer:
             endpoint_display=endpoint,
         )
 
+    def poll(self) -> None:
+        if not self._start_in_progress:
+            return
+        failure = self.bot_manager.startup_failure(
+            now=self.monotonic(),
+            timeout_seconds=self.bot_start_timeout_seconds,
+        )
+        if failure is None:
+            return
+
+        target_client_id = self._start_request_client_id
+        self._log(f"startup failed: {failure.message}")
+        self._abort_startup()
+        if target_client_id is not None and self.registry.has(target_client_id):
+            self._reject_client_request(target_client_id, failure.message)
+        else:
+            self._broadcast_lobby_state()
+
     def _abort_startup(self) -> None:
-        self.bot_manager.abort_startup()
+        startup_client_ids = self.bot_manager.abort_startup()
+        for startup_client_id in startup_client_ids:
+            if self.registry.has(startup_client_id):
+                self._remove_participant(startup_client_id)
+            self._connection_endpoints.pop(startup_client_id, None)
         self._start_in_progress = False
+        self._start_request_client_id = None
         self._log("startup aborted")
 
     def _abort_active_match(

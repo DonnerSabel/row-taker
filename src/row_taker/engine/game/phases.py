@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from .models import Card, PlayerID, RowID
+from .cards import Card
+from .models import PlayerID, RowID
 
 
 class Phase(StrEnum):

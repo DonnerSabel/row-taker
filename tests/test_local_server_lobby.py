@@ -26,6 +26,10 @@ from row_taker.server.local_server import LocalServer
 @dataclass
 class _DummyHandle:
     closed: bool = False
+    exit_code: int | None = None
+
+    def poll(self) -> int | None:
+        return self.exit_code
 
     def close(self) -> None:
         self.closed = True
@@ -335,3 +339,142 @@ def test_same_pending_bot_seat_may_keep_name_and_clearing_releases_it() -> None:
     messages = [envelope.message for envelope in server.drain_outbox()]
     assert not any(isinstance(message, LobbyActionRejected) for message in messages)
     assert server.bot_manager.pending_display_names() == {2: "Bot_Bob"}
+
+
+@dataclass
+class _FailingServerHandle:
+    fail_on_call: int
+    spawned: list[_DummyHandle] = field(default_factory=list)
+    calls: int = 0
+
+    def spawn_local_bot(
+        self,
+        *,
+        display_name: str,
+        client_id: str,
+        seed: int,
+    ) -> _DummyHandle:
+        del display_name, client_id, seed
+        self.calls += 1
+        if self.calls == self.fail_on_call:
+            raise RuntimeError("spawn failed")
+        handle = _DummyHandle()
+        self.spawned.append(handle)
+        return handle
+
+
+@dataclass
+class _FakeClock:
+    value: float = 0.0
+
+    def __call__(self) -> float:
+        return self.value
+
+
+def _configure_human_and_two_bots(
+    server: LocalServer,
+    *,
+    first_bot_name: str = "Bot_A",
+    second_bot_name: str = "Bot_B",
+) -> None:
+    server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name=first_bot_name)
+    )
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=2, display_name=second_bot_name)
+    )
+    server.drain_outbox()
+
+
+def test_local_server_rolls_back_partial_bot_spawn_failure() -> None:
+    fake_server_handle = _FailingServerHandle(fail_on_call=2)
+    server = LocalServer(
+        rng=random.Random(1234),
+        seat_count=3,
+        server_handle=fake_server_handle,
+    )
+    _configure_human_and_two_bots(server)
+
+    server.handle_client_message("client-0", RequestStartGame())
+    messages = [envelope.message for envelope in server.drain_outbox()]
+
+    rejection = next(message for message in messages if isinstance(message, LobbyActionRejected))
+    assert rejection.message == "could not start local bots"
+    assert fake_server_handle.spawned[0].closed
+    assert server.bot_manager.pending_display_names() == {1: "Bot_A", 2: "Bot_B"}
+    assert not server.bot_manager.has_pending_starts
+    assert server.active_match is None
+
+
+def test_local_server_aborts_timed_out_start_and_removes_connected_start_bot() -> None:
+    clock = _FakeClock(value=100.0)
+    fake_server_handle = _FakeServerHandle()
+    server = LocalServer(
+        rng=random.Random(1234),
+        seat_count=3,
+        server_handle=fake_server_handle,
+        bot_start_timeout_seconds=5.0,
+        monotonic=clock,
+    )
+    _configure_human_and_two_bots(server)
+
+    server.handle_client_message("client-0", RequestStartGame())
+    first_name, first_client_id, _seed, first_handle = fake_server_handle.spawned[0]
+    server.drain_outbox()
+    server.handle_client_message(
+        "temporary-bot-connection",
+        JoinLobby(display_name=first_name, requested_client_id=first_client_id),
+        reply_target_client_id="temporary-bot-connection",
+    )
+    server.drain_outbox()
+    assert server.registry.has(first_client_id)
+
+    clock.value = 105.0
+    server.poll()
+    envelopes = server.drain_outbox()
+
+    rejection = next(
+        envelope for envelope in envelopes if isinstance(envelope.message, LobbyActionRejected)
+    )
+    assert rejection.target_client_id == "client-0"
+    assert "did not join within 5 seconds" in rejection.message.message
+    assert not server.registry.has(first_client_id)
+    assert first_handle.closed
+    assert server.bot_manager.pending_display_names() == {1: "Bot_A", 2: "Bot_B"}
+    assert not server.bot_manager.has_pending_starts
+    assert server.active_match is None
+
+
+def test_local_server_aborts_start_when_bot_process_exits_before_joining() -> None:
+    clock = _FakeClock(value=100.0)
+    fake_server_handle = _FakeServerHandle()
+    server = LocalServer(
+        rng=random.Random(1234),
+        seat_count=2,
+        server_handle=fake_server_handle,
+        monotonic=clock,
+    )
+    server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-0", CreateLocalBotOnSeat(seat_index=1, display_name="Bot_A")
+    )
+    server.drain_outbox()
+
+    server.handle_client_message("client-0", RequestStartGame())
+    fake_server_handle.spawned[0][3].exit_code = 23
+    server.drain_outbox()
+
+    server.poll()
+    messages = [envelope.message for envelope in server.drain_outbox()]
+
+    rejection = next(message for message in messages if isinstance(message, LobbyActionRejected))
+    assert "exit code 23" in rejection.message
+    assert server.bot_manager.pending_display_names() == {1: "Bot_A"}
+    assert not server.bot_manager.has_pending_starts

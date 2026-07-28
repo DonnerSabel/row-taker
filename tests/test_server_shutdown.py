@@ -14,6 +14,9 @@ from row_taker.server.network_server import run_network_server
 class _DummyBotHandle:
     close_calls: int = 0
 
+    def poll(self) -> int | None:
+        return None
+
     def close(self) -> None:
         self.close_calls += 1
 
@@ -54,6 +57,12 @@ class _FakeLocalServer:
     def should_shutdown(self) -> bool:
         return False
 
+    def poll(self) -> None:
+        return None
+
+    def drain_outbox(self) -> list[object]:
+        return []
+
     def close(self) -> None:
         self.close_calls += 1
 
@@ -62,7 +71,11 @@ def test_local_server_close_closes_pending_bots_and_is_safe_twice() -> None:
     server = LocalServer(rng=random.Random(1234), seat_count=2)
     spawner = _FakeBotSpawner()
     server.bot_manager.reserve(0, "Bot_A")
-    server.bot_manager.spawn_pending(spawner, client_id_in_use=lambda _client_id: False)
+    server.bot_manager.spawn_pending(
+        spawner,
+        client_id_in_use=lambda _client_id: False,
+        started_at=0.0,
+    )
 
     server.close()
     server.close()

@@ -50,17 +50,11 @@ ignore = ["E501"]
 [tool.mypy]
 python_version = "3.11"
 files = ["src/row_taker"]
-check_untyped_defs = true
-disallow_untyped_defs = true
+strict = true
 disallow_any_generics = true
-follow_imports = "silent"
-ignore_missing_imports = true
-no_implicit_optional = true
-show_error_codes = true
-strict_equality = true
-warn_redundant_casts = true
-warn_return_any = true
+disallow_untyped_defs = true
 warn_unused_ignores = true
+show_error_codes = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

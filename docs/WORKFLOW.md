@@ -27,7 +27,7 @@ python tools/check_wheel.py dist/*.whl
 ```
 
 Der Standardcheck umfasst Bytecode-Kompilierung, Ruff-Lint, Ruff-Formatprüfung,
-das vollständige Paket mit mypy und die vollständige pytest-Suite.
+das vollständige Paket im strikten mypy-Modus und die vollständige pytest-Suite.
 
 ## Inhaltliche Leitplanken
 

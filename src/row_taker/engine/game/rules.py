@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .models import Card, EngineRow, Row
+from .cards import Card
+from .models import EngineRow, Row
 
 
 def target_row_index(rows: Sequence[EngineRow | Row], card: Card) -> int | None:

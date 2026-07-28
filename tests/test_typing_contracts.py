@@ -48,6 +48,9 @@ def test_mypy_is_part_of_dev_checks_and_has_explicit_scope() -> None:
 
     mypy_config = config["tool"]["mypy"]
     assert mypy_config["files"] == ["src/row_taker"]
+    assert mypy_config["strict"] is True
+    assert "ignore_missing_imports" not in mypy_config
+    assert "follow_imports" not in mypy_config
     assert mypy_config["disallow_any_generics"] is True
     assert mypy_config["disallow_untyped_defs"] is True
     assert mypy_config["warn_unused_ignores"] is True
