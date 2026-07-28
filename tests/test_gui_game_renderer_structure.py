@@ -30,13 +30,13 @@ def test_game_renderer_is_a_short_orchestrator() -> None:
     source = _source("rendering/game_renderer.py")
     for call in (
         "draw_rows(",
-        "draw_opponent_slots(",
         "draw_hand(",
         "draw_presentation_card_motion(",
         "draw_stats_field(",
         "draw_status_overlay(",
     ):
         assert call in source
+    assert "draw_opponent_slots(" not in source
     assert "class GameFrame" not in source
 
 
@@ -74,3 +74,12 @@ def test_sidebar_debug_frame_is_drawn_after_all_game_content() -> None:
     assert render_body.rfind("_draw_sidebar_debug_frame(") > render_body.rfind(
         "draw_status_overlay("
     )
+
+
+def test_old_opponent_circles_and_separate_score_list_are_removed() -> None:
+    source = _source("rendering/game_hud_renderer.py")
+    assert "def draw_opponent_slots" not in source
+    assert "pygame.draw.ellipse" not in source
+    assert "def _initials" not in source
+    assert "def _player_color" not in source
+    assert "for player in visual_state.players" not in source

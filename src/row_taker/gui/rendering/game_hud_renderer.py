@@ -8,7 +8,7 @@ from row_taker.engine.game.models import PlayerID
 from row_taker.gui.animation import AnimationClock
 from row_taker.gui.assets import GuiAssets
 from row_taker.gui.board_layout import BoardGeometry, hand_card_placements
-from row_taker.gui.card import GuiCard, draw_card_back
+from row_taker.gui.card import GuiCard
 from row_taker.gui.game_interaction import GameScreenTargets
 from row_taker.gui.game_visual_state import GameVisualState, MessageLevel
 from row_taker.gui.presentation_renderer import draw_presentation_panel
@@ -34,65 +34,6 @@ def opponent_staged_card_rects(
             strict=False,
         )
     }
-
-
-def draw_opponent_slots(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    geometry: BoardGeometry,
-    visual_state: GameVisualState,
-    assets: GuiAssets,
-    animation_clock: AnimationClock,
-) -> None:
-    """Draw opponent portraits and their current staged cards."""
-
-    for index, (player, slot_geometry) in enumerate(
-        zip(visual_state.opponents, geometry.opponent_slots, strict=False)
-    ):
-        color = _player_color(index)
-        circle_rect = slot_geometry.circle_rect
-        active_player = player.emphasis == "active"
-        pygame.draw.ellipse(screen, color, circle_rect)
-        pygame.draw.ellipse(
-            screen,
-            pygame.Color(255, 255, 255, 150),
-            circle_rect,
-            2,
-        )
-        if active_player:
-            inflate = 8 + animation_clock.pulse_inflate(
-                period_frames=54,
-                max_pixels=8,
-            )
-            ring_color = animation_clock.pulsed_color(
-                PALETTE.accent,
-                PALETTE.accent_hover,
-                period_frames=54,
-            )
-            pygame.draw.ellipse(
-                screen,
-                ring_color,
-                circle_rect.inflate(inflate, inflate),
-                3,
-            )
-
-        drawer.draw_text(
-            screen,
-            _initials(player.name),
-            (circle_rect.centerx - 8, circle_rect.centery - 8),
-            role="tiny",
-            color=PALETTE.text_primary,
-        )
-
-        staged_rect = slot_geometry.staged_card.rect
-        if player.staged_card_value is None:
-            draw_card_back(screen, staged_rect)
-        else:
-            GuiCard.from_card_value(
-                player.staged_card_value,
-                staged_rect,
-                selected=active_player,
-            ).draw(screen, drawer=drawer, assets=assets)
 
 
 def draw_hand(
@@ -179,20 +120,6 @@ def draw_stats_field(
         color=PALETTE.accent,
     )
 
-    y = rect.top + 112
-    for player in visual_state.players:
-        marker = "★ " if player.is_self else ""
-        drawer.draw_text(
-            screen,
-            f"{marker}{player.name}: {player.score}",
-            (rect.left + 12, y),
-            role="tiny",
-            color=PALETTE.text_primary if player.is_self else PALETTE.text_muted,
-        )
-        y += 20
-        if y > rect.bottom - 54:
-            break
-
 
 def draw_status_overlay(
     screen: pygame.Surface,
@@ -253,23 +180,3 @@ def _status_message_color(level: MessageLevel) -> pygame.Color:
 
 def _draw_overlay_box(screen: pygame.Surface, rect: pygame.Rect) -> None:
     draw_overlay_panel(screen, rect, theme=THEME)
-
-
-def _initials(name: str) -> str:
-    parts = [part for part in name.strip().split() if part]
-    if not parts:
-        return "?"
-    if len(parts) == 1:
-        return parts[0][:2].upper()
-    return f"{parts[0][0]}{parts[-1][0]}".upper()
-
-
-def _player_color(index: int) -> pygame.Color:
-    colors = (
-        pygame.Color(216, 83, 83),
-        pygame.Color(83, 151, 216),
-        pygame.Color(237, 194, 76),
-        pygame.Color(122, 197, 104),
-        pygame.Color(177, 113, 219),
-    )
-    return colors[index % len(colors)]

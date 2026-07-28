@@ -12,7 +12,6 @@ from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui.rendering.board_renderer import draw_rows
 from row_taker.gui.rendering.game_hud_renderer import (
     draw_hand,
-    draw_opponent_slots,
     draw_stats_field,
     draw_status_overlay,
     opponent_staged_card_rects,
@@ -44,14 +43,6 @@ def render_game_screen(
         geometry,
         visual_state,
         game_targets,
-        assets,
-        presentation_clock,
-    )
-    draw_opponent_slots(
-        screen,
-        drawer,
-        geometry,
-        visual_state,
         assets,
         presentation_clock,
     )

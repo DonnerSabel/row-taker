@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from row_taker.gui.board_layout import compute_board_geometry
+from row_taker.gui.board_layout import compute_board_geometry, hand_card_placements
 
 
 @pytest.mark.parametrize(
@@ -103,7 +103,7 @@ def test_own_player_tile_has_card_and_info_inside_own_section() -> None:
     assert own_tile.card_placement.rect.right < own_tile.info_rect.left
 
 
-def test_legacy_geometry_stays_available_during_incremental_migration() -> None:
+def test_remaining_legacy_geometry_stays_available_during_incremental_migration() -> None:
     geometry = compute_board_geometry(
         (1280, 720),
         row_count=4,
@@ -116,3 +116,28 @@ def test_legacy_geometry_stays_available_during_incremental_migration() -> None:
     assert geometry.hand_rect.width > 0
     assert len(geometry.opponent_slots) == 3
     assert geometry.overlay_rect.width > 0
+
+
+@pytest.mark.parametrize(
+    "window_size",
+    (
+        (980, 720),
+        (1024, 768),
+        (1280, 720),
+        (1600, 900),
+    ),
+)
+def test_hand_and_hand_cards_stay_left_of_sidebar(
+    window_size: tuple[int, int],
+) -> None:
+    geometry = compute_board_geometry(
+        window_size,
+        row_count=4,
+        hand_card_count=10,
+        opponent_count=5,
+    )
+
+    assert geometry.play_area_rect.contains(geometry.hand_rect)
+    assert geometry.hand_rect.right < geometry.sidebar_rect.left
+    for placement in hand_card_placements(geometry, card_count=10):
+        assert not placement.rect.colliderect(geometry.sidebar_rect)

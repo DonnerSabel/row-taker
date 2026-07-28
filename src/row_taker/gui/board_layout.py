@@ -18,7 +18,6 @@ class BoardRegionRatios:
 
     main_play: tuple[float, float, float, float] = (0.018, 0.066, 0.780, 0.784)
     stats: tuple[float, float, float, float] = (0.819, 0.046, 0.155, 0.782)
-    hand: tuple[float, float, float, float] = (0.014, 0.904, 0.975, 0.096)
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +102,13 @@ class BoardLayoutTuning:
     sidebar_max_width_px: int = 520
     play_area_min_width_px: int = 460
 
+    # The hand occupies a shallow strip at the bottom of the new play area.
+    # Cards may still extend below the window, but they must never extend into
+    # the sidebar horizontally.
+    play_hand_height_ratio: float = 0.095
+    play_hand_min_height_px: int = 64
+    play_hand_max_height_px: int = 90
+
     sidebar_inner_margin_min_px: int = 10
     sidebar_inner_margin_ratio: float = 0.025
     sidebar_section_gap_min_px: int = 8
@@ -179,10 +185,10 @@ class OpponentSlotGeometry:
 class BoardGeometry:
     window_rect: pygame.Rect
 
-    # New artwork-independent game-screen split. These fields are introduced
-    # before the renderers switch over, allowing the migration to remain small
-    # and testable.
+    # Artwork-independent game-screen split. The hand has already migrated to
+    # this geometry; later patches move the remaining renderers into it.
     play_area_rect: pygame.Rect
+    hand_rect: pygame.Rect
     sidebar_rect: pygame.Rect
     sidebar_header_rect: pygame.Rect
     opponent_list_rect: pygame.Rect
@@ -191,13 +197,12 @@ class BoardGeometry:
     opponent_tiles: tuple[PlayerTileGeometry, ...]
     own_player_tile: PlayerTileGeometry
 
-    # Legacy visual regions from board.png. They stay available until the
-    # following layout patches migrate each renderer.
+    # Remaining legacy visual regions from board.png. They stay available
+    # until the following layout patches migrate their renderers.
     main_play_rect: pygame.Rect
     row_area_rect: pygame.Rect
     opponent_area_rect: pygame.Rect
     stats_rect: pygame.Rect
-    hand_rect: pygame.Rect
 
     # Derived geometry.
     row_columns: tuple[pygame.Rect, ...]
@@ -244,7 +249,7 @@ def compute_board_geometry(
 
     main_play_rect = _relative_rect(window_rect, tuning.regions.main_play)
     stats_rect = _relative_rect(window_rect, tuning.regions.stats)
-    hand_rect = _relative_rect(window_rect, tuning.regions.hand)
+    hand_rect = _play_area_hand_rect(play_area_rect, tuning)
 
     opponent_area_width = _opponent_area_width(main_play_rect, opponent_count, tuning)
     gap = max(tuning.main_gap_min_px, round(window_rect.width * tuning.main_gap_width_ratio))
@@ -276,6 +281,7 @@ def compute_board_geometry(
     return BoardGeometry(
         window_rect=window_rect,
         play_area_rect=play_area_rect,
+        hand_rect=hand_rect,
         sidebar_rect=sidebar_rect,
         sidebar_header_rect=sidebar_header_rect,
         opponent_list_rect=opponent_list_rect,
@@ -287,7 +293,6 @@ def compute_board_geometry(
         row_area_rect=row_area_rect,
         opponent_area_rect=opponent_area_rect,
         stats_rect=stats_rect,
-        hand_rect=hand_rect,
         row_columns=row_columns,
         opponent_slots=opponent_slots,
         row_card_size=row_card_size,
@@ -498,6 +503,25 @@ def _game_screen_regions(
         opponent_list_rect,
         presentation_rect,
         own_player_rect,
+    )
+
+
+def _play_area_hand_rect(
+    play_area_rect: pygame.Rect,
+    tuning: BoardLayoutTuning,
+) -> pygame.Rect:
+    """Return the hand strip constrained to the artwork-independent play area."""
+
+    hand_height = _clamp(
+        round(play_area_rect.height * tuning.play_hand_height_ratio),
+        tuning.play_hand_min_height_px,
+        tuning.play_hand_max_height_px,
+    )
+    return pygame.Rect(
+        play_area_rect.left,
+        play_area_rect.bottom - hand_height,
+        play_area_rect.width,
+        hand_height,
     )
 
 
