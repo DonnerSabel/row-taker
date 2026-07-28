@@ -1,6 +1,6 @@
 # GameClientCore API
 
-Diese Datei ist bewusst fuer den spaeteren GUI-Bau und fuer Schueler geschrieben.
+Diese Datei beschreibt den gemeinsam von CLI, GUI und Bots verwendeten Client-Core.
 
 ## Idee
 
@@ -92,7 +92,7 @@ Das Frontend ist fuer Rendering, Eingabe und das Versenden der Outbound-Nachrich
 
 ## Frontend state axes
 
-Fuer die CLI sollen fachliche Entscheidungen primaer an diesen Achsen haengen:
+Frontends sollen fachliche Entscheidungen primaer an diesen Achsen ausrichten:
 
 - `state.client_mode`
 - `state.pending_action`

@@ -34,7 +34,6 @@ class VisualPlayer:
     player_id: PlayerID
     name: str
     score: int
-    hand_count: int
     is_self: bool
     staged_card_value: int | None = None
     emphasis: PlayerEmphasis = "none"

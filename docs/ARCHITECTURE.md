@@ -203,8 +203,8 @@ Framework-Schicht.
 
 Der `GameVisualState` ist die vollständige semantische Beschreibung des
 sichtbaren Spielbildschirms. Er enthält Reihen, Spieler, Handkarten,
-Interaktionsmöglichkeiten, Statusinformationen, Präsentationspanel und
-semantische Kartenbewegungen. Er enthält keine pygame-Objekte, Pixelkoordinaten,
+Interaktionsmöglichkeiten, Statusinformationen und semantische Kartenbewegungen.
+Er enthält keine pygame-Objekte, Pixelkoordinaten,
 Fonts, Farben, Protokollnachrichten oder Client-Actions.
 
 Alle Präsentationsereignisse werden vor dem Rendering in vollständige visuelle

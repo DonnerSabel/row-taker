@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from row_taker.cli.frontend import CliFrontend, set_flash
 from row_taker.cli.render import render_screen
-from row_taker.cli.screens import LobbyScreen, current_screen
-from row_taker.client.core_state import ClientCoreState
+from row_taker.client.core_state import ClientCoreState, ClientMode
 from row_taker.client.game_client_core import GameClientCore
 from row_taker.client.state import ClientState, enter_lobby_submenu
 from row_taker.participants import ParticipantKind
@@ -97,7 +96,9 @@ def test_reduce_server_message_stores_own_client_id_from_identity_assigned() -> 
     new_state = _apply_server_message(state, IdentityAssigned(client_id="client-1"))
 
     assert new_state.own_client_id == "client-1"
-    assert current_screen(new_state) == LobbyScreen(kind="main")
+    assert new_state.client_mode == ClientMode.LOBBY
+    assert new_state.navigation_state.lobby_submenu == "main"
+    assert new_state.navigation_state.selected_seat_index is None
 
 
 def test_reduce_user_input_assign_seat_uses_explicit_own_client_id() -> None:
@@ -106,7 +107,9 @@ def test_reduce_user_input_assign_seat_uses_explicit_own_client_id() -> None:
 
     state, outbound = _apply_user_input(state, "m")
 
-    assert current_screen(state) == LobbyScreen(kind="main")
+    assert state.client_mode == ClientMode.LOBBY
+    assert state.navigation_state.lobby_submenu == "main"
+    assert state.navigation_state.selected_seat_index is None
     assert outbound == AssignSeatToClient(seat_index=0, target_client_id="client-1")
 
 
@@ -117,7 +120,9 @@ def test_reduce_user_input_assign_seat_without_identity_sets_local_error() -> No
     state, outbound = _apply_user_input(state, "m")
 
     assert outbound is None
-    assert current_screen(state) == LobbyScreen(kind="seat_edit", seat_index=0)
+    assert state.client_mode == ClientMode.LOBBY
+    assert state.navigation_state.lobby_submenu == "seat_edit"
+    assert state.navigation_state.selected_seat_index == 0
     assert "client_id" in (state.flash_message.text if state.flash_message else "")
 
 
@@ -139,4 +144,6 @@ def test_reduce_server_message_lobby_update_keeps_active_lobby_mode() -> None:
     new_state = _apply_server_message(state, LobbyStateUpdated(lobby=_lobby()))
 
     assert new_state.lobby_view == _lobby()
-    assert current_screen(new_state) == LobbyScreen(kind="seat_edit", seat_index=2)
+    assert new_state.client_mode == ClientMode.LOBBY
+    assert new_state.navigation_state.lobby_submenu == "seat_edit"
+    assert new_state.navigation_state.selected_seat_index == 2

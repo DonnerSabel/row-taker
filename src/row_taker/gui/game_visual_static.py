@@ -139,7 +139,6 @@ def _build_players(
             player_id=player.player_id,
             name=player.name,
             score=player.score,
-            hand_count=player.hand_count,
             is_self=player.player_id == state.own_player_id,
             staged_card_value=revealed_values.get(player.player_id),
             emphasis="active" if player.player_id == active_player_id else "none",

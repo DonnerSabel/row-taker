@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "row-taker"
 version = "0.1.0"
-description = "Unterrichtsprojekt: Row-Taker in Python (CLI zuerst, weitere Clients später)."
+description = "Netzwerkfähiges Row-Taker-Unterrichtsprojekt mit CLI, Pygame-GUI und Bots."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"

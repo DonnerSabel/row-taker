@@ -133,3 +133,28 @@ def test_lobby_frame_only_orchestrates_prepared_lobby_parts() -> None:
     assert "render_lobby_screen" in source
     assert "ClientAction" not in source
     assert "draw_" not in source
+
+
+def test_removed_dead_client_and_gui_modules_do_not_return() -> None:
+    removed_paths = (
+        "src/row_taker/gui/constants.py",
+        "src/row_taker/cli/screens.py",
+        "src/row_taker/client/presentation_text.py",
+    )
+    assert all(not (ROOT / path).exists() for path in removed_paths)
+
+
+def test_visual_player_contains_only_data_used_by_the_gui() -> None:
+    from dataclasses import fields
+
+    from row_taker.gui.game_visual_state import VisualPlayer
+
+    assert tuple(field.name for field in fields(VisualPlayer)) == (
+        "player_id",
+        "name",
+        "score",
+        "is_self",
+        "staged_card_value",
+        "emphasis",
+    )
+

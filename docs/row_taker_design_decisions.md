@@ -717,15 +717,14 @@ Consequences:
 - the client core must not import state models from `row_taker.cli.*`
 - client actions live in `row_taker.client.actions` and use the neutral
   `ClientAction...` naming scheme
-- CLI-specific screen projection lives in `row_taker.cli.screens`
-- the CLI frontend may derive `LobbyScreen` and `GameScreen` from `ClientState`,
-  but the core should operate on `ClientState`, `ClientMode`, and
-  `PendingAction`
+- the CLI derives prompts, accepted input and rendering directly from
+  `ClientState`, `ClientMode`, `PendingAction`, and `navigation_state`
+- the core and frontends do not maintain a second derived screen-state model
 
 
 ---
 
-## 12. CLI state axes and view projection
+## 12. CLI state axes and direct view derivation
 
 The CLI uses three leading state axes:
 
@@ -735,8 +734,9 @@ The CLI uses three leading state axes:
 
 These are the primary source of truth for CLI input handling and prompt selection.
 
-`LobbyScreen` and `GameScreen` may still exist as derived view helpers, but they are
-not supposed to act as the hidden state machine of the client anymore.
+Prompts, input handling and rendering derive their decisions directly from these
+axes. A separate `LobbyScreen`/`GameScreen` projection is unnecessary and must not
+become a hidden second state machine.
 
 Consequences:
 - text input should not primarily branch on concrete screen objects

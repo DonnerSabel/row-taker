@@ -59,13 +59,14 @@ def test_builder_sorts_rows_visually_and_preserves_row_ids() -> None:
     assert visual_state.rows[0].card_values == (2, 13)
 
 
-def test_builder_copies_players_hand_scores_and_revealed_cards() -> None:
+def test_builder_copies_player_scores_hand_and_revealed_cards() -> None:
     state = get_scenario("cards-revealed").state
     visual_state = build_game_visual_state(state)
 
     assert visual_state.own_player is not None
     assert visual_state.own_player.player_id == state.own_player_id
     assert visual_state.own_player.score == 12
+    assert not hasattr(visual_state.own_player, "hand_count")
     assert tuple(card.card_value for card in visual_state.hand) == (
         7,
         17,
