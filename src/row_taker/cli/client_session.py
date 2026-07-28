@@ -15,12 +15,26 @@ initial_client_state = _initial_client_state
 
 
 class ClientSession:
-    def __init__(self, transport: ClientTransport, interactive: bool = True, own_client_id: str | None = None, *, console_factory=None, initial_state_factory=None) -> None:
+    def __init__(
+        self,
+        transport: ClientTransport,
+        interactive: bool = True,
+        own_client_id: str | None = None,
+        *,
+        console_factory=None,
+        initial_state_factory=None,
+    ) -> None:
         if console_factory is None:
             console_factory = CliConsole
         if initial_state_factory is None:
             initial_state_factory = initial_client_state
-        self.app = CliApp(transport=transport, own_client_id=own_client_id, interactive=interactive, console_factory=console_factory, initial_state_factory=initial_state_factory)
+        self.app = CliApp(
+            transport=transport,
+            own_client_id=own_client_id,
+            interactive=interactive,
+            console_factory=console_factory,
+            initial_state_factory=initial_state_factory,
+        )
 
     @property
     def transport(self) -> ClientTransport:

@@ -19,7 +19,15 @@ logger = logging.getLogger("row_taker.cli.app")
 
 
 class CliApp:
-    def __init__(self, transport: ClientTransport, own_client_id: str | None = None, *, interactive: bool = True, console_factory: type[CliConsole] = CliConsole, initial_state_factory=initial_client_state) -> None:
+    def __init__(
+        self,
+        transport: ClientTransport,
+        own_client_id: str | None = None,
+        *,
+        interactive: bool = True,
+        console_factory: type[CliConsole] = CliConsole,
+        initial_state_factory=initial_client_state,
+    ) -> None:
         self.transport = transport
         self.own_client_id = own_client_id
         self.interactive = interactive
@@ -31,7 +39,9 @@ class CliApp:
         state = self.initial_state_factory(self.own_client_id)
         core = GameClientCore(state)
         console = self.console_factory()
-        server_task: asyncio.Task[ServerToClientMessage] | None = asyncio.create_task(asyncio.to_thread(self.transport.receive))
+        server_task: asyncio.Task[ServerToClientMessage] | None = asyncio.create_task(
+            asyncio.to_thread(self.transport.receive)
+        )
         input_task: asyncio.Task[str] | None = None
         input_prompt: str | None = None
         abort_requested = False
@@ -40,14 +50,20 @@ class CliApp:
             while not state.should_exit and not abort_requested:
                 state = core.state
                 if not self.interactive and core.has_pending_presentation():
-                    state, _ = await self._process_action(console, core, ClientActionAdvancePresentation())
+                    state, _ = await self._process_action(
+                        console, core, ClientActionAdvancePresentation()
+                    )
                     continue
 
                 current_prompt = build_view(state).prompt if self.interactive else None
                 if current_prompt is None:
-                    input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
+                    input_task, input_prompt = await self._cancel_input_task(
+                        input_task, input_prompt
+                    )
                 elif input_task is None or input_prompt != current_prompt:
-                    input_task, input_prompt = await self._cancel_input_task(input_task, input_prompt)
+                    input_task, input_prompt = await self._cancel_input_task(
+                        input_task, input_prompt
+                    )
                     input_task = asyncio.create_task(console.read_line())
                     input_prompt = current_prompt
 
@@ -74,7 +90,9 @@ class CliApp:
                         update = core.on_server_message(message)
                         state = await self._apply_update(console, core, update)
                         if server_task is not None:
-                            server_task = asyncio.create_task(asyncio.to_thread(self.transport.receive))
+                            server_task = asyncio.create_task(
+                                asyncio.to_thread(self.transport.receive)
+                            )
                     continue
 
                 if input_task is not None and input_task in done:
@@ -95,16 +113,30 @@ class CliApp:
                             core.state = state
                         else:
                             core.state = state
-                            state, outbounds = await self._process_action(console, core, parsed.action)
+                            state, outbounds = await self._process_action(
+                                console, core, parsed.action
+                            )
                             for outbound in outbounds:
-                                logger.debug("sending outbound client message: type=%s", type(outbound).__name__)
+                                logger.debug(
+                                    "sending outbound client message: type=%s",
+                                    type(outbound).__name__,
+                                )
                                 await asyncio.to_thread(self.transport.send, outbound)
-            logger.debug("client main loop exiting: should_exit=%s suppress_final_result=%s session_error=%s", core.state.should_exit, core.state.suppress_final_result, core.state.session_error)
+            logger.debug(
+                "client main loop exiting: should_exit=%s suppress_final_result=%s session_error=%s",
+                core.state.should_exit,
+                core.state.suppress_final_result,
+                core.state.session_error,
+            )
             if core.state.suppress_final_result or core.state.session_error is not None:
                 return None
             return core.state.public_state
         finally:
-            logger.debug("client session cleanup start: server_task=%s input_task=%s", server_task is not None, input_task is not None)
+            logger.debug(
+                "client session cleanup start: server_task=%s input_task=%s",
+                server_task is not None,
+                input_task is not None,
+            )
             logger.debug("transport close requested")
             self.transport.close()
             if server_task is not None:
@@ -130,7 +162,9 @@ class CliApp:
             logger.debug("console close complete")
             logger.debug("client session cleanup finished")
 
-    async def _process_action(self, console: CliConsole, core: GameClientCore, action: object) -> tuple[ClientState, tuple[object, ...]]:
+    async def _process_action(
+        self, console: CliConsole, core: GameClientCore, action: object
+    ) -> tuple[ClientState, tuple[object, ...]]:
         update = core.on_ui_action(action)
         state = await self._apply_update(console, core, update)
         return state, update.outbound_messages
@@ -142,8 +176,7 @@ class CliApp:
             core.state = state
         for message in update.applied_server_messages:
             logger.debug(
-                "applying server message: type=%s inbox_remaining=%s "
-                "pending_presentation=%s",
+                "applying server message: type=%s inbox_remaining=%s pending_presentation=%s",
                 type(message).__name__,
                 len(core.server_inbox),
                 len(core.state.pending_presentation_steps),
@@ -157,7 +190,9 @@ class CliApp:
         prompt = view.prompt if self.interactive else None
         await console.render(view.body, prompt)
 
-    async def _cancel_input_task(self, input_task: asyncio.Task[str] | None, input_prompt: str | None) -> tuple[asyncio.Task[str] | None, str | None]:
+    async def _cancel_input_task(
+        self, input_task: asyncio.Task[str] | None, input_prompt: str | None
+    ) -> tuple[asyncio.Task[str] | None, str | None]:
         if input_task is not None:
             input_task.cancel()
             with suppress(asyncio.CancelledError, InputAborted, KeyboardInterrupt):

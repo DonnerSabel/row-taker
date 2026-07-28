@@ -52,7 +52,6 @@ def test_build_match_participants_from_sparse_seated_clients() -> None:
     assert match_participants.client_to_player_id["client-3"] == PlayerID("player-2")
 
 
-
 def test_lobby_view_uses_participant_kind_enums_in_participants_and_seats() -> None:
     registry = ClientRegistry()
     registry.register_participant(

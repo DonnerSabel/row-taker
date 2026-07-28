@@ -42,7 +42,10 @@ def _lobby_view() -> LobbyView:
         seat_count=3,
         participants=(
             LobbyParticipantView(
-                client_id="client-0", display_name="Alice", participant_kind=ParticipantKind.HUMAN, seat_index=0
+                client_id="client-0",
+                display_name="Alice",
+                participant_kind=ParticipantKind.HUMAN,
+                seat_index=0,
             ),
             LobbyParticipantView(
                 client_id="pending-bot-seat-2",
@@ -120,7 +123,9 @@ def test_server_messages_roundtrip() -> None:
         ),
         RowChoiceCommitted(row_id=RowID("row-0"), revision=3),
         DebugStateSnapshot(revision=4, game_state=game),
-        SessionEnded(message="left", reason=SessionEndReason.QUIT, client_id="client-0", display_name="Alice"),
+        SessionEnded(
+            message="left", reason=SessionEndReason.QUIT, client_id="client-0", display_name="Alice"
+        ),
         ServerError(message="boom"),
     ]
     for message in messages:
@@ -139,9 +144,10 @@ def test_lobby_state_is_metadata_free() -> None:
     assert not hasattr(lobby_state, "clients")
 
 
-
 def test_lobby_view_roundtrip_preserves_participant_kind_types() -> None:
-    decoded = server_message_from_dict(server_message_to_dict(LobbyStateUpdated(lobby=_lobby_view())))
+    decoded = server_message_from_dict(
+        server_message_to_dict(LobbyStateUpdated(lobby=_lobby_view()))
+    )
 
     assert isinstance(decoded, LobbyStateUpdated)
     assert decoded.lobby.participants[0].participant_kind is ParticipantKind.HUMAN

@@ -16,14 +16,18 @@
 ## Vor jedem PR
 
 ```bash
-pytest -q
-```
-
-Optional zusätzlich:
-
-```bash
 tools/run_checks.sh
 ```
+
+Vor Releases oder Änderungen an Paketierung und Ressourcen zusätzlich:
+
+```bash
+python -m build --wheel
+python tools/check_wheel.py dist/*.whl
+```
+
+Der Standardcheck umfasst Bytecode-Kompilierung, Ruff-Lint, Ruff-Formatprüfung
+und die vollständige pytest-Suite.
 
 ## Inhaltliche Leitplanken
 

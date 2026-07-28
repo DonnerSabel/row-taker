@@ -26,6 +26,7 @@ class WorkbenchTimeline:
         if not self.steps:
             raise ValueError("a workbench timeline requires at least one step")
 
+
 TimelineFactory = Callable[[], WorkbenchTimeline]
 
 

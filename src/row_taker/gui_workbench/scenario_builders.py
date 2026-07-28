@@ -78,6 +78,8 @@ def build_lobby_view(
         game_started=False,
         server_endpoint=endpoint,
     )
+
+
 def build_lobby_state(
     lobby: LobbyView,
     *,
@@ -85,6 +87,8 @@ def build_lobby_state(
 ) -> ClientState:
     state = reduce_server_message(initial_client_state(), IdentityAssigned(own_client_id))
     return reduce_server_message(state, LobbyStateUpdated(lobby=lobby))
+
+
 def build_game_state(
     *,
     phase: Phase = Phase.CHOOSE_CARD,
@@ -145,6 +149,8 @@ def build_game_state(
             pending_action=pending_action,
         )
     )
+
+
 def build_revealed_state(
     plays: tuple[tuple[int, int], ...],
     *,
@@ -164,6 +170,8 @@ def build_revealed_state(
         )
     )
     return reduce_server_message(state, revealed)
+
+
 def with_choose_row_request(state: ClientState) -> ClientState:
     player_state = state.player_state
     public_state = state.public_state
@@ -198,6 +206,8 @@ def with_choose_row_request(state: ClientState) -> ClientState:
             state=choose_row_player_state,
         ),
     )
+
+
 def advance_to_event(
     state: ClientState,
     event_type: type[PresentationEvent],

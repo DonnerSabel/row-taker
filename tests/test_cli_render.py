@@ -24,7 +24,9 @@ def test_pending_presentation_uses_enter_prompt_until_queue_is_empty() -> None:
             pending_presentation_steps=(_step(PresentationCardsRevealed(plays=())),)
         ),
     )
-    state = enter_game_mode(state, pending_action=PendingAction.CHOOSE_ROW, player_state=player_state_for(0))
+    state = enter_game_mode(
+        state, pending_action=PendingAction.CHOOSE_ROW, player_state=player_state_for(0)
+    )
 
     assert determine_prompt(state) == "Weiter mit Enter > "
 

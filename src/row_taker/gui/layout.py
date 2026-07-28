@@ -45,7 +45,9 @@ def compute_layout(window_width: int, window_height: int) -> GuiLayout:
     main_width = content_width - sidebar_width - PANEL_GAP
 
     main_rect = pygame.Rect(PANEL_GAP, content_top, main_width, content_height)
-    sidebar_rect = pygame.Rect(main_rect.right + PANEL_GAP, content_top, sidebar_width, content_height)
+    sidebar_rect = pygame.Rect(
+        main_rect.right + PANEL_GAP, content_top, sidebar_width, content_height
+    )
 
     split_height = max(180, (content_height - PANEL_GAP) // 2)
     main_top_rect = pygame.Rect(main_rect.left, main_rect.top, main_rect.width, split_height)

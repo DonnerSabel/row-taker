@@ -50,11 +50,15 @@ def draw_panel(
         overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
         fill_with_alpha = pygame.Color(effective_fill)
         fill_with_alpha.a = alpha
-        pygame.draw.rect(overlay, fill_with_alpha, overlay.get_rect(), border_radius=effective_radius)
+        pygame.draw.rect(
+            overlay, fill_with_alpha, overlay.get_rect(), border_radius=effective_radius
+        )
         surface.blit(overlay, rect)
 
     if border_width > 0:
-        pygame.draw.rect(surface, effective_border, rect, width=border_width, border_radius=effective_radius)
+        pygame.draw.rect(
+            surface, effective_border, rect, width=border_width, border_radius=effective_radius
+        )
 
 
 def draw_overlay_panel(
@@ -92,7 +96,9 @@ def draw_button(
     palette = theme.palette
     spacing = theme.spacing
     fill = _button_fill(variant, hovered=hovered, disabled=disabled, theme=theme)
-    border = palette.panel_border_active if hovered and not disabled else pygame.Color(210, 225, 245)
+    border = (
+        palette.panel_border_active if hovered and not disabled else pygame.Color(210, 225, 245)
+    )
     text_color = palette.text_muted if disabled else palette.text_primary
 
     pygame.draw.rect(surface, fill, rect, border_radius=spacing.button_radius)

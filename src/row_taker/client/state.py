@@ -219,7 +219,6 @@ def set_trick_presentation_state(
     )
 
 
-
 def request_card_choice(
     state: ClientState,
     player_id: PlayerID,

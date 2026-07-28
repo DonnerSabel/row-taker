@@ -30,7 +30,9 @@ class TrickPresentationState:
     presentation_steps: tuple[PresentationStep, ...]
 
 
-def start_trick_presentation(public_state: PublicState, revealed: CardsRevealed) -> TrickPresentationState:
+def start_trick_presentation(
+    public_state: PublicState, revealed: CardsRevealed
+) -> TrickPresentationState:
     ordered = tuple(sorted(revealed.plays, key=lambda play: play.card_value))
     initial_shadow_state = _clone_public_state(public_state)
     revealed_event = build_presentation_cards_revealed(revealed.plays)

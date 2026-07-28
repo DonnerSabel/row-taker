@@ -129,8 +129,7 @@ def begin_trick_resolution(state: GameState) -> tuple[RevealedPlay, ...]:
 
     ordered = sorted(state.selected_cards.items(), key=lambda item: item[1].value)
     state.current_trick_revealed_plays = tuple(
-        RevealedPlay(player_id=player_id, card=card)
-        for player_id, card in ordered
+        RevealedPlay(player_id=player_id, card=card) for player_id, card in ordered
     )
     state.resolution_cursor = TrickResolutionCursor(
         remaining_player_ids=[player_id for player_id, _card in ordered],
@@ -148,7 +147,11 @@ def has_pending_row_choice(state: GameState) -> bool:
 
 def has_pending_resolution_step(state: GameState) -> bool:
     cursor = state.resolution_cursor
-    return cursor is not None and bool(cursor.remaining_player_ids) and state.phase_info.phase != Phase.CHOOSE_ROW
+    return (
+        cursor is not None
+        and bool(cursor.remaining_player_ids)
+        and state.phase_info.phase != Phase.CHOOSE_ROW
+    )
 
 
 def _append_current_trick_step(state: GameState, step: TrickResolutionStep) -> TrickResolutionStep:
@@ -260,7 +263,11 @@ def submit_choose_row(state: GameState, player_id: PlayerID, row_id: RowID) -> T
 
 def trick_resolution_finished(state: GameState) -> bool:
     cursor = state.resolution_cursor
-    return cursor is not None and not cursor.remaining_player_ids and state.phase_info.phase != Phase.CHOOSE_ROW
+    return (
+        cursor is not None
+        and not cursor.remaining_player_ids
+        and state.phase_info.phase != Phase.CHOOSE_ROW
+    )
 
 
 def finish_trick(state: GameState) -> TrickResolutionSummary:

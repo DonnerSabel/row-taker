@@ -52,7 +52,9 @@ def apply_user_input(state: ClientState, text: str):
         elif previous_mode.value == "ended":
             state = enter_ended_mode(state, player_state=state.player_state)
         else:
-            state = enter_game_mode(state, pending_action=previous_action, player_state=state.player_state)
+            state = enter_game_mode(
+                state, pending_action=previous_action, player_state=state.player_state
+            )
         state = set_flash(state, "error", update.local_messages[-1])
         return state, None
     outbound = update.outbound_messages[0] if update.outbound_messages else None

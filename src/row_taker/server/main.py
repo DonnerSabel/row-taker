@@ -31,7 +31,10 @@ def _discover_local_ipv4_addresses() -> list[str]:
         except OSError:
             continue
 
-    return sorted(addresses, key=lambda value: (value != "127.0.0.1", tuple(int(part) for part in value.split("."))))
+    return sorted(
+        addresses,
+        key=lambda value: (value != "127.0.0.1", tuple(int(part) for part in value.split("."))),
+    )
 
 
 def _prompt_choice(options: Iterable[str], label: str) -> str:

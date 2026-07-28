@@ -77,8 +77,12 @@ class GuiCard:
         border_width = 2 if self.selected or self.hovered else 1
 
         pygame.draw.rect(surface, fill, self.rect, border_radius=spacing.card_radius)
-        pygame.draw.rect(surface, border, self.rect, border_width, border_radius=spacing.card_radius)
-        drawer.draw_text(surface, str(self.card_value), (self.rect.left + 8, self.rect.top + 6), role="body")
+        pygame.draw.rect(
+            surface, border, self.rect, border_width, border_radius=spacing.card_radius
+        )
+        drawer.draw_text(
+            surface, str(self.card_value), (self.rect.left + 8, self.rect.top + 6), role="body"
+        )
         if self.bullheads is not None:
             drawer.draw_text(
                 surface,
@@ -101,7 +105,6 @@ class GuiCard:
         )
 
 
-
 def _card_border_color(*, selected: bool, hovered: bool, theme: GuiTheme) -> pygame.Color:
     if selected:
         return theme.palette.accent
@@ -121,6 +124,8 @@ def draw_card_back(
     palette = theme.palette
     spacing = theme.spacing
     back = pygame.Surface(rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(back, palette.card_back_fill, back.get_rect(), border_radius=spacing.card_radius)
+    pygame.draw.rect(
+        back, palette.card_back_fill, back.get_rect(), border_radius=spacing.card_radius
+    )
     surface.blit(back, rect)
     pygame.draw.rect(surface, palette.card_back_border, rect, 1, border_radius=spacing.card_radius)

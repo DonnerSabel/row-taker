@@ -40,7 +40,9 @@ def test_start_routes_revisioned_match_messages_to_clients() -> None:
 
     assert isinstance(envelopes[0].message, StateUpdated)
     assert envelopes[0].message.revision == 1
-    prompts = [envelope for envelope in envelopes if isinstance(envelope.message, ChooseCardRequested)]
+    prompts = [
+        envelope for envelope in envelopes if isinstance(envelope.message, ChooseCardRequested)
+    ]
     assert [envelope.message.revision for envelope in prompts] == [2, 3]
     assert [envelope.target_client_id for envelope in prompts] == ["client-0", "client-1"]
 

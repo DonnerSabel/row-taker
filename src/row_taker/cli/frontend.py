@@ -68,7 +68,11 @@ def parse_text_to_action(state: ClientState, text: str) -> FrontendInputResult:
     if has_pending_presentation(state):
         if normalized == "":
             return FrontendInputResult(state=state, action=ClientActionAdvancePresentation())
-        return FrontendInputResult(state=set_flash(state, "info", "Bitte zuerst die lokale Auflösung mit Enter weiterführen."))
+        return FrontendInputResult(
+            state=set_flash(
+                state, "info", "Bitte zuerst die lokale Auflösung mit Enter weiterführen."
+            )
+        )
 
     if state.client_mode == ClientMode.LOBBY:
         return _parse_lobby_input(state, normalized)
@@ -106,40 +110,68 @@ def _parse_lobby_main(state: ClientState, text: str) -> FrontendInputResult:
     if text.isdigit():
         seat_index = int(text)
         if state.lobby_view is None or not (0 <= seat_index < state.lobby_view.seat_count):
-            return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "main"), "error", "Ungültiger Platz."))
+            return FrontendInputResult(
+                state=set_flash(enter_lobby_submenu(state, "main"), "error", "Ungültiger Platz.")
+            )
         next_state = enter_lobby_submenu(state, "seat_edit", selected_seat_index=seat_index)
         next_state = clear_flash_message(next_state)
         return FrontendInputResult(state=next_state)
-    return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "main"), "error", "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer."))
+    return FrontendInputResult(
+        state=set_flash(
+            enter_lobby_submenu(state, "main"),
+            "error",
+            "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer.",
+        )
+    )
 
 
 def _parse_lobby_rename(state: ClientState, text: str) -> FrontendInputResult:
     if text == "":
-        return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "rename"), "error", "Der Anzeigename darf nicht leer sein."))
+        return FrontendInputResult(
+            state=set_flash(
+                enter_lobby_submenu(state, "rename"),
+                "error",
+                "Der Anzeigename darf nicht leer sein.",
+            )
+        )
     next_state = enter_lobby_submenu(state, "main")
     next_state = clear_flash_message(next_state)
     return FrontendInputResult(state=next_state, action=ClientActionRename(text))
 
 
-def _parse_lobby_seat_edit(state: ClientState, text: str, seat_index: int | None) -> FrontendInputResult:
+def _parse_lobby_seat_edit(
+    state: ClientState, text: str, seat_index: int | None
+) -> FrontendInputResult:
     if seat_index is None:
         raise TypeError("seat_edit screen requires seat_index")
     if text == "m":
-        return FrontendInputResult(state=clear_flash(state), action=ClientActionAssignSelfToSeat(seat_index))
+        return FrontendInputResult(
+            state=clear_flash(state), action=ClientActionAssignSelfToSeat(seat_index)
+        )
     if text == "b":
         next_state = enter_lobby_submenu(state, "bot_name", selected_seat_index=seat_index)
         next_state = clear_flash_message(next_state)
         return FrontendInputResult(state=next_state)
     if text == "c":
-        return FrontendInputResult(state=clear_flash(state), action=ClientActionClearSeat(seat_index))
+        return FrontendInputResult(
+            state=clear_flash(state), action=ClientActionClearSeat(seat_index)
+        )
     if text == "x":
         next_state = enter_lobby_submenu(state, "main")
         next_state = clear_flash_message(next_state)
         return FrontendInputResult(state=next_state)
-    return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "seat_edit", selected_seat_index=seat_index), "error", "Ungültige Eingabe. Erlaubt sind m, b, c oder x."))
+    return FrontendInputResult(
+        state=set_flash(
+            enter_lobby_submenu(state, "seat_edit", selected_seat_index=seat_index),
+            "error",
+            "Ungültige Eingabe. Erlaubt sind m, b, c oder x.",
+        )
+    )
 
 
-def _parse_lobby_bot_name(state: ClientState, text: str, seat_index: int | None) -> FrontendInputResult:
+def _parse_lobby_bot_name(
+    state: ClientState, text: str, seat_index: int | None
+) -> FrontendInputResult:
     if seat_index is None:
         raise TypeError("bot_name screen requires seat_index")
     if text == "x":
@@ -149,14 +181,18 @@ def _parse_lobby_bot_name(state: ClientState, text: str, seat_index: int | None)
     display_name = text or f"Bot_{seat_index}"
     next_state = enter_lobby_submenu(state, "main")
     next_state = clear_flash_message(next_state)
-    return FrontendInputResult(state=next_state, action=ClientActionCreateBot(seat_index, display_name))
+    return FrontendInputResult(
+        state=next_state, action=ClientActionCreateBot(seat_index, display_name)
+    )
 
 
 def _parse_game_choose_card(state: ClientState, text: str) -> FrontendInputResult:
     try:
         value = int(text)
     except ValueError:
-        return FrontendInputResult(state=set_flash(state, "error", "Bitte eine Kartenzahl eingeben."))
+        return FrontendInputResult(
+            state=set_flash(state, "error", "Bitte eine Kartenzahl eingeben.")
+        )
     return FrontendInputResult(state=clear_flash(state), action=ClientActionChooseCard(value))
 
 
@@ -167,7 +203,9 @@ def _parse_game_choose_row(state: ClientState, text: str) -> FrontendInputResult
     try:
         cli_row = int(text)
     except ValueError:
-        return FrontendInputResult(state=set_flash(state, "error", "Bitte eine Reihennummer eingeben."))
+        return FrontendInputResult(
+            state=set_flash(state, "error", "Bitte eine Reihennummer eingeben.")
+        )
     mapping = build_row_display_mapping(player_state.public_state)
     if cli_row < 1 or cli_row > mapping.max_cli_row():
         return FrontendInputResult(state=set_flash(state, "error", "Ungültige Reihennummer."))

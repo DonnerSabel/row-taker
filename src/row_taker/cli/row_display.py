@@ -51,7 +51,9 @@ def format_resolution_steps_for_cli(
         row_index = shadow_state.get_row_index(step.affected_row_id)
         mapping = build_row_display_mapping(shadow_state)
         cli_row = mapping.to_cli_row(row_index)
-        player = next(player for player in shadow_state.players if player.player_id == step.player_id)
+        player = next(
+            player for player in shadow_state.players if player.player_id == step.player_id
+        )
 
         if step.action == StepAction.PLACED:
             lines.append(f"- {player.name} legt {step.played_card.value} an Reihe {cli_row}.")

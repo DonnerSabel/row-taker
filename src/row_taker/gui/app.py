@@ -184,9 +184,7 @@ class GuiApp:
                 port=str(port),
                 display_name=display_name,
                 active_field="host",
-                error_message=(
-                    "Unerwarteter Verbindungsfehler. Details stehen im Log."
-                ),
+                error_message=("Unerwarteter Verbindungsfehler. Details stehen im Log."),
                 status_message="Bitte erneut versuchen.",
             )
             return

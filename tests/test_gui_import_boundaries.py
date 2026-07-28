@@ -7,9 +7,7 @@ import sys
 
 def _assert_import_does_not_load_pygame(module_name: str) -> None:
     env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join(
-        part for part in ("src", env.get("PYTHONPATH", "")) if part
-    )
+    env["PYTHONPATH"] = os.pathsep.join(part for part in ("src", env.get("PYTHONPATH", "")) if part)
     code = (
         f"import {module_name}; "
         "import sys; "

@@ -35,6 +35,8 @@ from row_taker.protocol.messages import (
 def _front_event(state: ClientState) -> PresentationEvent | None:
     step = state.current_presentation_step
     return None if step is None else step.event
+
+
 def _step(
     timeline_name: str,
     index: int,
@@ -50,6 +52,8 @@ def _step(
         state=state,
         interesting_frames=frames,
     )
+
+
 def _deliver_relevant_messages(
     core: GameClientCore,
     messages: list[object],
@@ -61,6 +65,8 @@ def _deliver_relevant_messages(
             if message.player_id != own_player_id:
                 continue
         core.on_server_message(message)
+
+
 def _frame_for_state(
     state: ClientState,
     *,
@@ -72,6 +78,8 @@ def _frame_for_state(
         presentation_elapsed_frames=0,
         mouse_pos=mouse_pos,
     )
+
+
 def _apply_click_action(
     core: GameClientCore,
     *,
@@ -92,6 +100,8 @@ def _apply_click_action(
             f"expected {expected_action_type.__name__} from GameFrame, got {action!r}"
         )
     return core.on_ui_action(action)
+
+
 def _advance_presentation(core: GameClientCore) -> ClientState:
     frame = _frame_for_state(core.state)
     _apply_click_action(
@@ -100,6 +110,8 @@ def _advance_presentation(core: GameClientCore) -> ClientState:
         expected_action_type=ClientActionAdvancePresentation,
     )
     return core.state
+
+
 def build_full_trick_timeline() -> WorkbenchTimeline:
     timeline_name = "full-trick"
     own_player_id = PlayerID("player-0")

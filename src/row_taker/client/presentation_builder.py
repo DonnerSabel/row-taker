@@ -13,11 +13,15 @@ from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.protocol.messages import PlayedCardView
 
 
-def _player_name(player_id: PlayerID, player_names: dict[PlayerID, str], fallback: str = "?") -> str:
+def _player_name(
+    player_id: PlayerID, player_names: dict[PlayerID, str], fallback: str = "?"
+) -> str:
     return player_names.get(player_id, fallback)
 
 
-def build_presentation_cards_revealed(plays: tuple[PlayedCardView, ...]) -> PresentationCardsRevealed:
+def build_presentation_cards_revealed(
+    plays: tuple[PlayedCardView, ...],
+) -> PresentationCardsRevealed:
     return PresentationCardsRevealed(plays=plays)
 
 

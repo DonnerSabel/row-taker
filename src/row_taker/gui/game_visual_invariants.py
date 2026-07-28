@@ -27,12 +27,10 @@ def assert_visual_matches_public_state(
         )
 
     visual_players = {
-        player.player_id: (player.name, player.score)
-        for player in visual_state.players
+        player.player_id: (player.name, player.score) for player in visual_state.players
     }
     public_players = {
-        player.player_id: (player.name, player.score)
-        for player in public_state.players
+        player.player_id: (player.name, player.score) for player in public_state.players
     }
     if visual_players != public_players:
         raise AssertionError(

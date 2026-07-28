@@ -12,6 +12,8 @@ def _lobby_empty() -> LobbyWorkbenchScenario:
         description="Leere Lobby direkt nach dem Verbinden.",
         state=build_lobby_state(build_lobby_view((None, None, None, None))),
     )
+
+
 def _waitingbuild_lobby_state() -> ClientState:
     return build_lobby_state(
         build_lobby_view(
@@ -24,12 +26,16 @@ def _waitingbuild_lobby_state() -> ClientState:
             extra_participants=(("client-ben", "Ben", ParticipantKind.HUMAN, "192.0.2.12:52144"),),
         )
     )
+
+
 def _lobby_waiting() -> LobbyWorkbenchScenario:
     return LobbyWorkbenchScenario(
         name="lobby-waiting",
         description="Gemischte Lobby mit Mensch, Bot, freien Plätzen und Zuschauer.",
         state=_waitingbuild_lobby_state(),
     )
+
+
 def _lobby_seat_selected() -> LobbyWorkbenchScenario:
     return LobbyWorkbenchScenario(
         name="lobby-seat-selected",
@@ -40,6 +46,8 @@ def _lobby_seat_selected() -> LobbyWorkbenchScenario:
             selected_seat_index=1,
         ),
     )
+
+
 def _lobby_bot_name_edit() -> LobbyWorkbenchScenario:
     state = enter_lobby_submenu(
         _waitingbuild_lobby_state(),
@@ -56,6 +64,8 @@ def _lobby_bot_name_edit() -> LobbyWorkbenchScenario:
         description="Namenseingabe für einen vorhandenen lokalen Bot.",
         state=state,
     )
+
+
 def _lobby_full() -> LobbyWorkbenchScenario:
     return LobbyWorkbenchScenario(
         name="lobby-full",
@@ -71,6 +81,8 @@ def _lobby_full() -> LobbyWorkbenchScenario:
             )
         ),
     )
+
+
 def _lobby_long_names() -> LobbyWorkbenchScenario:
     return LobbyWorkbenchScenario(
         name="lobby-long-names",
@@ -110,6 +122,7 @@ def _lobby_long_names() -> LobbyWorkbenchScenario:
             )
         ),
     )
+
 
 LOBBY_SCENARIO_FACTORIES: dict[str, ScenarioFactory] = {
     "lobby-empty": _lobby_empty,

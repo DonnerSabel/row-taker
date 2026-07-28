@@ -18,9 +18,13 @@ from row_taker.protocol.messages import ClientToServerMessage, ServerToClientMes
 @dataclass(slots=True)
 class RandomBotClient:
     rng: random.Random = field(default_factory=random.Random)
-    core: GameClientCore = field(default_factory=lambda: GameClientCore(state=initial_client_state()))
+    core: GameClientCore = field(
+        default_factory=lambda: GameClientCore(state=initial_client_state())
+    )
 
-    def handle_server_message(self, message: ServerToClientMessage) -> tuple[ClientToServerMessage, ...]:
+    def handle_server_message(
+        self, message: ServerToClientMessage
+    ) -> tuple[ClientToServerMessage, ...]:
         update = self.core.on_server_message(message)
         outbound_messages: list[ClientToServerMessage] = list(update.outbound_messages)
         self._drain_presentation(outbound_messages)

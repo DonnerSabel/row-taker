@@ -63,7 +63,9 @@ class GuiPalette:
     row_overflow: pygame.Color = field(default_factory=lambda: pygame.Color(255, 82, 82))
     row_neutral: pygame.Color = field(default_factory=lambda: pygame.Color(255, 255, 255, 28))
     taken_badge_fill: pygame.Color = field(default_factory=lambda: pygame.Color(80, 20, 12, 170))
-    taken_badge_border: pygame.Color = field(default_factory=lambda: pygame.Color(255, 200, 160, 120))
+    taken_badge_border: pygame.Color = field(
+        default_factory=lambda: pygame.Color(255, 200, 160, 120)
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -19,7 +19,9 @@ PALETTE = THEME.palette
 
 
 def draw_menu_background(screen: pygame.Surface, *, theme: GuiTheme = THEME) -> None:
-    background = DEFAULT_GUI_ASSETS.scaled_connect_background(screen.get_width(), screen.get_height())
+    background = DEFAULT_GUI_ASSETS.scaled_connect_background(
+        screen.get_width(), screen.get_height()
+    )
     if background is None:
         draw_vertical_gradient(screen, theme=theme)
     else:
@@ -51,7 +53,13 @@ def draw_menu_header(
     rect = header_footer_layout(layout, config=config).header_rect
     draw_overlay_panel(screen, rect, radius=20, alpha=58, theme=theme)
     drawer.draw_text(screen, title, (rect.left + 24, rect.top + 10), role="title")
-    drawer.draw_text(screen, subtitle, (rect.left + 24, rect.top + 42), role="body", color=theme.palette.text_muted)
+    drawer.draw_text(
+        screen,
+        subtitle,
+        (rect.left + 24, rect.top + 42),
+        role="body",
+        color=theme.palette.text_muted,
+    )
 
 
 def draw_menu_footer(
@@ -137,7 +145,9 @@ def _draw_text_selection(
 ) -> None:
     font = drawer._font_for_role("body")
     text_width, text_height = font.size(text)
-    selection_rect = pygame.Rect(rect.left + 12, rect.top + 8, text_width + 10, max(30, text_height + 8))
+    selection_rect = pygame.Rect(
+        rect.left + 12, rect.top + 8, text_width + 10, max(30, text_height + 8)
+    )
     selection_surface = pygame.Surface(selection_rect.size, pygame.SRCALPHA)
     selection_surface.fill(pygame.Color(80, 132, 212, 120))
     screen.blit(selection_surface, selection_rect)

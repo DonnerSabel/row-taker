@@ -29,9 +29,7 @@ def _equal_step_pair() -> tuple[PresentationStep, PresentationStep]:
 def test_presentation_clock_keeps_running_for_same_step_object() -> None:
     step, _ = _equal_step_pair()
     app = GuiApp()
-    app._client_state = ClientState(
-        core_state=ClientCoreState(pending_presentation_steps=(step,))
-    )
+    app._client_state = ClientState(core_state=ClientCoreState(pending_presentation_steps=(step,)))
     app._sync_presentation_clock()
     app._presentation_elapsed_frames = 10
 
@@ -44,9 +42,7 @@ def test_presentation_clock_keeps_running_for_same_step_object() -> None:
 def test_presentation_clock_resets_for_equal_but_distinct_steps() -> None:
     first, second = _equal_step_pair()
     app = GuiApp()
-    app._client_state = ClientState(
-        core_state=ClientCoreState(pending_presentation_steps=(first,))
-    )
+    app._client_state = ClientState(core_state=ClientCoreState(pending_presentation_steps=(first,)))
     app._sync_presentation_clock()
     app._presentation_elapsed_frames = 10
 

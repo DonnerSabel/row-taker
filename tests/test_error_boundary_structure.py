@@ -6,12 +6,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_domain_layers_do_not_catch_all_exceptions() -> None:
-    action_transitions = (
-        ROOT / "src/row_taker/client/action_transitions.py"
-    ).read_text(encoding="utf-8")
-    local_server = (ROOT / "src/row_taker/server/local_server.py").read_text(
+    action_transitions = (ROOT / "src/row_taker/client/action_transitions.py").read_text(
         encoding="utf-8"
     )
+    local_server = (ROOT / "src/row_taker/server/local_server.py").read_text(encoding="utf-8")
 
     assert "except Exception" not in action_transitions
     assert "except Exception" not in local_server

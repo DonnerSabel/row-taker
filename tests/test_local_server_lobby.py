@@ -162,8 +162,12 @@ def test_leave_session_aborts_active_match_for_remaining_clients() -> None:
     server.register_connection("client-1", endpoint_display="10.0.0.2:1000")
     server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
     server.handle_client_message("client-1", JoinLobby(display_name="Bob"))
-    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
-    server.handle_client_message("client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1")
+    )
     server.drain_outbox()
 
     server.handle_client_message("client-0", RequestStartGame())
@@ -185,8 +189,12 @@ def test_game_messages_are_revisioned_when_routed() -> None:
     server = LocalServer(rng=random.Random(1234), seat_count=2)
     server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
     server.handle_client_message("client-1", JoinLobby(display_name="Bob"))
-    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
-    server.handle_client_message("client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1")
+    )
     server.drain_outbox()
 
     server.handle_client_message("client-0", RequestStartGame(), reply_target_client_id="client-0")
@@ -202,11 +210,19 @@ def test_game_messages_are_revisioned_when_routed() -> None:
     for index, row in enumerate(state.rows):
         row.cards = [Card((index + 1) * 10)]
 
-    server.handle_client_message("client-0", SubmitCard(card_value=1), reply_target_client_id="client-0")
+    server.handle_client_message(
+        "client-0", SubmitCard(card_value=1), reply_target_client_id="client-0"
+    )
     server.drain_outbox()
-    server.handle_client_message("client-1", SubmitCard(card_value=90), reply_target_client_id="client-1")
+    server.handle_client_message(
+        "client-1", SubmitCard(card_value=90), reply_target_client_id="client-1"
+    )
     envelopes = server.drain_outbox()
-    tagged = [env.message for env in envelopes if isinstance(env.message, CardsRevealed | ChooseRowRequested)]
+    tagged = [
+        env.message
+        for env in envelopes
+        if isinstance(env.message, CardsRevealed | ChooseRowRequested)
+    ]
     assert [message.revision for message in tagged] == [4, 5]
 
 
@@ -216,8 +232,12 @@ def test_match_abort_does_not_broadcast_lobby_state_during_session_teardown() ->
     server.register_connection("client-1", endpoint_display="10.0.0.2:1000")
     server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
     server.handle_client_message("client-1", JoinLobby(display_name="Bob"))
-    server.handle_client_message("client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0"))
-    server.handle_client_message("client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1"))
+    server.handle_client_message(
+        "client-0", AssignSeatToClient(seat_index=0, target_client_id="client-0")
+    )
+    server.handle_client_message(
+        "client-1", AssignSeatToClient(seat_index=1, target_client_id="client-1")
+    )
     server.drain_outbox()
 
     server.handle_client_message("client-0", RequestStartGame())

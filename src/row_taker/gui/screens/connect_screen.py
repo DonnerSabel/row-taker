@@ -107,7 +107,9 @@ def build_connect_screen_targets(layout: GuiLayout) -> ConnectScreenTargets:
     field_targets = (
         ConnectFieldTarget("host", "Server IP", "z. B. 127.0.0.1", panel_layout.field_rects[0]),
         ConnectFieldTarget("port", "Port", "z. B. 8765", panel_layout.field_rects[1]),
-        ConnectFieldTarget("display_name", "Anzeigename", "Name im Spiel", panel_layout.field_rects[2]),
+        ConnectFieldTarget(
+            "display_name", "Anzeigename", "Name im Spiel", panel_layout.field_rects[2]
+        ),
     )
     button_targets = (
         ConnectButtonTarget("connect", "Verbinden", panel_layout.button_rects[0]),
@@ -219,7 +221,9 @@ def handle_connect_event(
     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and connect_targets is not None:
         for target in connect_targets.field_targets:
             if target.rect.collidepoint(event.pos):
-                return ScreenResult(next_connect_form=activate_field(connect_form, target.field_name))
+                return ScreenResult(
+                    next_connect_form=activate_field(connect_form, target.field_name)
+                )
         for target in connect_targets.button_targets:
             if not target.rect.collidepoint(event.pos):
                 continue

@@ -218,9 +218,7 @@ class LocalServer:
         old_name = self.registry.get_participant(client_id).display_name
         self.registry.set_display_name(client_id, message.display_name)
         new_name = self.registry.get_participant(client_id).display_name
-        self._log(
-            f"display name changed: client_id={client_id} old={old_name!r} new={new_name!r}"
-        )
+        self._log(f"display name changed: client_id={client_id} old={old_name!r} new={new_name!r}")
         self._broadcast_lobby_state()
 
     def _handle_assign_seat(self, message: AssignSeatToClient) -> None:
@@ -234,9 +232,7 @@ class LocalServer:
             message.target_client_id,
             message.seat_index,
         )
-        self._log(
-            f"seat assigned: seat={message.seat_index} client_id={message.target_client_id}"
-        )
+        self._log(f"seat assigned: seat={message.seat_index} client_id={message.target_client_id}")
         self._broadcast_lobby_state()
 
     def _handle_create_local_bot(self, message: CreateLocalBotOnSeat) -> None:
@@ -248,9 +244,7 @@ class LocalServer:
         if current_occupant is not None:
             self.lobby_state = clear_seat(self.lobby_state, message.seat_index)
         self.bot_manager.reserve(message.seat_index, display_name)
-        self._log(
-            f"pending bot configured: seat={message.seat_index} name={display_name!r}"
-        )
+        self._log(f"pending bot configured: seat={message.seat_index} name={display_name!r}")
         self._broadcast_lobby_state()
 
     def _handle_clear_seat(self, message: ClearSeat) -> None:
@@ -266,9 +260,7 @@ class LocalServer:
         if self.match_router.is_active or self._start_in_progress:
             raise ClientRequestRejected("game already started")
         if not self.bot_manager.can_complete_lobby(self.lobby_state):
-            raise ClientRequestRejected(
-                "cannot start game without full valid lobby configuration"
-            )
+            raise ClientRequestRejected("cannot start game without full valid lobby configuration")
         if not self.bot_manager.has_pending_reservations:
             self._start_match_now()
             return
@@ -377,9 +369,7 @@ class LocalServer:
             endpoint_display=endpoint_display,
         )
         remaining_client_ids = tuple(
-            client_id
-            for client_id in self.registry.records
-            if client_id != departing_client_id
+            client_id for client_id in self.registry.records if client_id != departing_client_id
         )
         self._log(
             "active match aborted: "
@@ -451,9 +441,7 @@ class LocalServer:
         logger.debug(
             "remove participant: client_id=%s kind=%s",
             client_id,
-            self.registry.get_participant(client_id).kind
-            if self.registry.has(client_id)
-            else None,
+            self.registry.get_participant(client_id).kind if self.registry.has(client_id) else None,
         )
         self.bot_manager.close_running(client_id)
         self.registry.remove_participant(client_id)
@@ -477,13 +465,10 @@ class LocalServer:
         if reason is SessionEndReason.QUIT:
             return f"Spiel abgebrochen: {departing_display_name} hat die Sitzung verlassen."
         if reason is SessionEndReason.KICKED:
-            return (
-                f"Spiel abgebrochen: {departing_display_name} wurde aus der Sitzung entfernt."
-            )
+            return f"Spiel abgebrochen: {departing_display_name} wurde aus der Sitzung entfernt."
         endpoint_suffix = f" ({endpoint_display})" if endpoint_display else ""
         return (
-            "Spiel abgebrochen: Verbindung zu "
-            f"{departing_display_name}{endpoint_suffix} verloren."
+            f"Spiel abgebrochen: Verbindung zu {departing_display_name}{endpoint_suffix} verloren."
         )
 
     def _log(self, message: str) -> None:

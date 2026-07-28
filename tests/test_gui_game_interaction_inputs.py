@@ -296,4 +296,3 @@ def test_mouse_button_release_never_triggers_a_game_action() -> None:
     )
 
     assert result is NO_SCREEN_RESULT
-

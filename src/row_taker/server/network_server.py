@@ -50,14 +50,18 @@ class NetworkServer:
     _client_counter: int = 0
     _ever_had_connection: bool = False
 
-    def add_connection(self, transport: ServerTransport, endpoint_display: str | None = None) -> str:
+    def add_connection(
+        self, transport: ServerTransport, endpoint_display: str | None = None
+    ) -> str:
         with self._lock:
             client_id = f"client-{self._client_counter}"
             self._client_counter += 1
             self._connections[client_id] = _Connection(client_id=client_id, transport=transport)
             self._ever_had_connection = True
             self.server.register_connection(client_id, endpoint_display=endpoint_display)
-            logger.info(f"connection accepted: client_id={client_id} endpoint={endpoint_display or '-'}")
+            logger.info(
+                f"connection accepted: client_id={client_id} endpoint={endpoint_display or '-'}"
+            )
             return client_id
 
     def remove_connection(self, client_id: str) -> None:
@@ -87,7 +91,6 @@ class NetworkServer:
             self._drain_and_dispatch_locked()
             return client_id
 
-
     def _drain_and_dispatch_locked(self) -> None:
         while True:
             envelopes = self.server.drain_outbox()
@@ -99,7 +102,9 @@ class NetworkServer:
 
     def should_shutdown(self) -> bool:
         with self._lock:
-            return self._ever_had_connection and self.server.should_shutdown and not self._connections
+            return (
+                self._ever_had_connection and self.server.should_shutdown and not self._connections
+            )
 
     def _rename_connection_locked(self, old_client_id: str, new_client_id: str) -> None:
         if new_client_id in self._connections:
@@ -114,18 +119,35 @@ class NetworkServer:
         for envelope in envelopes:
             if envelope.target_client_id is None:
                 recipients = list(self._connections.values())
-                logger.debug("dispatch envelope broadcast: type=%s recipients=%s", type(envelope.message).__name__, [c.client_id for c in recipients])
+                logger.debug(
+                    "dispatch envelope broadcast: type=%s recipients=%s",
+                    type(envelope.message).__name__,
+                    [c.client_id for c in recipients],
+                )
             else:
                 connection = self._connections.get(envelope.target_client_id)
                 recipients = [] if connection is None else [connection]
-                logger.debug("dispatch envelope targeted: type=%s target=%s connection_found=%s", type(envelope.message).__name__, envelope.target_client_id, connection is not None)
+                logger.debug(
+                    "dispatch envelope targeted: type=%s target=%s connection_found=%s",
+                    type(envelope.message).__name__,
+                    envelope.target_client_id,
+                    connection is not None,
+                )
             for connection in recipients:
                 if connection.client_id in failed_client_ids:
                     continue
                 try:
-                    logger.debug("send envelope start: type=%s target_client_id=%s", type(envelope.message).__name__, connection.client_id)
+                    logger.debug(
+                        "send envelope start: type=%s target_client_id=%s",
+                        type(envelope.message).__name__,
+                        connection.client_id,
+                    )
                     connection.send(envelope)
-                    logger.debug("send envelope success: type=%s target_client_id=%s", type(envelope.message).__name__, connection.client_id)
+                    logger.debug(
+                        "send envelope success: type=%s target_client_id=%s",
+                        type(envelope.message).__name__,
+                        connection.client_id,
+                    )
                 except TransportError as exc:
                     failed_client_ids.add(connection.client_id)
                     logger.info(
@@ -146,7 +168,9 @@ def _format_endpoint(addr: object) -> str | None:
     return None if addr is None else str(addr)
 
 
-def _serve_connection(conn: socket.socket, network_server: NetworkServer, endpoint_display: str | None) -> None:
+def _serve_connection(
+    conn: socket.socket, network_server: NetworkServer, endpoint_display: str | None
+) -> None:
     transport = ServerTransport.from_socket(conn)
     client_id = network_server.add_connection(transport, endpoint_display=endpoint_display)
     try:
@@ -199,7 +223,9 @@ def run_network_server(
         network_server = NetworkServer(server=local_server)
         while True:
             if network_server.should_shutdown():
-                logger.info("session ended and no participants connected anymore; server shutting down")
+                logger.info(
+                    "session ended and no participants connected anymore; server shutting down"
+                )
                 break
             try:
                 conn, addr = listener.accept()

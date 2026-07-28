@@ -28,7 +28,9 @@ class ScreenView:
 
 def build_view(state: ClientState) -> ScreenView:
     if state.session_error is not None:
-        return ScreenView(body=render_session_error(state.session_error), prompt=determine_prompt(state))
+        return ScreenView(
+            body=render_session_error(state.session_error), prompt=determine_prompt(state)
+        )
     body = render_main_screen(state)
     if state.flash_message is not None:
         body = "\n\n".join([body, render_flash_message(state.flash_message)])
@@ -136,7 +138,11 @@ def render_lobby_rename(state: ClientState) -> str:
 
 def render_lobby_seat_edit(state: ClientState) -> str:
     seat_index = state.navigation_state.selected_seat_index
-    if state.client_mode != ClientMode.LOBBY or state.navigation_state.lobby_submenu != "seat_edit" or seat_index is None:
+    if (
+        state.client_mode != ClientMode.LOBBY
+        or state.navigation_state.lobby_submenu != "seat_edit"
+        or seat_index is None
+    ):
         raise TypeError("expected seat_edit submenu")
     return "\n".join(
         [
@@ -155,7 +161,11 @@ def render_lobby_seat_edit(state: ClientState) -> str:
 
 def render_lobby_bot_name(state: ClientState) -> str:
     seat_index = state.navigation_state.selected_seat_index
-    if state.client_mode != ClientMode.LOBBY or state.navigation_state.lobby_submenu != "bot_name" or seat_index is None:
+    if (
+        state.client_mode != ClientMode.LOBBY
+        or state.navigation_state.lobby_submenu != "bot_name"
+        or seat_index is None
+    ):
         raise TypeError("expected bot_name submenu")
     current_name = _current_bot_name(state, seat_index)
     return "\n".join(
@@ -223,7 +233,9 @@ def render_lobby_overview_with_highlight(state: ClientState, selected_seat_index
 
 
 def render_lobby_participant_line(state: ClientState, participant: LobbyParticipantView) -> str:
-    position = f"Platz {participant.seat_index}" if participant.seat_index is not None else "nicht gesetzt"
+    position = (
+        f"Platz {participant.seat_index}" if participant.seat_index is not None else "nicht gesetzt"
+    )
     marker = " <- du" if participant.client_id == state.own_client_id else ""
     return f"  {participant.display_name} ({participant.participant_kind}, {position}){marker}"
 
@@ -245,7 +257,11 @@ def _current_bot_name(state: ClientState, seat_index: int) -> str:
     lobby = state.lobby_view
     if lobby is not None:
         for seat in lobby.seats:
-            if seat.seat_index == seat_index and seat.occupant_kind is ParticipantKind.BOT and seat.occupant_display_name:
+            if (
+                seat.seat_index == seat_index
+                and seat.occupant_kind is ParticipantKind.BOT
+                and seat.occupant_display_name
+            ):
                 return seat.occupant_display_name
     return f"Bot_{seat_index}"
 
@@ -261,7 +277,11 @@ def render_game_waiting(state: ClientState) -> str:
 
 def render_game_choose_card(state: ClientState) -> str:
     player_state = state.player_state
-    if state.client_mode != ClientMode.GAME or state.pending_action != PendingAction.CHOOSE_CARD or player_state is None:
+    if (
+        state.client_mode != ClientMode.GAME
+        or state.pending_action != PendingAction.CHOOSE_CARD
+        or player_state is None
+    ):
         raise TypeError("expected choose_card state")
     lines = [
         render_game_overview(state),
@@ -277,7 +297,11 @@ def render_game_choose_card(state: ClientState) -> str:
 
 def render_game_choose_row(state: ClientState) -> str:
     player_state = state.player_state
-    if state.client_mode != ClientMode.GAME or state.pending_action != PendingAction.CHOOSE_ROW or player_state is None:
+    if (
+        state.client_mode != ClientMode.GAME
+        or state.pending_action != PendingAction.CHOOSE_ROW
+        or player_state is None
+    ):
         raise TypeError("expected choose_row state")
     mapping = build_row_display_mapping(player_state.public_state)
     pending_card_value = player_state.pending_card_value()
@@ -323,7 +347,9 @@ def render_game_overview(state: ClientState) -> str:
     lines.extend(["", "Scores:"])
     for index, player in enumerate(public_state.players):
         marker = " <- du" if player.player_id == state.own_player_id else ""
-        lines.append(f"  ({index}) {player.name}: {player.score}, {player.hand_count} Karten{marker}")
+        lines.append(
+            f"  ({index}) {player.name}: {player.score}, {player.hand_count} Karten{marker}"
+        )
     return "\n".join(lines)
 
 
@@ -347,7 +373,9 @@ def render_resolution_lines(state: ClientState) -> str | None:
     return "\n".join(lines)
 
 
-def render_presentation_event(event: PresentationEvent, *, own_player_id: str | None) -> tuple[str, ...]:
+def render_presentation_event(
+    event: PresentationEvent, *, own_player_id: str | None
+) -> tuple[str, ...]:
     match event:
         case PresentationCardsRevealed(plays=plays):
             lines = ["Gespielte Karten:"]
@@ -355,20 +383,42 @@ def render_presentation_event(event: PresentationEvent, *, own_player_id: str | 
                 marker = " <- du" if card.player_id == own_player_id else ""
                 lines.append(f"  {card.card_value:>3}  {card.player_name}{marker}")
             return tuple(lines)
-        case PresentationCardPlaced(player_name=name, card_value=value, row_id=row_id, row_cards_after=row_cards_after):
-            return (f"- {name} legt {value} an Reihe {row_id}; danach: {' '.join(str(v) for v in row_cards_after)}",)
+        case PresentationCardPlaced(
+            player_name=name, card_value=value, row_id=row_id, row_cards_after=row_cards_after
+        ):
+            return (
+                f"- {name} legt {value} an Reihe {row_id}; danach: {' '.join(str(v) for v in row_cards_after)}",
+            )
         case PresentationRowChoiceRequired(player_name=name, card_value=value):
             return (f"- {name} muss mit {value} eine Reihe wählen.",)
         case PresentationRowChosen(player_name=name, row_id=row_id, card_value=value):
             return (f"- {name} wählt Reihe {row_id} für {value}.",)
-        case PresentationRowTaken(player_name=name, row_id=row_id, taken_cards=taken_cards, bullheads=bullheads, replacement_card_value=value, row_cards_after=row_cards_after):
-            cards = ' '.join(str(v) for v in taken_cards)
-            after = ' '.join(str(v) for v in row_cards_after)
-            return (f"- {name} nimmt Reihe {row_id} ({cards}) für {bullheads} Hornochsen und startet mit {value}; danach: {after}",)
-        case PresentationOverflowResolved(player_name=name, row_id=row_id, card_value=value, taken_cards=taken_cards, bullheads=bullheads, row_cards_after=row_cards_after):
-            cards = ' '.join(str(v) for v in taken_cards)
-            after = ' '.join(str(v) for v in row_cards_after)
-            return (f"- {name} löst Overflow in Reihe {row_id} mit {value} aus, nimmt ({cards}) für {bullheads} Hornochsen; danach: {after}",)
+        case PresentationRowTaken(
+            player_name=name,
+            row_id=row_id,
+            taken_cards=taken_cards,
+            bullheads=bullheads,
+            replacement_card_value=value,
+            row_cards_after=row_cards_after,
+        ):
+            cards = " ".join(str(v) for v in taken_cards)
+            after = " ".join(str(v) for v in row_cards_after)
+            return (
+                f"- {name} nimmt Reihe {row_id} ({cards}) für {bullheads} Hornochsen und startet mit {value}; danach: {after}",
+            )
+        case PresentationOverflowResolved(
+            player_name=name,
+            row_id=row_id,
+            card_value=value,
+            taken_cards=taken_cards,
+            bullheads=bullheads,
+            row_cards_after=row_cards_after,
+        ):
+            cards = " ".join(str(v) for v in taken_cards)
+            after = " ".join(str(v) for v in row_cards_after)
+            return (
+                f"- {name} löst Overflow in Reihe {row_id} mit {value} aus, nimmt ({cards}) für {bullheads} Hornochsen; danach: {after}",
+            )
         case PresentationTrickFinished():
             return ("- Stich fertig.",)
     return (f"- {type(event).__name__}",)
@@ -376,10 +426,12 @@ def render_presentation_event(event: PresentationEvent, *, own_player_id: str | 
 
 def render_own_hand(player_state: PlayerState) -> str:
     cards = " ".join(f"|{card.value} {card.bullheads * '🐮'}|" for card in player_state.hand)
-    return "\n".join([
-        f"{player_state.self_player_name()}: Deine Handkarten:",
-        f"  {cards}" if cards else "  -",
-    ])
+    return "\n".join(
+        [
+            f"{player_state.self_player_name()}: Deine Handkarten:",
+            f"  {cards}" if cards else "  -",
+        ]
+    )
 
 
 def render_public_state(public_state: PublicState) -> None:

@@ -47,7 +47,11 @@ class MatchHub:
     outbox: list[GameServerMessage] = field(default_factory=list)
 
     def start_match(self) -> None:
-        logger.debug("match start: phase=%s players=%s", self.state.phase_info.phase, [player.name for player in self.state.players])
+        logger.debug(
+            "match start: phase=%s players=%s",
+            self.state.phase_info.phase,
+            [player.name for player in self.state.players],
+        )
         self.outbox.append(StateUpdated(state=self.build_public_state()))
         self._request_choose_cards_for_current_trick()
 
@@ -90,7 +94,10 @@ class MatchHub:
             return
 
         revealed_plays = begin_trick_resolution(self.state)
-        logger.debug("cards revealed: plays=%s", [(play.player_id, play.card.value) for play in revealed_plays])
+        logger.debug(
+            "cards revealed: plays=%s",
+            [(play.player_id, play.card.value) for play in revealed_plays],
+        )
         self.outbox.append(self._build_cards_revealed(revealed_plays))
         self._advance_resolution_until_blocked()
 

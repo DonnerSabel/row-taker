@@ -29,12 +29,15 @@ from row_taker.protocol.messages import RowChoiceCommitted
 SIX_PLAYER_NAMES = ("Ada", "Ben", "Clara", "Dorian", "Emil", "Fatima")
 SIX_PLAYER_PLAYS = ((0, 44), (1, 62), (2, 71), (3, 86), (4, 90), (5, 100))
 
+
 def _choose_card() -> GameWorkbenchScenario:
     return GameWorkbenchScenario(
         name="choose-card",
         description="Ruhiger Spielzustand mit auswählbarer eigener Hand.",
         state=build_game_state(),
     )
+
+
 def _choose_row() -> GameWorkbenchScenario:
     base = build_game_state()
     assert base.public_state is not None
@@ -49,6 +52,8 @@ def _choose_row() -> GameWorkbenchScenario:
             selectable_row_ids=row_ids,
         ),
     )
+
+
 def _cards_revealed() -> GameWorkbenchScenario:
     return GameWorkbenchScenario(
         name="cards-revealed",
@@ -56,6 +61,8 @@ def _cards_revealed() -> GameWorkbenchScenario:
         state=build_revealed_state(((0, 44), (1, 62), (2, 71), (3, 86))),
         interesting_frames=ANIMATION_FRAMES,
     )
+
+
 def _card_placed() -> GameWorkbenchScenario:
     from row_taker.client.presentation_events import PresentationCardPlaced
 
@@ -69,6 +76,8 @@ def _card_placed() -> GameWorkbenchScenario:
         state=state,
         interesting_frames=ANIMATION_FRAMES,
     )
+
+
 def _row_choice_required() -> GameWorkbenchScenario:
     from row_taker.client.presentation_events import PresentationRowChoiceRequired
 
@@ -80,6 +89,8 @@ def _row_choice_required() -> GameWorkbenchScenario:
         state=state,
         interesting_frames=ANIMATION_FRAMES,
     )
+
+
 def _row_taken() -> GameWorkbenchScenario:
     from row_taker.client.presentation_events import PresentationRowTaken
 
@@ -96,6 +107,8 @@ def _row_taken() -> GameWorkbenchScenario:
         state=state,
         interesting_frames=ANIMATION_FRAMES,
     )
+
+
 def _overflow_resolved() -> GameWorkbenchScenario:
     from row_taker.client.presentation_events import PresentationOverflowResolved
 
@@ -115,12 +128,16 @@ def _overflow_resolved() -> GameWorkbenchScenario:
         state=state,
         interesting_frames=ANIMATION_FRAMES,
     )
+
+
 def _five_opponents() -> GameWorkbenchScenario:
     return GameWorkbenchScenario(
         name="five-opponents",
         description="Maximale Besetzung mit fünf kompakten Gegnerkacheln.",
         state=build_game_state(player_names=SIX_PLAYER_NAMES),
     )
+
+
 def _five_opponents_revealed() -> GameWorkbenchScenario:
     return GameWorkbenchScenario(
         name="five-opponents-revealed",
@@ -128,6 +145,8 @@ def _five_opponents_revealed() -> GameWorkbenchScenario:
         state=build_revealed_state(SIX_PLAYER_PLAYS, player_names=SIX_PLAYER_NAMES),
         interesting_frames=ANIMATION_FRAMES,
     )
+
+
 def _five_opponents_active() -> GameWorkbenchScenario:
     from row_taker.client.presentation_events import PresentationCardPlaced
 
@@ -141,6 +160,8 @@ def _five_opponents_active() -> GameWorkbenchScenario:
         state=state,
         interesting_frames=ANIMATION_FRAMES,
     )
+
+
 def _own_player_active() -> GameWorkbenchScenario:
     scenario = _row_choice_required()
     return GameWorkbenchScenario(
@@ -149,6 +170,8 @@ def _own_player_active() -> GameWorkbenchScenario:
         state=scenario.state,
         interesting_frames=scenario.interesting_frames,
     )
+
+
 def _own_card_revealed() -> GameWorkbenchScenario:
     return GameWorkbenchScenario(
         name="own-card-revealed",
@@ -156,6 +179,8 @@ def _own_card_revealed() -> GameWorkbenchScenario:
         state=build_revealed_state(((0, 44),)),
         interesting_frames=ANIMATION_FRAMES,
     )
+
+
 def _presentation_click_required() -> GameWorkbenchScenario:
     scenario = _cards_revealed()
     return GameWorkbenchScenario(
@@ -164,6 +189,8 @@ def _presentation_click_required() -> GameWorkbenchScenario:
         state=scenario.state,
         interesting_frames=(0,),
     )
+
+
 def _long_names_five_opponents() -> GameWorkbenchScenario:
     return GameWorkbenchScenario(
         name="long-names-five-opponents",
@@ -179,6 +206,8 @@ def _long_names_five_opponents() -> GameWorkbenchScenario:
             )
         ),
     )
+
+
 def _error_message() -> GameWorkbenchScenario:
     state = build_game_state()
     state = replace(
@@ -196,6 +225,8 @@ def _error_message() -> GameWorkbenchScenario:
         description="Echte Fehlermeldung innerhalb der eigenen Spielerkachel.",
         state=state,
     )
+
+
 def _finished_scenario(
     *,
     name: str,
@@ -224,18 +255,24 @@ def _finished_scenario(
         description=description,
         state=state,
     )
+
+
 def _round_finished() -> GameWorkbenchScenario:
     return _finished_scenario(
         name="round-finished",
         description="Rundenende als Meldung innerhalb der eigenen Spielerkachel.",
         event=PresentationRoundFinished(),
     )
+
+
 def _game_finished() -> GameWorkbenchScenario:
     return _finished_scenario(
         name="game-finished",
         description="Spielende als Meldung innerhalb der eigenen Spielerkachel.",
         event=PresentationGameFinished(),
     )
+
+
 def _long_names() -> GameWorkbenchScenario:
     return GameWorkbenchScenario(
         name="long-names",
@@ -249,6 +286,7 @@ def _long_names() -> GameWorkbenchScenario:
             )
         ),
     )
+
 
 GAME_SCENARIO_FACTORIES: dict[str, ScenarioFactory] = {
     "choose-card": _choose_card,

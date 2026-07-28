@@ -44,9 +44,7 @@ def test_staged_card_mapping_uses_every_players_tile() -> None:
     }
     own_player = frame.visual_state.own_player
     assert own_player is not None
-    expected[own_player.player_id] = (
-        frame.geometry.own_player_tile.card_placement.rect
-    )
+    expected[own_player.player_id] = frame.geometry.own_player_tile.card_placement.rect
     assert mapping == expected
 
 
@@ -88,9 +86,7 @@ def test_revealed_own_card_moves_from_hand_to_own_tile() -> None:
     assert own_player is not None
     assert own_player.staged_card_value is not None
     own_hand_card = next(
-        card
-        for card in frame.visual_state.hand
-        if card.card_value == own_player.staged_card_value
+        card for card in frame.visual_state.hand if card.card_value == own_player.staged_card_value
     )
     assert own_hand_card.visible is False
     assert frame.geometry.own_player_rect.contains(
@@ -144,4 +140,3 @@ def test_active_player_tile_uses_stronger_background() -> None:
 
     fill_sample = panel_rect.center
     assert active_surface.get_at(fill_sample) != inactive_surface.get_at(fill_sample)
-

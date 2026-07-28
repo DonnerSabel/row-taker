@@ -28,7 +28,9 @@ def _parse_size(text: str) -> tuple[int, int]:
         width = int(width_text)
         height = int(height_text)
     except (ValueError, TypeError) as exc:
-        raise argparse.ArgumentTypeError("size must use WIDTHxHEIGHT, for example 1600x900") from exc
+        raise argparse.ArgumentTypeError(
+            "size must use WIDTHxHEIGHT, for example 1600x900"
+        ) from exc
     if width <= 0 or height <= 0:
         raise argparse.ArgumentTypeError("width and height must be positive")
     return width, height
@@ -61,7 +63,9 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("scenario", nargs="?", choices=scenario_names())
-    parser.add_argument("--timeline", choices=timeline_names(), help="open a complete state timeline")
+    parser.add_argument(
+        "--timeline", choices=timeline_names(), help="open a complete state timeline"
+    )
     parser.add_argument("--step", type=int, default=0, help="timeline step used by --save")
     parser.add_argument("--list", action="store_true", help="list available scenarios")
     parser.add_argument(

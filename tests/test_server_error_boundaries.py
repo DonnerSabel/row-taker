@@ -37,7 +37,6 @@ def test_expected_client_request_error_is_reported_and_lobby_is_resent() -> None
     assert envelopes[1].target_client_id == "client-0"
 
 
-
 def test_invalid_game_action_is_rejected_without_lobby_snapshot() -> None:
     server = LocalServer(rng=random.Random(1234), seat_count=2)
     server.handle_client_message("client-0", JoinLobby(display_name="Alice"))
@@ -63,6 +62,7 @@ def test_invalid_game_action_is_rejected_without_lobby_snapshot() -> None:
     assert envelopes[0].target_client_id == "client-0"
     assert server.active_match is not None
     assert server.active_match.state.selected_cards == {}
+
 
 def test_unexpected_local_server_error_is_not_disguised_as_rejection(
     monkeypatch: pytest.MonkeyPatch,

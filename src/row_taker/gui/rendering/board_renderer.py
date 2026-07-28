@@ -82,9 +82,7 @@ def _draw_row_column(
 ) -> None:
     lane_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
     lane_fill = (
-        PALETTE.lane_overlay_active
-        if emphasis != "none" or hovered
-        else PALETTE.lane_overlay
+        PALETTE.lane_overlay_active if emphasis != "none" or hovered else PALETTE.lane_overlay
     )
     pygame.draw.rect(lane_surface, lane_fill, lane_surface.get_rect(), border_radius=8)
     screen.blit(lane_surface, rect)
@@ -99,11 +97,7 @@ def _draw_row_column(
     border_width = 4 if emphasis != "none" or hovered else 3 if selectable else 1
     pygame.draw.rect(screen, border, rect, border_width, border_radius=8)
 
-    label_color = (
-        border
-        if selectable or hovered or emphasis != "none"
-        else PALETTE.text_muted
-    )
+    label_color = border if selectable or hovered or emphasis != "none" else PALETTE.text_muted
     drawer.draw_text(
         screen,
         str(row_id),

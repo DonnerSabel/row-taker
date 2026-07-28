@@ -142,9 +142,7 @@ class LiveGuiClient:
                 return
             except Exception:
                 logger.exception("unexpected error while sending to server")
-                self._set_error_message(
-                    "Unerwarteter Fehler beim Senden. Details stehen im Log."
-                )
+                self._set_error_message("Unerwarteter Fehler beim Senden. Details stehen im Log.")
                 return
 
         if update.local_messages:

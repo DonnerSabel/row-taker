@@ -52,7 +52,9 @@ def test_cards_revealed_is_stored_in_core_state() -> None:
         ),
     )
 
-    state = apply_server_message(ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
+    state = apply_server_message(
+        ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed
+    )
 
     assert state.public_state == player_state.public_state
     assert state.revealed_trick == revealed
@@ -61,7 +63,12 @@ def test_cards_revealed_is_stored_in_core_state() -> None:
 def test_session_ended_exits_immediately() -> None:
     state = apply_server_message(
         ClientState(),
-        SessionEnded(message="Spiel abgebrochen", reason=SessionEndReason.QUIT, client_id="client-0", display_name="Alice"),
+        SessionEnded(
+            message="Spiel abgebrochen",
+            reason=SessionEndReason.QUIT,
+            client_id="client-0",
+            display_name="Alice",
+        ),
     )
 
     assert state.should_exit is True
@@ -85,7 +92,9 @@ def test_cards_revealed_builds_trick_presentation_steps() -> None:
         ),
     )
 
-    state = apply_server_message(ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
+    state = apply_server_message(
+        ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed
+    )
 
     assert state.trick_presentation_state is not None
     assert state.pending_presentation_steps
@@ -105,7 +114,9 @@ def test_row_choice_committed_advances_trick_presentation_state() -> None:
         ),
     )
 
-    state = apply_server_message(ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
+    state = apply_server_message(
+        ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed
+    )
     assert state.trick_presentation_state is not None
     assert state.trick_presentation_state.pending_row_choice is not None
 
@@ -115,8 +126,7 @@ def test_row_choice_committed_advances_trick_presentation_state() -> None:
     assert state.trick_presentation_state is not None
     assert state.trick_presentation_state.pending_row_choice is None
     assert any(
-        isinstance(step.event, PresentationRowTaken)
-        for step in state.pending_presentation_steps
+        isinstance(step.event, PresentationRowTaken) for step in state.pending_presentation_steps
     )
 
 
@@ -132,7 +142,9 @@ def test_cards_revealed_queues_presentation_steps_before_display() -> None:
         ),
     )
 
-    state = apply_server_message(ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed)
+    state = apply_server_message(
+        ClientState(core_state=ClientCoreState(public_state=player_state.public_state)), revealed
+    )
 
     assert state.presentation_steps == ()
     assert state.pending_presentation_steps

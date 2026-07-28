@@ -41,7 +41,9 @@ class GameClientCore:
         self.state = result.state
         first = CoreUpdate(
             state=self.state,
-            outbound_messages=(result.outbound_message,) if result.outbound_message is not None else (),
+            outbound_messages=(result.outbound_message,)
+            if result.outbound_message is not None
+            else (),
             local_messages=(result.local_message,) if result.local_message is not None else (),
         )
         second = self._drain_server_inbox()

@@ -39,7 +39,5 @@ def test_timeline_catalog_does_not_construct_the_full_trick() -> None:
 
 def test_product_gui_does_not_import_workbench() -> None:
     product_gui = ROOT / "src/row_taker/gui"
-    source = "\n".join(
-        path.read_text(encoding="utf-8") for path in product_gui.rglob("*.py")
-    )
+    source = "\n".join(path.read_text(encoding="utf-8") for path in product_gui.rglob("*.py"))
     assert "row_taker.gui_workbench" not in source

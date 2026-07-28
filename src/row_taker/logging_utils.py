@@ -25,9 +25,9 @@ def configure_logging(
     handlers: list[logging.Handler]
     if log_file:
         path = Path(log_file).expanduser()
-        if path.parent != Path('.'):
+        if path.parent != Path("."):
             path.parent.mkdir(parents=True, exist_ok=True)
-        handlers = [logging.FileHandler(path, encoding='utf-8')]
+        handlers = [logging.FileHandler(path, encoding="utf-8")]
     else:
         handlers = [logging.StreamHandler()]
 

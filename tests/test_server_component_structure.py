@@ -6,9 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_local_server_delegates_bot_process_and_match_routing_details() -> None:
-    local_server = (ROOT / "src/row_taker/server/local_server.py").read_text(
-        encoding="utf-8"
-    )
+    local_server = (ROOT / "src/row_taker/server/local_server.py").read_text(encoding="utf-8")
 
     assert "BotProcessHandle" not in local_server
     assert "validate_submit_card" not in local_server
@@ -20,12 +18,10 @@ def test_local_server_delegates_bot_process_and_match_routing_details() -> None:
 
 
 def test_extracted_server_components_have_single_primary_responsibilities() -> None:
-    bot_manager = (
-        ROOT / "src/row_taker/server/local_bot_manager.py"
-    ).read_text(encoding="utf-8")
-    match_router = (
-        ROOT / "src/row_taker/server/match_session_router.py"
-    ).read_text(encoding="utf-8")
+    bot_manager = (ROOT / "src/row_taker/server/local_bot_manager.py").read_text(encoding="utf-8")
+    match_router = (ROOT / "src/row_taker/server/match_session_router.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "class LocalBotManager" in bot_manager
     assert "MatchHub" not in bot_manager

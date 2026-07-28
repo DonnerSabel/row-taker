@@ -106,12 +106,17 @@ def test_row_choice_resumes_with_chained_before_after_snapshots() -> None:
     row_taken = completed.presentation_steps[3]
     assert _row_values(row_taken.public_state_before, RowID("row-1")) == (65,)
     assert _row_values(row_taken.public_state_after, RowID("row-1")) == (7,)
-    assert row_taken.public_state_after.players[0].score > row_taken.public_state_before.players[0].score
+    assert (
+        row_taken.public_state_after.players[0].score
+        > row_taken.public_state_before.players[0].score
+    )
 
     overflow = completed.presentation_steps[4]
     assert _row_values(overflow.public_state_before, RowID("row-0")) == (10, 20, 30, 40, 50)
     assert _row_values(overflow.public_state_after, RowID("row-0")) == (53,)
-    assert overflow.public_state_after.players[1].score > overflow.public_state_before.players[1].score
+    assert (
+        overflow.public_state_after.players[1].score > overflow.public_state_before.players[1].score
+    )
 
     assert completed.shadow_state == completed.presentation_steps[-1].public_state_after
     assert len(completed.resolution_steps) == 4

@@ -92,7 +92,5 @@ def test_unexpected_receive_failure_is_logged_and_reported_generically(
         client._receive_loop()
     client.poll()
 
-    assert client.state.session_error == (
-        "Unerwarteter Netzwerkfehler. Details stehen im Log."
-    )
+    assert client.state.session_error == ("Unerwarteter Netzwerkfehler. Details stehen im Log.")
     assert "decoder bug" in caplog.text

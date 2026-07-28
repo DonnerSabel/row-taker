@@ -29,7 +29,10 @@ def _lobby() -> LobbyView:
                 seat_index=None,
             ),
             LobbyParticipantView(
-                client_id="client-2", display_name="Bob", participant_kind=ParticipantKind.HUMAN, seat_index=1
+                client_id="client-2",
+                display_name="Bob",
+                participant_kind=ParticipantKind.HUMAN,
+                seat_index=1,
             ),
             LobbyParticipantView(
                 client_id="pending-bot-seat-2",

@@ -52,8 +52,17 @@ class LobbyScreenTargets:
 
 def build_lobby_screen_targets(layout: GuiLayout, state: ClientState) -> LobbyScreenTargets:
     seat_targets = _build_lobby_seat_targets(layout, state)
-    edited_seat_index = state.navigation_state.selected_seat_index if is_editing_bot_name(state) else None
-    input_rect = next((target.rect.inflate(-72, -8).move(58, 0) for target in seat_targets if target.seat_index == edited_seat_index), None)
+    edited_seat_index = (
+        state.navigation_state.selected_seat_index if is_editing_bot_name(state) else None
+    )
+    input_rect = next(
+        (
+            target.rect.inflate(-72, -8).move(58, 0)
+            for target in seat_targets
+            if target.seat_index == edited_seat_index
+        ),
+        None,
+    )
     return LobbyScreenTargets(
         seat_targets=seat_targets,
         button_targets=_build_lobby_button_targets(layout, state),
@@ -92,8 +101,16 @@ def _handle_left_click(
         if target.rect.collidepoint(position):
             seat = _seat_by_index(state, target.seat_index)
             if seat is not None and seat.occupant_kind == ParticipantKind.BOT:
-                return ScreenResult(next_state=_enter_bot_name_editor(state, target.seat_index, seat.occupant_display_name))
-            return ScreenResult(next_state=enter_lobby_submenu(state, "seat_edit", selected_seat_index=target.seat_index))
+                return ScreenResult(
+                    next_state=_enter_bot_name_editor(
+                        state, target.seat_index, seat.occupant_display_name
+                    )
+                )
+            return ScreenResult(
+                next_state=enter_lobby_submenu(
+                    state, "seat_edit", selected_seat_index=target.seat_index
+                )
+            )
 
     for target in lobby_targets.button_targets:
         if target.rect.collidepoint(position):
@@ -111,11 +128,15 @@ def _map_lobby_button(button_id: str, state: ClientState) -> ScreenResult:
     if selected_seat_index is None:
         return NO_SCREEN_RESULT
     if button_id == "take_seat":
-        return ScreenResult(client_action=ClientActionAssignSelfToSeat(seat_index=selected_seat_index))
+        return ScreenResult(
+            client_action=ClientActionAssignSelfToSeat(seat_index=selected_seat_index)
+        )
     if button_id == "create_bot":
         seat = _seat_by_index(state, selected_seat_index)
         initial_name = None if seat is None else seat.occupant_display_name
-        return ScreenResult(next_state=_enter_bot_name_editor(state, selected_seat_index, initial_name))
+        return ScreenResult(
+            next_state=_enter_bot_name_editor(state, selected_seat_index, initial_name)
+        )
     if button_id == "clear_seat":
         return ScreenResult(client_action=ClientActionClearSeat(seat_index=selected_seat_index))
     return NO_SCREEN_RESULT
@@ -136,7 +157,10 @@ def _handle_bot_name_event(
     if event.type == pygame.KEYDOWN and event.unicode:
         return ScreenResult(next_state=_append_bot_name_character(state, event.unicode))
     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-        if lobby_targets.bot_name_input_rect is not None and lobby_targets.bot_name_input_rect.collidepoint(event.pos):
+        if (
+            lobby_targets.bot_name_input_rect is not None
+            and lobby_targets.bot_name_input_rect.collidepoint(event.pos)
+        ):
             return ScreenResult(next_state=select_bot_name_text(state))
         return _confirm_bot_name(state)
     return NO_SCREEN_RESULT
@@ -156,7 +180,9 @@ def _build_lobby_seat_targets(layout: GuiLayout, state: ClientState) -> tuple[Se
     )
 
 
-def _build_lobby_button_targets(layout: GuiLayout, state: ClientState) -> tuple[LobbyButtonTarget, ...]:
+def _build_lobby_button_targets(
+    layout: GuiLayout, state: ClientState
+) -> tuple[LobbyButtonTarget, ...]:
     lobby_view = state.lobby_view
     seat_count = 4 if lobby_view is None else max(1, lobby_view.seat_count)
     action_rect = compute_lobby_panel_layout(layout, seat_count).action_rect
@@ -167,29 +193,55 @@ def _build_lobby_button_targets(layout: GuiLayout, state: ClientState) -> tuple[
     buttons: list[LobbyButtonTarget] = []
     x = action_rect.left
     selected_seat_index = state.navigation_state.selected_seat_index
-    selected_seat = None if selected_seat_index is None else _seat_by_index(state, selected_seat_index)
+    selected_seat = (
+        None if selected_seat_index is None else _seat_by_index(state, selected_seat_index)
+    )
 
     if selected_seat_index is not None:
         if selected_seat is None or selected_seat.occupant_display_name is None:
             for button_id, label in (("take_seat", "Nehmen"), ("create_bot", "Bot")):
-                buttons.append(LobbyButtonTarget(button_id, label, pygame.Rect(x, y, button_width, MENU_LAYOUT.control_height)))
+                buttons.append(
+                    LobbyButtonTarget(
+                        button_id,
+                        label,
+                        pygame.Rect(x, y, button_width, MENU_LAYOUT.control_height),
+                    )
+                )
                 x += button_width + gap
         elif selected_seat.occupant_kind == ParticipantKind.BOT:
             for button_id, label in (("create_bot", "Name"), ("clear_seat", "Leeren")):
-                buttons.append(LobbyButtonTarget(button_id, label, pygame.Rect(x, y, button_width, MENU_LAYOUT.control_height)))
+                buttons.append(
+                    LobbyButtonTarget(
+                        button_id,
+                        label,
+                        pygame.Rect(x, y, button_width, MENU_LAYOUT.control_height),
+                    )
+                )
                 x += button_width + gap
         else:
-            buttons.append(LobbyButtonTarget("clear_seat", "Leeren", pygame.Rect(x, y, button_width, MENU_LAYOUT.control_height)))
+            buttons.append(
+                LobbyButtonTarget(
+                    "clear_seat",
+                    "Leeren",
+                    pygame.Rect(x, y, button_width, MENU_LAYOUT.control_height),
+                )
+            )
             x += button_width + gap
 
-        buttons.append(LobbyButtonTarget("back", "Lösen", pygame.Rect(x, y, button_width, MENU_LAYOUT.control_height)))
+        buttons.append(
+            LobbyButtonTarget(
+                "back", "Lösen", pygame.Rect(x, y, button_width, MENU_LAYOUT.control_height)
+            )
+        )
 
     start_width = MENU_LAYOUT.panel_button_width
     buttons.append(
         LobbyButtonTarget(
             button_id="start_game",
             label="Spiel starten",
-            rect=pygame.Rect(action_rect.right - start_width, y, start_width, MENU_LAYOUT.control_height),
+            rect=pygame.Rect(
+                action_rect.right - start_width, y, start_width, MENU_LAYOUT.control_height
+            ),
         )
     )
     return tuple(buttons)
@@ -199,7 +251,9 @@ def is_editing_bot_name(state: ClientState) -> bool:
     return state.navigation_state.lobby_submenu == "bot_name"
 
 
-def _enter_bot_name_editor(state: ClientState, seat_index: int, initial_name: str | None) -> ClientState:
+def _enter_bot_name_editor(
+    state: ClientState, seat_index: int, initial_name: str | None
+) -> ClientState:
     next_state = enter_lobby_submenu(state, "bot_name", selected_seat_index=seat_index)
     next_state = clear_flash_message(next_state)
     return set_bot_name_editor(

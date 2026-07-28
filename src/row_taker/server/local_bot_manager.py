@@ -48,10 +48,7 @@ class LocalBotManager:
         self._pending_by_seat.pop(seat_index, None)
 
     def pending_display_names(self) -> dict[int, str]:
-        return {
-            seat_index: spec.display_name
-            for seat_index, spec in self._pending_by_seat.items()
-        }
+        return {seat_index: spec.display_name for seat_index, spec in self._pending_by_seat.items()}
 
     def normalize_pending_display_name(self, display_name: str) -> str:
         value = display_name.strip()
@@ -65,9 +62,7 @@ class LocalBotManager:
         if lobby_state.game_started:
             return False
         occupied_humans = {
-            seat.seat_index
-            for seat in lobby_state.seats
-            if seat.occupant_client_id is not None
+            seat.seat_index for seat in lobby_state.seats if seat.occupant_client_id is not None
         }
         occupied = occupied_humans | set(self._pending_by_seat)
         return len(occupied) >= 2 and len(occupied) == lobby_state.seat_count

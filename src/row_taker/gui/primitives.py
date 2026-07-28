@@ -102,7 +102,13 @@ class PrimitiveDrawer:
         pygame.draw.rect(surface, PANEL_BORDER if not selected else ACCENT, rect, width=1)
 
         self.draw_text(surface, str(value), (rect.left + 8, rect.top + 6), role="body")
-        self.draw_text(surface, f"{bullheads} bh", (rect.left + 8, rect.top + 30), role="small", color=TEXT_MUTED)
+        self.draw_text(
+            surface,
+            f"{bullheads} bh",
+            (rect.left + 8, rect.top + 30),
+            role="small",
+            color=TEXT_MUTED,
+        )
 
     def draw_badge(
         self,

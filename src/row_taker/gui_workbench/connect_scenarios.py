@@ -13,6 +13,8 @@ def _connect_default() -> ConnectWorkbenchScenario:
         description="Unverändertes Verbindungsformular beim Programmstart.",
         connect_form=ConnectFormState(),
     )
+
+
 def _connect_invalid_values() -> ConnectWorkbenchScenario:
     return ConnectWorkbenchScenario(
         name="connect-invalid-values",
@@ -27,6 +29,8 @@ def _connect_invalid_values() -> ConnectWorkbenchScenario:
             error_message="Bitte gültige Werte für Server IP, Port und Anzeigename eingeben.",
         ),
     )
+
+
 def _connect_error() -> ConnectWorkbenchScenario:
     return ConnectWorkbenchScenario(
         name="connect-error",
@@ -45,6 +49,8 @@ def _connect_error() -> ConnectWorkbenchScenario:
             status_message="Bitte Werte prüfen und erneut verbinden.",
         ),
     )
+
+
 def _connect_long_values() -> ConnectWorkbenchScenario:
     return ConnectWorkbenchScenario(
         name="connect-long-values",
@@ -58,6 +64,7 @@ def _connect_long_values() -> ConnectWorkbenchScenario:
             auto_select_fields=(),
         ),
     )
+
 
 CONNECT_SCENARIO_FACTORIES: dict[str, ScenarioFactory] = {
     "connect-default": _connect_default,

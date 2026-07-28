@@ -33,9 +33,9 @@ def compute_lobby_panel_layout(
     seats_width = group_width - participants_width - config.panel_gap
 
     row_count = max(1, seat_count)
-    seat_list_height = row_count * config.control_height + max(
-        0, row_count - 1
-    ) * config.control_gap
+    seat_list_height = (
+        row_count * config.control_height + max(0, row_count - 1) * config.control_gap
+    )
     group_height = (
         config.lobby_panel_title_height
         + seat_list_height
@@ -98,9 +98,7 @@ def row_rects(
     rects: list[pygame.Rect] = []
     for index in range(max(0, count)):
         y = list_rect.top + index * (config.control_height + config.control_gap)
-        rects.append(
-            pygame.Rect(list_rect.left, y, list_rect.width, config.control_height)
-        )
+        rects.append(pygame.Rect(list_rect.left, y, list_rect.width, config.control_height))
     return tuple(rects)
 
 

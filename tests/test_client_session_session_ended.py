@@ -44,7 +44,6 @@ class _FakeTransport:
         self.closed = True
 
 
-
 def test_session_ended_clears_prompt_before_shutdown() -> None:
     transport = _FakeTransport()
     session = ClientSession(transport=transport, console_factory=_FakeConsole)
@@ -76,7 +75,6 @@ class _QueuedTransport:
 
     def close(self) -> None:
         self.closed = True
-
 
 
 def test_client_session_applies_game_messages_one_by_one_around_presentation_queue() -> None:
@@ -128,5 +126,7 @@ def test_client_session_applies_game_messages_one_by_one_around_presentation_que
     console = _FakeConsole.instances[-1]
     rendered_bodies = [body for body, _prompt in console.renders]
     assert any("Lokale Auflösung:" in body for body in rendered_bodies)
-    first_resolution_index = next(i for i, body in enumerate(rendered_bodies) if "Lokale Auflösung:" in body)
+    first_resolution_index = next(
+        i for i, body in enumerate(rendered_bodies) if "Lokale Auflösung:" in body
+    )
     assert first_resolution_index > 0

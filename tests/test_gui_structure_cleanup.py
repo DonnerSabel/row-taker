@@ -49,7 +49,12 @@ def test_gui_app_no_longer_orchestrates_screen_targets() -> None:
     app_source = (ROOT / "src/row_taker/gui/app.py").read_text(encoding="utf-8")
     assert ".build_targets(" not in app_source
     assert "handle_event(event, targets)" not in app_source
-    assert "layout=layout" not in app_source.split("def _process_current_screen", 1)[1].split("def _prepare_current_screen", 1)[0]
+    assert (
+        "layout=layout"
+        not in app_source.split("def _process_current_screen", 1)[1].split(
+            "def _prepare_current_screen", 1
+        )[0]
+    )
 
 
 def test_workbench_uses_prepared_frames_instead_of_renderer_helpers() -> None:
@@ -65,9 +70,7 @@ def test_workbench_uses_prepared_frames_instead_of_renderer_helpers() -> None:
 def test_gui_uses_single_presentation_frame_counter() -> None:
     roots = (Path("src/row_taker/gui"), Path("src/row_taker/gui_workbench"))
     texts = "\n".join(
-        path.read_text(encoding="utf-8")
-        for root in roots
-        for path in root.rglob("*.py")
+        path.read_text(encoding="utf-8") for root in roots for path in root.rglob("*.py")
     )
 
     assert "frame_count" not in texts
@@ -90,12 +93,8 @@ def test_lobby_screen_is_split_by_responsibility() -> None:
 
 
 def test_lobby_geometry_is_not_kept_in_shared_menu_layout() -> None:
-    shared_source = (ROOT / "src/row_taker/gui/menu_layout.py").read_text(
-        encoding="utf-8"
-    )
-    lobby_source = (ROOT / "src/row_taker/gui/lobby_layout.py").read_text(
-        encoding="utf-8"
-    )
+    shared_source = (ROOT / "src/row_taker/gui/menu_layout.py").read_text(encoding="utf-8")
+    lobby_source = (ROOT / "src/row_taker/gui/lobby_layout.py").read_text(encoding="utf-8")
 
     assert "class LobbyPanelLayout" not in shared_source
     assert "def compute_lobby_panel_layout" not in shared_source
@@ -157,4 +156,3 @@ def test_visual_player_contains_only_data_used_by_the_gui() -> None:
         "staged_card_value",
         "emphasis",
     )
-

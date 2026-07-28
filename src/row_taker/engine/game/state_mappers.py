@@ -86,8 +86,12 @@ def row_from_dict(data: dict[str, object]) -> Row:
 def phase_info_to_dict(phase_info: PhaseInfo) -> dict[str, object]:
     return {
         "phase": phase_info.phase.value,
-        "active_player_id": None if phase_info.active_player_id is None else str(phase_info.active_player_id),
-        "pending_card": None if phase_info.pending_card is None else card_to_dict(phase_info.pending_card),
+        "active_player_id": None
+        if phase_info.active_player_id is None
+        else str(phase_info.active_player_id),
+        "pending_card": None
+        if phase_info.pending_card is None
+        else card_to_dict(phase_info.pending_card),
         "selectable_row_ids": [str(row_id) for row_id in phase_info.selectable_row_ids],
         "message": phase_info.message,
     }
@@ -96,7 +100,9 @@ def phase_info_to_dict(phase_info: PhaseInfo) -> dict[str, object]:
 def phase_info_from_dict(data: dict[str, object]) -> PhaseInfo:
     return PhaseInfo(
         phase=Phase(str(data["phase"])),
-        active_player_id=None if data["active_player_id"] is None else PlayerID(str(data["active_player_id"])),
+        active_player_id=None
+        if data["active_player_id"] is None
+        else PlayerID(str(data["active_player_id"])),
         pending_card=None if data["pending_card"] is None else card_from_dict(data["pending_card"]),
         selectable_row_ids=tuple(RowID(str(row_id)) for row_id in data["selectable_row_ids"]),
         message=str(data["message"]),
@@ -236,7 +242,9 @@ def _trick_resolution_cursor_to_dict(cursor: TrickResolutionCursor) -> dict[str,
 
 def _trick_resolution_cursor_from_dict(data: dict[str, object]) -> TrickResolutionCursor:
     return TrickResolutionCursor(
-        remaining_player_ids=[PlayerID(str(player_id)) for player_id in data["remaining_player_ids"]],
+        remaining_player_ids=[
+            PlayerID(str(player_id)) for player_id in data["remaining_player_ids"]
+        ],
         steps=[trick_resolution_step_from_dict(step) for step in data["steps"]],
     )
 
@@ -254,8 +262,12 @@ def game_state_to_dict(state: GameState) -> dict[str, object]:
             {"player_id": str(player_id), "card": card_to_dict(card)}
             for player_id, card in state.selected_cards.items()
         ],
-        "current_trick_revealed_plays": [_revealed_play_to_dict(play) for play in state.current_trick_revealed_plays],
-        "resolution_cursor": None if state.resolution_cursor is None else _trick_resolution_cursor_to_dict(state.resolution_cursor),
+        "current_trick_revealed_plays": [
+            _revealed_play_to_dict(play) for play in state.current_trick_revealed_plays
+        ],
+        "resolution_cursor": None
+        if state.resolution_cursor is None
+        else _trick_resolution_cursor_to_dict(state.resolution_cursor),
     }
 
 
@@ -277,7 +289,9 @@ def game_state_from_dict(data: dict[str, object]) -> GameState:
         _revealed_play_from_dict(play) for play in data["current_trick_revealed_plays"]
     )
     resolution_cursor = data["resolution_cursor"]
-    state.resolution_cursor = None if resolution_cursor is None else _trick_resolution_cursor_from_dict(resolution_cursor)
+    state.resolution_cursor = (
+        None if resolution_cursor is None else _trick_resolution_cursor_from_dict(resolution_cursor)
+    )
     return state
 
 

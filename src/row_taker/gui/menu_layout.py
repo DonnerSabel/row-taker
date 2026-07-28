@@ -85,8 +85,12 @@ def compute_connect_panel_layout(
     config: MenuLayoutConfig = DEFAULT_MENU_LAYOUT,
 ) -> ConnectPanelLayout:
     area = content_rect(layout)
-    panel_width = min(config.connect_panel_max_width, max(config.connect_panel_min_width, area.width - 160))
-    panel_height = min(config.connect_panel_max_height, max(config.connect_panel_min_height, area.height - 48))
+    panel_width = min(
+        config.connect_panel_max_width, max(config.connect_panel_min_width, area.width - 160)
+    )
+    panel_height = min(
+        config.connect_panel_max_height, max(config.connect_panel_min_height, area.height - 48)
+    )
     panel = pygame.Rect(0, 0, panel_width, panel_height)
     panel.center = area.center
     panel.y -= 6
@@ -97,7 +101,9 @@ def compute_connect_panel_layout(
     first_field_top = panel.top + config.panel_title_height + config.field_label_gap
     vertical_step = config.control_height + config.control_gap + config.field_label_gap
     field_rects = tuple(
-        pygame.Rect(inner_left, first_field_top + index * vertical_step, field_width, config.control_height)
+        pygame.Rect(
+            inner_left, first_field_top + index * vertical_step, field_width, config.control_height
+        )
         for index in range(field_count)
     )
 
@@ -123,4 +129,7 @@ def _button_widths(button_count: int, *, config: MenuLayoutConfig) -> tuple[int,
         return ()
     if button_count == 1:
         return (config.panel_button_width,)
-    return (config.panel_button_width, *([config.panel_button_secondary_width] * (button_count - 1)))
+    return (
+        config.panel_button_width,
+        *([config.panel_button_secondary_width] * (button_count - 1)),
+    )
