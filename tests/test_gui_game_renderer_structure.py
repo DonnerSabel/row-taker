@@ -59,3 +59,18 @@ def test_presentation_renderer_uses_rect_mapping_instead_of_foreign_slot_type() 
     assert "Mapping[PlayerID, pygame.Rect]" in source
     assert "OpponentSlot" not in source
     assert "Any" not in source
+
+
+def test_game_renderer_uses_flat_background_instead_of_board_artwork() -> None:
+    source = _source("rendering/game_renderer.py")
+    assert "scaled_board_image_full" not in source
+    assert "_draw_full_background" not in source
+    assert "_draw_game_background(" in source
+
+
+def test_sidebar_debug_frame_is_drawn_after_all_game_content() -> None:
+    source = _source("rendering/game_renderer.py")
+    render_body = source.split("def _draw_game_background", maxsplit=1)[0]
+    assert render_body.rfind("_draw_sidebar_debug_frame(") > render_body.rfind(
+        "draw_status_overlay("
+    )
