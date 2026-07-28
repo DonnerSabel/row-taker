@@ -261,11 +261,20 @@ def compute_board_geometry(
         main_play_rect.height,
     )
 
+    # The rows still keep their established vertical tuning, but their
+    # interactive columns must obey the artwork-independent play/sidebar
+    # split. In particular, wide windows must not let the fourth row target
+    # extend underneath the sidebar.
+    legacy_row_right = main_play_rect.right - opponent_area_width - gap
+    row_left = max(main_play_rect.left, play_area_rect.left)
+    row_top = max(main_play_rect.top, play_area_rect.top)
+    row_right = min(legacy_row_right, play_area_rect.right)
+    row_bottom = min(main_play_rect.bottom, hand_rect.top - gap)
     row_area_rect = pygame.Rect(
-        main_play_rect.left,
-        main_play_rect.top,
-        main_play_rect.width - opponent_area_width - gap,
-        main_play_rect.height,
+        row_left,
+        row_top,
+        max(1, row_right - row_left),
+        max(1, row_bottom - row_top),
     )
 
     rows = max(1, row_count)
@@ -394,10 +403,11 @@ def hand_card_spacing(
         return card_width
 
     exact_spacing = (geometry.hand_rect.width - card_width) // max(1, count - 1)
-    return max(
+    preferred_spacing = max(
         tuning.hand_card_min_spacing_px,
-        min(round(card_width * tuning.hand_card_spacing_ratio), exact_spacing),
+        round(card_width * tuning.hand_card_spacing_ratio),
     )
+    return max(1, min(preferred_spacing, exact_spacing))
 
 
 def _game_screen_regions(
