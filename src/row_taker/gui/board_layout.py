@@ -304,7 +304,7 @@ def hand_card_spacing(
 def _game_screen_regions(
     window_rect: pygame.Rect,
     tuning: BoardLayoutTuning,
-) -> tuple[pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect]:
+) -> tuple[pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect]:
     """Return the play/sidebar split and the prepared sidebar sections."""
 
     content_margin = max(

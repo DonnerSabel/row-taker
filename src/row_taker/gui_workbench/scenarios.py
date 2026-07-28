@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from row_taker.client.core_reducer import (
@@ -9,9 +9,15 @@ from row_taker.client.core_reducer import (
     reduce_server_message,
 )
 from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction
-from row_taker.client.presentation_events import PresentationEvent
+from row_taker.client.presentation_events import (
+    PresentationEvent,
+    PresentationGameFinished,
+    PresentationRoundFinished,
+)
+from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import (
     ClientState,
+    UiMessage,
     enter_lobby_submenu,
     initial_client_state,
     with_navigation_updates,
@@ -647,6 +653,71 @@ def _long_names_five_opponents() -> GameWorkbenchScenario:
     )
 
 
+def _error_message() -> GameWorkbenchScenario:
+    state = _base_state()
+    state = replace(
+        state,
+        feedback_state=replace(
+            state.feedback_state,
+            flash_message=UiMessage(
+                level="error",
+                text="Ungültige Karte: Bitte eine sichtbare Handkarte auswählen.",
+            ),
+        ),
+    )
+    return GameWorkbenchScenario(
+        name="error-message",
+        description="Echte Fehlermeldung innerhalb der eigenen Spielerkachel.",
+        state=state,
+    )
+
+
+def _finished_scenario(
+    *,
+    name: str,
+    description: str,
+    event: PresentationRoundFinished | PresentationGameFinished,
+) -> GameWorkbenchScenario:
+    state = _base_state(pending_action=PendingAction.NONE)
+    public_state = state.public_state
+    if public_state is None:
+        raise ValueError("finished workbench scenario requires a public state")
+    step = PresentationStep(
+        event=event,
+        public_state_before=public_state,
+        public_state_after=public_state,
+    )
+    state = replace(
+        state,
+        core_state=replace(
+            state.core_state,
+            presentation_steps=(step,),
+            pending_presentation_steps=(step,),
+        ),
+    )
+    return GameWorkbenchScenario(
+        name=name,
+        description=description,
+        state=state,
+    )
+
+
+def _round_finished() -> GameWorkbenchScenario:
+    return _finished_scenario(
+        name="round-finished",
+        description="Rundenende als Meldung innerhalb der eigenen Spielerkachel.",
+        event=PresentationRoundFinished(),
+    )
+
+
+def _game_finished() -> GameWorkbenchScenario:
+    return _finished_scenario(
+        name="game-finished",
+        description="Spielende als Meldung innerhalb der eigenen Spielerkachel.",
+        event=PresentationGameFinished(),
+    )
+
+
 def _long_names() -> GameWorkbenchScenario:
     return GameWorkbenchScenario(
         name="long-names",
@@ -693,6 +764,9 @@ _SCENARIO_FACTORIES: dict[ScenarioCategory, dict[str, ScenarioFactory]] = {
         "own-card-revealed": _own_card_revealed,
         "presentation-click-required": _presentation_click_required,
         "long-names-five-opponents": _long_names_five_opponents,
+        "error-message": _error_message,
+        "round-finished": _round_finished,
+        "game-finished": _game_finished,
     },
 }
 

@@ -6,7 +6,9 @@ from row_taker.client.core_state import PendingAction
 from row_taker.client.presentation_events import (
     PresentationCardPlaced,
     PresentationCardsRevealed,
+    PresentationGameFinished,
     PresentationOverflowResolved,
+    PresentationRoundFinished,
     PresentationRowChoiceRequired,
     PresentationRowTaken,
 )
@@ -53,6 +55,9 @@ def test_workbench_scenario_catalog_is_stable_and_grouped() -> None:
         "own-card-revealed",
         "presentation-click-required",
         "long-names-five-opponents",
+        "error-message",
+        "round-finished",
+        "game-finished",
     )
     assert tuple(scenario.name for scenario in scenarios()) == scenario_names()
 
@@ -120,6 +125,8 @@ def test_choose_row_scenario_uses_real_choose_row_state() -> None:
         ("row-choice-required", PresentationRowChoiceRequired),
         ("row-taken", PresentationRowTaken),
         ("overflow-resolved", PresentationOverflowResolved),
+        ("round-finished", PresentationRoundFinished),
+        ("game-finished", PresentationGameFinished),
     ),
 )
 def test_presentation_scenarios_put_expected_real_event_at_queue_front(
@@ -160,3 +167,25 @@ def test_maximum_player_scenarios_really_contain_five_opponents() -> None:
 def test_unknown_scenario_has_actionable_error() -> None:
     with pytest.raises(KeyError, match="available: connect-default"):
         get_scenario("missing")
+
+
+def test_sidebar_status_scenarios_cover_error_round_and_game_end() -> None:
+    error = get_scenario("error-message")
+    round_finished = get_scenario("round-finished")
+    game_finished = get_scenario("game-finished")
+
+    assert isinstance(error, GameWorkbenchScenario)
+    assert error.state.flash_message is not None
+    assert error.state.flash_message.level == "error"
+
+    assert isinstance(round_finished, GameWorkbenchScenario)
+    assert isinstance(
+        round_finished.state.pending_presentation_steps[0].event,
+        PresentationRoundFinished,
+    )
+
+    assert isinstance(game_finished, GameWorkbenchScenario)
+    assert isinstance(
+        game_finished.state.pending_presentation_steps[0].event,
+        PresentationGameFinished,
+    )

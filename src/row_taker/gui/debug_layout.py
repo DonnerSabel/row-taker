@@ -3,6 +3,7 @@ from __future__ import annotations
 import pygame
 
 from row_taker.gui.board_layout import (
+    DEFAULT_BOARD_LAYOUT,
     BoardGeometry,
     CardPlacement,
     PlayerTileGeometry,
@@ -27,6 +28,7 @@ COLOR_ROW_CARD = pygame.Color(0, 255, 90)
 COLOR_HAND_CARD = pygame.Color(255, 115, 0)
 COLOR_TILE = pygame.Color(0, 150, 255)
 COLOR_TILE_INFO = pygame.Color(130, 220, 255)
+COLOR_OPPONENT_REMAINDER = pygame.Color(155, 80, 220)
 COLOR_TEXT_BG = pygame.Color(0, 0, 0, 180)
 BACKGROUND_COLOR = pygame.Color(24, 72, 48)
 SIDEBAR_COLOR = pygame.Color(24, 34, 48)
@@ -159,6 +161,26 @@ class LayoutDebugApp:
     def _draw_player_tiles(self, geometry: BoardGeometry) -> None:
         for index, tile in enumerate(geometry.opponent_tiles):
             self._draw_player_tile(tile, f"opponent[{index}]")
+
+        used_bottom = (
+            geometry.opponent_tiles[-1].tile_rect.bottom
+            if geometry.opponent_tiles
+            else geometry.opponent_list_rect.top
+        )
+        if used_bottom < geometry.opponent_list_rect.bottom:
+            free_rect = pygame.Rect(
+                geometry.opponent_list_rect.left,
+                used_bottom,
+                geometry.opponent_list_rect.width,
+                geometry.opponent_list_rect.bottom - used_bottom,
+            )
+            self._draw_rect(
+                free_rect,
+                COLOR_OPPONENT_REMAINDER,
+                "opponent_free_space",
+                width=1,
+            )
+
         self._draw_player_tile(geometry.own_player_tile, "own_player")
 
     def _draw_player_tile(self, tile: PlayerTileGeometry, label: str) -> None:
@@ -206,9 +228,24 @@ class LayoutDebugApp:
         if self._screen is None or self._font is None:
             raise RuntimeError("LayoutDebugApp not initialized")
 
+        opponent_tile_height = (
+            geometry.opponent_tiles[0].tile_rect.height if geometry.opponent_tiles else 0
+        )
+        used_bottom = (
+            geometry.opponent_tiles[-1].tile_rect.bottom
+            if geometry.opponent_tiles
+            else geometry.opponent_list_rect.top
+        )
+        free_height = geometry.opponent_list_rect.bottom - used_bottom
         lines = [
             "Layout Debug",
             f"Mitspieler: {self._opponent_count}",
+            f"Kachelhöhe: {opponent_tile_height}px · frei: {free_height}px",
+            (
+                "Kartenversatz: "
+                f"{DEFAULT_BOARD_LAYOUT.player_tile_card_left_offset_px}px / "
+                f"{DEFAULT_BOARD_LAYOUT.player_tile_card_top_offset_px}px"
+            ),
             f"Handkarten: {self._hand_card_count}",
             f"Karten/Reihe: {self._row_card_count}",
             "1-5 Gegner · H/J Hand +/-",

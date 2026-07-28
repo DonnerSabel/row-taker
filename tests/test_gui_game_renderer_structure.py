@@ -168,3 +168,33 @@ def test_presentation_advance_uses_global_mouse_click_without_button_or_space() 
     assert "event.button in (1, 3)" in interaction_source
     assert "draw_button(" not in hud_source
     assert "Weiter [Leertaste]" not in hud_source
+
+
+def test_sidebar_layout_owns_card_offsets_and_no_renderer_recomputes_them() -> None:
+    layout_source = _source("board_layout.py")
+    hud_source = _source("rendering/game_hud_renderer.py")
+
+    assert "player_tile_card_left_offset_px" in layout_source
+    assert "player_tile_card_top_offset_px" in layout_source
+    assert "tile.card_placement.rect" in hud_source
+    assert "card_top =" not in hud_source
+    assert "card_left =" not in hud_source
+
+
+def test_gui_contains_no_reserved_presentation_region_or_event_narration() -> None:
+    sources = "\n".join(
+        _source(path)
+        for path in (
+            "board_layout.py",
+            "game_visual_state.py",
+            "game_visual_presentations.py",
+            "presentation_renderer.py",
+            "rendering/game_hud_renderer.py",
+            "rendering/game_renderer.py",
+        )
+    )
+
+    assert "presentation_rect" not in sources
+    assert "VisualPresentationPanel" not in sources
+    assert "format_presentation_event" not in sources
+    assert "Karten aufgedeckt" not in sources

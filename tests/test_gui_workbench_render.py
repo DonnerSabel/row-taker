@@ -179,6 +179,9 @@ def test_render_rejects_surface_with_wrong_size() -> None:
         "own-card-revealed",
         "presentation-click-required",
         "long-names-five-opponents",
+        "error-message",
+        "round-finished",
+        "game-finished",
     ),
 )
 def test_new_sidebar_scenarios_render_at_compact_sizes(
@@ -201,3 +204,16 @@ def test_new_sidebar_scenarios_render_at_compact_sizes(
         geometry.sidebar_rect.contains(tile.card_placement.rect) for tile in geometry.opponent_tiles
     )
     assert geometry.sidebar_rect.contains(geometry.own_player_tile.card_placement.rect)
+
+
+@pytest.mark.parametrize("size", ((980, 720), (1280, 720)))
+def test_sidebar_has_no_reserved_presentation_gap(size: tuple[int, int]) -> None:
+    rendered = render_scenario_frame(get_scenario("five-opponents"), size=size)
+    assert isinstance(rendered.prepared_screen, GameFrame)
+    geometry = rendered.prepared_screen.geometry
+
+    opponent_to_own_gap = geometry.own_player_rect.top - geometry.opponent_list_rect.bottom
+    header_to_opponent_gap = geometry.opponent_list_rect.top - geometry.sidebar_header_rect.bottom
+
+    assert opponent_to_own_gap == header_to_opponent_gap
+    assert not hasattr(geometry, "presentation_rect")

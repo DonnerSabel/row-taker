@@ -34,6 +34,13 @@ Die Connect-Szenen decken Standardwerte, ungültige Eingaben,
 Verbindungsfehler und lange Feldwerte ab. Die Lobby-Szenen decken leere und
 volle Lobbys, Sitzplatzauswahl, Bot-Namenseingabe und lange Namen ab.
 
+Die Spielszenen decken zusätzlich die kompakte Seitenleiste mit bis zu fünf
+Gegnern, aufgedeckte und bewegte Karten, lange Namen sowie Meldungen in der
+eigenen Spielerkachel ab. Dazu gehören auch die festen Szenen
+`error-message`, `round-finished` und `game-finished`. Eine separate
+Präsentationsbox existiert nicht; Ereignisse werden durch die Produktionsanimation
+dargestellt.
+
 ## Interaktiv untersuchen
 
 Steuerung:
