@@ -109,13 +109,14 @@ def test_own_player_uses_dedicated_sidebar_tile_instead_of_legacy_stats_field() 
     assert "def draw_stats_field" not in hud_source
     assert "draw_stats_field(" not in renderer_source
 
+
 def test_presentation_panel_is_text_only_and_has_no_duplicate_card_strip() -> None:
     state_source = _source("game_visual_state.py")
     presentation_source = _source("presentation_renderer.py")
 
-    panel_source = state_source.split(
-        "class VisualPresentationPanel:", maxsplit=1
-    )[1].split("class PlayerPlayAnchor:", maxsplit=1)[0]
+    panel_source = state_source.split("class VisualPresentationPanel:", maxsplit=1)[1].split(
+        "class PlayerPlayAnchor:", maxsplit=1
+    )[0]
     assert "card_values" not in panel_source
     assert "_draw_presentation_card_strip" not in presentation_source
     assert "panel.card_values" not in presentation_source
@@ -130,6 +131,7 @@ def test_player_tiles_render_visual_active_emphasis() -> None:
     assert "selected=active" in source
     assert "for active_layer in (False, True)" in source
 
+
 def test_status_and_presentation_use_only_new_sidebar_regions() -> None:
     hud_source = _source("rendering/game_hud_renderer.py")
     presentation_source = _source("presentation_renderer.py")
@@ -143,5 +145,17 @@ def test_status_and_presentation_use_only_new_sidebar_regions() -> None:
     assert "status.secondary_line" not in hud_source
     assert "status.hand_prompt" not in hud_source
     assert "geometry.stats_rect" not in presentation_source
-    assert "geometry.presentation_rect" in interaction_source
+    assert "geometry.presentation_rect" not in interaction_source
 
+
+def test_presentation_advance_uses_global_mouse_click_without_button_or_space() -> None:
+    interaction_source = _source("game_interaction.py")
+    hud_source = _source("rendering/game_hud_renderer.py")
+
+    assert "ContinueTarget" not in interaction_source
+    assert "continue_target" not in interaction_source
+    assert "_build_continue_target" not in interaction_source
+    assert "pygame.K_SPACE" not in interaction_source
+    assert "event.button in (1, 3)" in interaction_source
+    assert "draw_button(" not in hud_source
+    assert "Weiter [Leertaste]" not in hud_source

@@ -107,23 +107,6 @@ def _frame_for_state(
     )
 
 
-def _apply_key_action(
-    core: GameClientCore,
-    *,
-    key: int,
-    expected_action_type: type,
-):
-    result = _frame_for_state(core.state).handle_event(
-        pygame.event.Event(pygame.KEYDOWN, key=key, mod=0)
-    )
-    action = result.client_action
-    if not isinstance(action, expected_action_type):
-        raise RuntimeError(
-            f"expected {expected_action_type.__name__} from GameFrame, got {action!r}"
-        )
-    return core.on_ui_action(action)
-
-
 def _apply_click_action(
     core: GameClientCore,
     *,
@@ -147,9 +130,10 @@ def _apply_click_action(
 
 
 def _advance_presentation(core: GameClientCore) -> ClientState:
-    _apply_key_action(
+    frame = _frame_for_state(core.state)
+    _apply_click_action(
         core,
-        key=pygame.K_SPACE,
+        position=frame.geometry.play_area_rect.center,
         expected_action_type=ClientActionAdvancePresentation,
     )
     return core.state
@@ -268,7 +252,11 @@ def _build_full_trick_timeline() -> WorkbenchTimeline:
         expected_action_type=ClientActionChooseRow,
     )
     row_message = next(
-        (message for message in row_update.outbound_messages if isinstance(message, SubmitRowChoice)),
+        (
+            message
+            for message in row_update.outbound_messages
+            if isinstance(message, SubmitRowChoice)
+        ),
         None,
     )
     if row_message is None:
@@ -285,8 +273,7 @@ def _build_full_trick_timeline() -> WorkbenchTimeline:
         event = core.state.pending_presentation_steps[0].event
         label = type(event).__name__.removeprefix("Presentation")
         kebab_label = "".join(
-            ("-" + char.lower()) if char.isupper() else char
-            for char in label
+            ("-" + char.lower()) if char.isupper() else char for char in label
         ).lstrip("-")
         steps.append(
             _step(
@@ -301,9 +288,7 @@ def _build_full_trick_timeline() -> WorkbenchTimeline:
 
     expected_final_public_state = hub.build_public_state()
     if core.state.public_state != expected_final_public_state:
-        raise RuntimeError(
-            "final client public state differs from the real MatchHub public state"
-        )
+        raise RuntimeError("final client public state differs from the real MatchHub public state")
 
     steps.append(
         _step(

@@ -79,12 +79,8 @@ def test_builder_copies_players_hand_scores_and_revealed_cards() -> None:
         86,
         101,
     )
-    assert {
-        player.player_id: player.staged_card_value
-        for player in visual_state.players
-    } == {
-        play.player_id: play.card_value
-        for play in state.revealed_trick.plays
+    assert {player.player_id: player.staged_card_value for player in visual_state.players} == {
+        play.player_id: play.card_value for play in state.revealed_trick.plays
     }
 
 
@@ -118,7 +114,7 @@ def test_presentation_interaction_suppresses_game_choices() -> None:
     assert visual_state.interaction.selectable_card_values == frozenset()
     assert visual_state.interaction.selectable_row_ids == frozenset()
     assert visual_state.interaction.can_advance_presentation is True
-    assert visual_state.status.action_line == "Präsentation läuft"
+    assert visual_state.status.action_line == "Klicken zum Fortfahren"
 
 
 def test_status_text_and_message_level_are_built_before_rendering() -> None:
@@ -178,9 +174,7 @@ def test_cards_revealed_panel_and_own_card_staging_live_in_visual_state() -> Non
     own_player = visual_state.own_player
     assert own_player is not None
     assert own_player.staged_card_value == 44
-    own_hand_card = next(
-        card for card in visual_state.hand if card.card_value == 44
-    )
+    own_hand_card = next(card for card in visual_state.hand if card.card_value == 44)
     assert own_hand_card.visible is False
     assert own_hand_card.emphasis == "none"
 
@@ -231,9 +225,7 @@ def test_card_placed_uses_before_and_after_snapshots_with_one_motion() -> None:
     assert motion.progress == 0.875
     assert after.moving_cards == ()
 
-    active_player = next(
-        player for player in middle.players if player.player_id == event.player_id
-    )
+    active_player = next(player for player in middle.players if player.player_id == event.player_id)
     assert active_player.emphasis == "active"
     assert active_player.staged_card_value is None
     if event.player_id == state.own_player_id:
@@ -261,19 +253,14 @@ def test_completed_card_placement_stays_hidden_in_following_step() -> None:
         presentation_elapsed_frames=0,
     )
     completed_player = next(
-        player
-        for player in visual_state.players
-        if player.player_id == first_step.event.player_id
+        player for player in visual_state.players if player.player_id == first_step.event.player_id
     )
     assert completed_player.staged_card_value is None
     if first_step.event.player_id == following.own_player_id:
         completed_card = next(
-            card
-            for card in visual_state.hand
-            if card.card_value == first_step.event.card_value
+            card for card in visual_state.hand if card.card_value == first_step.event.card_value
         )
         assert completed_card.visible is False
-
 
 
 def test_card_placed_keeps_target_row_in_final_visual_column() -> None:
@@ -338,6 +325,8 @@ def test_card_placed_keeps_target_row_in_final_visual_column() -> None:
     assert tuple(row.row_id for row in before.rows) == expected_order
     assert tuple(row.row_id for row in after.rows) == expected_order
     assert before.moving_cards[0].target == RowCardAnchor(target_row_id, 1)
+
+
 def test_row_choice_required_lives_in_visual_state() -> None:
     state = get_scenario("row-choice-required").state
     current_step = state.current_presentation_step
@@ -348,10 +337,7 @@ def test_row_choice_required_lives_in_visual_state() -> None:
     visual_state = build_game_visual_state(state, last_action_summary="test")
 
     assert visual_state.presentation_panel is not None
-    assert (
-        visual_state.presentation_panel.headline
-        == f"{event.player_name} muss eine Reihe wählen"
-    )
+    assert visual_state.presentation_panel.headline == f"{event.player_name} muss eine Reihe wählen"
     assert visual_state.interaction.can_advance_presentation is True
     assert all(row.emphasis == "none" for row in visual_state.rows)
 
@@ -362,9 +348,7 @@ def test_row_choice_required_lives_in_visual_state() -> None:
     assert active_player.staged_card_value == event.card_value
 
     if event.player_id == state.own_player_id:
-        own_card = next(
-            card for card in visual_state.hand if card.card_value == event.card_value
-        )
+        own_card = next(card for card in visual_state.hand if card.card_value == event.card_value)
         assert own_card.visible is False
 
 
@@ -394,6 +378,8 @@ def test_row_chosen_lives_in_visual_state_and_marks_stable_row_id() -> None:
     )
     assert active_player.emphasis == "active"
     assert active_player.staged_card_value == event.card_value
+
+
 def test_row_taken_uses_snapshot_scores_row_replacement_and_one_motion() -> None:
     state = get_scenario("row-taken").state
     step = state.current_presentation_step
@@ -432,21 +418,13 @@ def test_row_taken_uses_snapshot_scores_row_replacement_and_one_motion() -> None
     assert tuple(card.card_value for card in before_row.taken_cards) == event.taken_cards
     assert tuple(card.card_value for card in after_row.taken_cards) == event.taken_cards
 
-    before_player = next(
-        player for player in before.players if player.player_id == event.player_id
-    )
-    after_player = next(
-        player for player in after.players if player.player_id == event.player_id
-    )
+    before_player = next(player for player in before.players if player.player_id == event.player_id)
+    after_player = next(player for player in after.players if player.player_id == event.player_id)
     before_snapshot_player = next(
-        player
-        for player in step.public_state_before.players
-        if player.player_id == event.player_id
+        player for player in step.public_state_before.players if player.player_id == event.player_id
     )
     after_snapshot_player = next(
-        player
-        for player in step.public_state_after.players
-        if player.player_id == event.player_id
+        player for player in step.public_state_after.players if player.player_id == event.player_id
     )
     assert before_player.score == before_snapshot_player.score
     assert after_player.score == after_snapshot_player.score
@@ -468,17 +446,12 @@ def test_row_taken_uses_snapshot_scores_row_replacement_and_one_motion() -> None
     assert before_player.staged_card_value is None
     if event.player_id == state.own_player_id:
         own_card = next(
-            card
-            for card in middle.hand
-            if card.card_value == event.replacement_card_value
+            card for card in middle.hand if card.card_value == event.replacement_card_value
         )
         assert own_card.visible is False
 
     assert middle.presentation_panel is not None
-    assert (
-        middle.presentation_panel.headline
-        == f"{event.player_name} nimmt Reihe {event.row_id}"
-    )
+    assert middle.presentation_panel.headline == f"{event.player_name} nimmt Reihe {event.row_id}"
 
 
 def test_row_taken_keeps_replaced_row_in_one_visual_column() -> None:
@@ -498,7 +471,5 @@ def test_row_taken_keeps_replaced_row_in_one_visual_column() -> None:
         presentation_elapsed_frames=32,
     )
 
-    assert tuple(row.row_id for row in before.rows) == tuple(
-        row.row_id for row in after.rows
-    )
+    assert tuple(row.row_id for row in before.rows) == tuple(row.row_id for row in after.rows)
     assert before.moving_cards[0].target == RowCardAnchor(step.event.row_id, 0)

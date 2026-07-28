@@ -40,16 +40,9 @@ class RowTarget:
 
 
 @dataclass(frozen=True, slots=True)
-class ContinueTarget:
-    rect: pygame.Rect
-    hovered: bool = False
-
-
-@dataclass(frozen=True, slots=True)
 class GameScreenTargets:
     card_targets: tuple[CardTarget, ...] = ()
     row_targets: tuple[RowTarget, ...] = ()
-    continue_target: ContinueTarget | None = None
 
 
 def build_game_screen_targets(
@@ -77,11 +70,6 @@ def build_game_screen_targets(
             visual_state,
             mouse_pos=resolved_mouse_pos,
         ),
-        continue_target=_build_continue_target(
-            geometry,
-            visual_state,
-            mouse_pos=resolved_mouse_pos,
-        ),
     )
 
 
@@ -101,8 +89,8 @@ def handle_game_event(
         return NO_SCREEN_RESULT
 
     if (
-        event.type == pygame.KEYDOWN
-        and event.key == pygame.K_SPACE
+        event.type == pygame.MOUSEBUTTONDOWN
+        and event.button in (1, 3)
         and visual_state.interaction.can_advance_presentation
     ):
         return ScreenResult(client_action=ClientActionAdvancePresentation())
@@ -126,12 +114,6 @@ def _handle_left_click(
     for target in game_targets.row_targets:
         if target.rect.collidepoint(position):
             return ScreenResult(client_action=ClientActionChooseRow(row_id=target.row_id))
-
-    if (
-        game_targets.continue_target is not None
-        and game_targets.continue_target.rect.collidepoint(position)
-    ):
-        return ScreenResult(client_action=ClientActionAdvancePresentation())
 
     return NO_SCREEN_RESULT
 
@@ -191,21 +173,3 @@ def _build_row_targets(
         for row, rect in zip(visual_state.rows, geometry.row_columns, strict=False)
         if row.row_id in selectable
     )
-
-
-def _build_continue_target(
-    geometry: BoardGeometry,
-    visual_state: GameVisualState,
-    *,
-    mouse_pos: tuple[int, int],
-) -> ContinueTarget | None:
-    if not visual_state.interaction.can_advance_presentation:
-        return None
-
-    rect = pygame.Rect(
-        geometry.presentation_rect.left + 10,
-        geometry.presentation_rect.bottom - 42,
-        max(1, geometry.presentation_rect.width - 20),
-        34,
-    )
-    return ContinueTarget(rect=rect, hovered=rect.collidepoint(mouse_pos))

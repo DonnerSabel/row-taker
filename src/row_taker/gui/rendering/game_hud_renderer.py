@@ -14,7 +14,7 @@ from row_taker.gui.game_visual_state import GameVisualState, MessageLevel
 from row_taker.gui.presentation_renderer import draw_presentation_panel
 from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui.theme import DEFAULT_THEME
-from row_taker.gui.widgets import draw_button, draw_overlay_panel, draw_panel
+from row_taker.gui.widgets import draw_overlay_panel, draw_panel
 
 THEME = DEFAULT_THEME
 PALETTE = THEME.palette
@@ -278,9 +278,7 @@ def draw_hand(
         if not card.visible:
             continue
         target = target_by_value.get(card.card_value)
-        selected = card.emphasis == "selected" or (
-            target is not None and target.card.selected
-        )
+        selected = card.emphasis == "selected" or (target is not None and target.card.selected)
         hovered = target.card.hovered if target is not None else False
         GuiCard(
             card_value=card.card_value,
@@ -291,21 +289,17 @@ def draw_hand(
         ).draw(screen, drawer=drawer, assets=assets)
 
 
-
 def draw_status_overlay(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
     visual_state: GameVisualState,
-    game_targets: GameScreenTargets,
     animation_clock: AnimationClock,
 ) -> None:
     """Draw global status and presentation text inside the new sidebar."""
 
     _draw_sidebar_header(screen, drawer, geometry, visual_state)
 
-    continue_target = game_targets.continue_target
-    reserved_bottom = 46 if continue_target is not None else 0
     if visual_state.presentation_panel is not None:
         draw_presentation_panel(
             screen,
@@ -313,7 +307,6 @@ def draw_status_overlay(
             geometry.presentation_rect,
             visual_state.presentation_panel,
             animation_clock,
-            reserved_bottom=reserved_bottom,
         )
     else:
         _draw_sidebar_message(
@@ -322,18 +315,6 @@ def draw_status_overlay(
             geometry.presentation_rect,
             visual_state.status.message_line,
             visual_state.status.message_level,
-            reserved_bottom=reserved_bottom,
-        )
-
-    if continue_target is not None:
-        draw_button(
-            screen,
-            drawer,
-            continue_target.rect,
-            "Weiter [Leertaste]",
-            variant="primary",
-            hovered=continue_target.hovered,
-            theme=THEME,
         )
 
 
@@ -362,8 +343,6 @@ def _draw_sidebar_message(
     rect: pygame.Rect,
     message: str | None,
     level: MessageLevel,
-    *,
-    reserved_bottom: int,
 ) -> None:
     _draw_overlay_box(screen, rect)
     if not message:
@@ -373,7 +352,7 @@ def _draw_sidebar_message(
         rect.left + 12,
         rect.top + 10,
         max(1, rect.width - 24),
-        max(1, rect.height - 20 - reserved_bottom),
+        max(1, rect.height - 20),
     )
     drawer.draw_wrapped_lines(
         screen,

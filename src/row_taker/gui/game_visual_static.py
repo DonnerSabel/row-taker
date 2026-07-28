@@ -57,14 +57,10 @@ def build_stable_game_visual_state(
         active_player_id=active_player_id,
     )
     own_staged_card_value = (
-        staged_values.get(state.own_player_id)
-        if state.own_player_id is not None
-        else None
+        staged_values.get(state.own_player_id) if state.own_player_id is not None else None
     )
     if own_staged_card_value is not None:
-        hidden_hand_card_values = hidden_hand_card_values | frozenset(
-            (own_staged_card_value,)
-        )
+        hidden_hand_card_values = hidden_hand_card_values | frozenset((own_staged_card_value,))
     hand = _build_hand(
         state,
         selected_card_value=(
@@ -106,8 +102,7 @@ def _build_rows(
         VisualRow(
             row_id=row.row_id,
             cards=tuple(
-                VisualCard(card_value=card.value, bullheads=card.bullheads)
-                for card in row.cards
+                VisualCard(card_value=card.value, bullheads=card.bullheads) for card in row.cards
             ),
             emphasis=emphasis_by_id.get(row.row_id, "none"),
             taken_cards=taken_cards_by_id.get(row.row_id, ()),
@@ -219,16 +214,12 @@ def _build_interaction(
 
     if state.pending_action == PendingAction.CHOOSE_CARD:
         return VisualInteraction(
-            selectable_card_values=frozenset(
-                card.card_value for card in hand if card.visible
-            )
+            selectable_card_values=frozenset(card.card_value for card in hand if card.visible)
         )
 
     if state.pending_action == PendingAction.CHOOSE_ROW and state.player_state is not None:
         return VisualInteraction(
-            selectable_row_ids=frozenset(
-                state.player_state.get_selectable_row_ids_for_choose_row()
-            )
+            selectable_row_ids=frozenset(state.player_state.get_selectable_row_ids_for_choose_row())
         )
 
     return VisualInteraction()
@@ -262,17 +253,13 @@ def _status_action_line(
     public_state: PublicState | None,
 ) -> str | None:
     if state.pending_presentation_steps:
-        return "Präsentation läuft"
+        return "Klicken zum Fortfahren"
 
     if state.pending_action == PendingAction.CHOOSE_CARD:
         return "Karte auswählen"
 
     if state.pending_action == PendingAction.CHOOSE_ROW:
-        pending_card = (
-            public_state.phase_info.pending_card
-            if public_state is not None
-            else None
-        )
+        pending_card = public_state.phase_info.pending_card if public_state is not None else None
         if pending_card is not None:
             return f"Reihe für Karte {pending_card.value} wählen"
         return "Reihe auswählen"

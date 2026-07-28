@@ -146,8 +146,6 @@ def draw_presentation_panel(
     rect: pygame.Rect,
     panel: VisualPresentationPanel,
     animation_clock: AnimationClock,
-    *,
-    reserved_bottom: int = 0,
 ) -> None:
     """Draw the text-only panel in the prepared sidebar rectangle."""
 
@@ -174,7 +172,7 @@ def draw_presentation_panel(
             events_rect.left + 12,
             text_top,
             events_rect.width - 24,
-            max(1, events_rect.bottom - text_top - 6 - reserved_bottom),
+            max(1, events_rect.bottom - text_top - 6),
         )
         drawer.draw_wrapped_lines(
             screen,
