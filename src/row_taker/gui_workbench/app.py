@@ -15,7 +15,7 @@ from row_taker.gui.screens.connect_screen import ConnectFrame
 from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui.screens.lobby_frame import LobbyFrame
 from row_taker.gui.screens.prepared_screen import PreparedScreen
-from row_taker.gui_workbench.scenarios import (
+from row_taker.gui_workbench.scenario_types import (
     ConnectWorkbenchScenario,
     GameWorkbenchScenario,
     LobbyWorkbenchScenario,

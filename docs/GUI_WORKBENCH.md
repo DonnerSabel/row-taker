@@ -152,3 +152,18 @@ Beginn des aktuellen Präsentationsschritts verstrichenen Frames. Ein Wechsel
 zum nächsten oder vorherigen Timeline-Schritt setzt diesen Zähler auf `0`.
 Interaktiv verändern Links/Rechts den Frame; mit gedrückter Umschalttaste in
 10er-Schritten.
+
+## Interne Modulstruktur
+
+Die öffentliche Szenario-API bleibt über `row_taker.gui_workbench.scenarios`
+erreichbar. Intern sind Datentypen, gemeinsame Builder und die drei
+Szenariokategorien getrennt:
+
+- `scenario_types.py`: Szenario-Datentypen und gemeinsame Konstanten
+- `scenario_builders.py`: regelkonforme Lobby- und Spielzustände
+- `connect_scenarios.py`, `lobby_scenarios.py`, `game_scenarios.py`: konkrete Szenarien
+- `scenario_catalog.py`: Namen, Kategorien und Lookup
+- `timeline.py`: Timeline-Datentyp und Katalog
+- `timeline_builders.py`: konkrete, durch echte Produktionspfade erzeugte Timelines
+
+Produktive GUI-Module importieren keine Workbench-Module.

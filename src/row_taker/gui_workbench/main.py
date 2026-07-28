@@ -10,7 +10,7 @@ from row_taker.gui_workbench.app import (
     save_scenario_frames,
     save_timeline_frames,
 )
-from row_taker.gui_workbench.scenarios import (
+from row_taker.gui_workbench.scenario_catalog import (
     get_scenario,
     scenario_names,
     scenarios,

@@ -1,37 +1,10 @@
 from __future__ import annotations
 
-import random
 from collections.abc import Callable
 from dataclasses import dataclass
 
-import pygame
-
-from row_taker.client.actions import (
-    ClientActionAdvancePresentation,
-    ClientActionChooseCard,
-    ClientActionChooseRow,
-)
-from row_taker.client.game_client_core import GameClientCore
-from row_taker.client.presentation_events import PresentationEvent
-from row_taker.client.state import ClientState, initial_client_state
-from row_taker.engine.game import RulesConfig, setup_game
-from row_taker.engine.game.cards import Card
-from row_taker.engine.game.models import EngineRow, PlayerID, RowID
 from row_taker.engine.game.state import PublicState
-from row_taker.gui.layout import compute_layout
-from row_taker.gui.screens.game_frame import GameFrame
-from row_taker.gui_workbench.scenarios import (
-    ANIMATION_FRAMES,
-    DEFAULT_SIZE,
-    GameWorkbenchScenario,
-)
-from row_taker.hub.match_hub import MatchHub
-from row_taker.protocol.messages import (
-    ChooseCardRequested,
-    ChooseRowRequested,
-    SubmitCard,
-    SubmitRowChoice,
-)
+from row_taker.gui_workbench.scenario_types import DEFAULT_SIZE, GameWorkbenchScenario
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,279 +26,28 @@ class WorkbenchTimeline:
         if not self.steps:
             raise ValueError("a workbench timeline requires at least one step")
 
-
 TimelineFactory = Callable[[], WorkbenchTimeline]
 
 
-def _front_event(state: ClientState) -> PresentationEvent | None:
-    step = state.current_presentation_step
-    return None if step is None else step.event
+def _timeline_factories() -> dict[str, TimelineFactory]:
+    from row_taker.gui_workbench.timeline_builders import build_full_trick_timeline
 
-
-def _step(
-    timeline_name: str,
-    index: int,
-    label: str,
-    description: str,
-    state: ClientState,
-) -> GameWorkbenchScenario:
-    event = _front_event(state)
-    frames = ANIMATION_FRAMES if event is not None else (0,)
-    return GameWorkbenchScenario(
-        name=f"{timeline_name}-{index:02d}-{label}",
-        description=description,
-        state=state,
-        interesting_frames=frames,
-    )
-
-
-def _deliver_relevant_messages(
-    core: GameClientCore,
-    messages: list[object],
-    *,
-    own_player_id: PlayerID,
-) -> None:
-    for message in messages:
-        if isinstance(message, (ChooseCardRequested, ChooseRowRequested)):
-            if message.player_id != own_player_id:
-                continue
-        core.on_server_message(message)
-
-
-def _frame_for_state(
-    state: ClientState,
-    *,
-    mouse_pos: tuple[int, int] = (-1, -1),
-) -> GameFrame:
-    return GameFrame.from_layout(
-        layout=compute_layout(*DEFAULT_SIZE),
-        state=state,
-        presentation_elapsed_frames=0,
-        mouse_pos=mouse_pos,
-    )
-
-
-def _apply_click_action(
-    core: GameClientCore,
-    *,
-    position: tuple[int, int],
-    expected_action_type: type,
-):
-    frame = _frame_for_state(core.state, mouse_pos=position)
-    result = frame.handle_event(
-        pygame.event.Event(
-            pygame.MOUSEBUTTONDOWN,
-            button=1,
-            pos=position,
-        )
-    )
-    action = result.client_action
-    if not isinstance(action, expected_action_type):
-        raise RuntimeError(
-            f"expected {expected_action_type.__name__} from GameFrame, got {action!r}"
-        )
-    return core.on_ui_action(action)
-
-
-def _advance_presentation(core: GameClientCore) -> ClientState:
-    frame = _frame_for_state(core.state)
-    _apply_click_action(
-        core,
-        position=frame.geometry.play_area_rect.center,
-        expected_action_type=ClientActionAdvancePresentation,
-    )
-    return core.state
-
-
-def _build_full_trick_timeline() -> WorkbenchTimeline:
-    timeline_name = "full-trick"
-    own_player_id = PlayerID("player-0")
-    selected_values = (7, 53, 66, 95)
-
-    engine_state = setup_game(
-        ("Ada", "Ben", "Clara", "Dorian"),
-        rng=random.Random(123),
-        config=RulesConfig(hand_size=2),
-    )
-    for player, played_value, remaining_value in zip(
-        engine_state.players,
-        selected_values,
-        (17, 54, 67, 96),
-        strict=True,
-    ):
-        player.hand = [Card(played_value), Card(remaining_value)]
-
-    engine_state.rows = [
-        EngineRow(RowID("row-0"), [Card(value) for value in (10, 20, 30, 40, 50)]),
-        EngineRow(RowID("row-1"), [Card(65)]),
-        EngineRow(RowID("row-2"), [Card(78)]),
-        EngineRow(RowID("row-3"), [Card(92)]),
-    ]
-
-    hub = MatchHub(state=engine_state)
-    core = GameClientCore(initial_client_state("workbench-client"))
-    hub.start_match()
-    _deliver_relevant_messages(
-        core,
-        hub.drain_outbox(),
-        own_player_id=own_player_id,
-    )
-
-    steps: list[GameWorkbenchScenario] = []
-    steps.append(
-        _step(
-            timeline_name,
-            len(steps),
-            "choose-card",
-            "Eigene Karte vor dem vollständigen Stich auswählen.",
-            core.state,
-        )
-    )
-
-    frame = _frame_for_state(core.state)
-    card_target = next(
-        target for target in frame.targets.card_targets if target.card_value == selected_values[0]
-    )
-    own_update = _apply_click_action(
-        core,
-        position=card_target.rect.center,
-        expected_action_type=ClientActionChooseCard,
-    )
-    own_message = next(
-        (message for message in own_update.outbound_messages if isinstance(message, SubmitCard)),
-        None,
-    )
-    if own_message is None:
-        raise RuntimeError("choose-card input did not produce SubmitCard")
-    hub.handle_client_message(own_player_id, own_message)
-
-    for player, card_value in zip(engine_state.players[1:], selected_values[1:], strict=True):
-        hub.handle_client_message(player.player_id, SubmitCard(card_value=card_value))
-
-    _deliver_relevant_messages(
-        core,
-        hub.drain_outbox(),
-        own_player_id=own_player_id,
-    )
-    steps.append(
-        _step(
-            timeline_name,
-            len(steps),
-            "cards-revealed",
-            "Alle gespielten Karten sind aufgedeckt.",
-            core.state,
-        )
-    )
-
-    _advance_presentation(core)
-    steps.append(
-        _step(
-            timeline_name,
-            len(steps),
-            "row-choice-required",
-            "Die kleinste Karte benötigt eine Reihenwahl.",
-            core.state,
-        )
-    )
-
-    _advance_presentation(core)
-    steps.append(
-        _step(
-            timeline_name,
-            len(steps),
-            "choose-row",
-            "Die zurückgestellte Serveranfrage ist aktiv; Reihe 1 kann gewählt werden.",
-            core.state,
-        )
-    )
-
-    row_frame = _frame_for_state(core.state)
-    chosen_row_id = RowID("row-1")
-    row_target = next(
-        target for target in row_frame.targets.row_targets if target.row_id == chosen_row_id
-    )
-    row_update = _apply_click_action(
-        core,
-        position=row_target.rect.center,
-        expected_action_type=ClientActionChooseRow,
-    )
-    row_message = next(
-        (
-            message
-            for message in row_update.outbound_messages
-            if isinstance(message, SubmitRowChoice)
-        ),
-        None,
-    )
-    if row_message is None:
-        raise RuntimeError("choose-row input did not produce SubmitRowChoice")
-    hub.handle_client_message(own_player_id, row_message)
-
-    _deliver_relevant_messages(
-        core,
-        hub.drain_outbox(),
-        own_player_id=own_player_id,
-    )
-
-    while core.state.pending_presentation_steps:
-        event = core.state.pending_presentation_steps[0].event
-        label = type(event).__name__.removeprefix("Presentation")
-        kebab_label = "".join(
-            ("-" + char.lower()) if char.isupper() else char for char in label
-        ).lstrip("-")
-        steps.append(
-            _step(
-                timeline_name,
-                len(steps),
-                kebab_label,
-                f"Präsentationsereignis {type(event).__name__}.",
-                core.state,
-            )
-        )
-        _advance_presentation(core)
-
-    expected_final_public_state = hub.build_public_state()
-    if core.state.public_state != expected_final_public_state:
-        raise RuntimeError("final client public state differs from the real MatchHub public state")
-
-    steps.append(
-        _step(
-            timeline_name,
-            len(steps),
-            "final-state",
-            "Präsentationsqueue leer; der nächste echte Spielzustand ist aktiv.",
-            core.state,
-        )
-    )
-
-    return WorkbenchTimeline(
-        name=timeline_name,
-        description=(
-            "Vollständiger Stich über MatchHub, GameClientCore und GameFrame: "
-            "Kartenwahl, Aufdecken, Reihenwahl, Überlauf, Ablagen und Endzustand."
-        ),
-        steps=tuple(steps),
-        expected_final_public_state=expected_final_public_state,
-    )
-
-
-_TIMELINE_FACTORIES: dict[str, TimelineFactory] = {
-    "full-trick": _build_full_trick_timeline,
-}
+    return {"full-trick": build_full_trick_timeline}
 
 
 def timeline_names() -> tuple[str, ...]:
-    return tuple(_TIMELINE_FACTORIES)
+    return tuple(_timeline_factories())
 
 
 def get_timeline(name: str) -> WorkbenchTimeline:
+    factories = _timeline_factories()
     try:
-        factory = _TIMELINE_FACTORIES[name]
+        factory = factories[name]
     except KeyError as exc:
-        available = ", ".join(timeline_names())
+        available = ", ".join(factories)
         raise KeyError(f"unknown workbench timeline {name!r}; available: {available}") from exc
     return factory()
 
 
 def timelines() -> tuple[WorkbenchTimeline, ...]:
-    return tuple(factory() for factory in _TIMELINE_FACTORIES.values())
+    return tuple(factory() for factory in _timeline_factories().values())
