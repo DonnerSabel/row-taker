@@ -102,7 +102,7 @@ def submit_card(state: ClientState, action: ClientActionChooseCard) -> ActionRes
         return ActionResult(state=state, local_message="Keine Kartenauswahl aktiv.")
     try:
         validate_submit_card(player_state, action.card_value)
-    except Exception as exc:
+    except ValueError as exc:
         return ActionResult(state=state, local_message=str(exc))
     next_state = enter_game_mode(
         state,
@@ -122,7 +122,7 @@ def submit_row_choice(state: ClientState, action: ClientActionChooseRow) -> Acti
         return ActionResult(state=state, local_message="Keine Reihenwahl aktiv.")
     try:
         validate_submit_row_choice(player_state, action.row_id)
-    except Exception as exc:
+    except ValueError as exc:
         return ActionResult(state=state, local_message=str(exc))
     next_state = enter_game_mode(
         state,

@@ -8,6 +8,7 @@ GUI-Experimente der Schüler ist es normalerweise nicht der erste Ort für
 
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 
@@ -20,9 +21,11 @@ from row_taker.client.state import (
     set_flash_message,
 )
 from row_taker.client.update import CoreUpdate
-from row_taker.protocol.errors import ConnectionClosed
+from row_taker.protocol.errors import ConnectionClosed, TransportError
 from row_taker.protocol.messages import JoinLobby, ServerToClientMessage
 from row_taker.protocol.transport import ClientTransport
+
+logger = logging.getLogger(__name__)
 
 
 class LiveGuiClient:
@@ -53,7 +56,12 @@ class LiveGuiClient:
         return self.core.state
 
     def start(self) -> None:
-        self.transport.send(JoinLobby(display_name=self.display_name, requested_client_id=self.core.state.own_client_id))
+        self.transport.send(
+            JoinLobby(
+                display_name=self.display_name,
+                requested_client_id=self.core.state.own_client_id,
+            )
+        )
         self._receiver_thread = threading.Thread(
             target=self._receive_loop,
             name="row_taker_gui_receive",
@@ -68,11 +76,17 @@ class LiveGuiClient:
             except queue.Empty:
                 break
 
-            if isinstance(item, BaseException):
-                self._apply_update(self.core.on_transport_closed("Die Verbindung zum Server wurde beendet."))
+            if isinstance(item, ConnectionClosed):
+                message = "Die Verbindung zum Server wurde beendet."
+            elif isinstance(item, TransportError):
+                message = f"Netzwerkfehler: {item}"
+            elif isinstance(item, BaseException):
+                message = "Unerwarteter Netzwerkfehler. Details stehen im Log."
+            else:
+                self._apply_update(self.core.on_server_message(item))
                 continue
 
-            self._apply_update(self.core.on_server_message(item))
+            self._apply_update(self.core.on_transport_closed(message))
 
     def apply_local_state(self, state: ClientState) -> None:
         self.core.state = state
@@ -89,8 +103,10 @@ class LiveGuiClient:
         if send_leave_session:
             try:
                 self.apply_action(ClientActionLeaveSession())
+            except TransportError as exc:
+                logger.info("LeaveSession could not be sent during shutdown: %s", exc)
             except Exception:
-                pass
+                logger.exception("unexpected error while sending LeaveSession")
 
         self._closed = True
         self.transport.close()
@@ -105,7 +121,11 @@ class LiveGuiClient:
             except ConnectionClosed as exc:
                 self._incoming.put(exc)
                 return
+            except TransportError as exc:
+                self._incoming.put(exc)
+                return
             except Exception as exc:
+                logger.exception("unexpected error in GUI receive loop")
                 self._incoming.put(exc)
                 return
             self._incoming.put(message)
@@ -116,15 +136,22 @@ class LiveGuiClient:
         for outbound in update.outbound_messages:
             try:
                 self.transport.send(outbound)
+            except TransportError as exc:
+                logger.info("sending to server failed: %s", exc)
+                self._set_error_message("Senden an den Server fehlgeschlagen.")
+                return
             except Exception:
-                self.core.state = set_flash_message(
-                    self.core.state,
-                    UiMessage(level="error", text="Senden an den Server fehlgeschlagen."),
+                logger.exception("unexpected error while sending to server")
+                self._set_error_message(
+                    "Unerwarteter Fehler beim Senden. Details stehen im Log."
                 )
                 return
 
         if update.local_messages:
-            self.core.state = set_flash_message(
-                self.core.state,
-                UiMessage(level="error", text=update.local_messages[-1]),
-            )
+            self._set_error_message(update.local_messages[-1])
+
+    def _set_error_message(self, text: str) -> None:
+        self.core.state = set_flash_message(
+            self.core.state,
+            UiMessage(level="error", text=text),
+        )

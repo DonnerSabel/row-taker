@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import pygame
 
 from row_taker.client.actions import ClientAction
@@ -19,10 +21,13 @@ from row_taker.gui.screens.connect_screen import ConnectFrame, normalized_connec
 from row_taker.gui.screens.game_frame import GameFrame
 from row_taker.gui.screens.lobby_frame import LobbyFrame
 from row_taker.gui.screens.prepared_screen import PreparedScreen
+from row_taker.protocol.errors import TransportError
 from row_taker.protocol.transport import ClientTransport
 
 WINDOW_TITLE = "Row-Taker"
 FPS = 30
+
+logger = logging.getLogger(__name__)
 
 
 class GuiApp:
@@ -153,11 +158,14 @@ class GuiApp:
             return
 
         host, port, display_name = connection_values
+        transport: ClientTransport | None = None
         try:
             transport = ClientTransport.connect(host, port)
             live_client = LiveGuiClient(transport, display_name=display_name)
             live_client.start()
-        except Exception as exc:
+        except TransportError as exc:
+            if transport is not None:
+                transport.close()
             self._connect_form = ConnectFormState(
                 host=host,
                 port=str(port),
@@ -165,6 +173,21 @@ class GuiApp:
                 active_field="host",
                 error_message=f"Verbindung fehlgeschlagen: {exc}",
                 status_message="Bitte Werte prüfen und erneut verbinden.",
+            )
+            return
+        except Exception:
+            logger.exception("unexpected error while connecting GUI client")
+            if transport is not None:
+                transport.close()
+            self._connect_form = ConnectFormState(
+                host=host,
+                port=str(port),
+                display_name=display_name,
+                active_field="host",
+                error_message=(
+                    "Unerwarteter Verbindungsfehler. Details stehen im Log."
+                ),
+                status_message="Bitte erneut versuchen.",
             )
             return
 

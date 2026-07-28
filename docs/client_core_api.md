@@ -144,3 +144,18 @@ einen `ActionResult` mit neuem Zustand, optionaler Outbound-Nachricht und
 optionaler lokaler Meldung. Die zentrale `match`-Anweisung bleibt dadurch als
 vollständiges Inhaltsverzeichnis aller unterstützten Eingaben lesbar, ohne eine
 Handler-Registry oder Factory-Klassen einzuführen.
+
+## Fehler bei lokalen Aktionen
+
+`action_transitions.py` unterscheidet erwartete Validierungsfehler von
+Programmierfehlern:
+
+- `ValueError` aus der fachlichen Karten- oder Reihenvalidierung wird als
+  `CoreUpdate.local_messages` an das Frontend zurückgegeben.
+- Andere Ausnahmen werden nicht in eine gewöhnliche Benutzermeldung
+  umgewandelt. Sie müssen an einer äußeren Infrastrukturgrenze geloggt und
+  behandelt werden.
+
+Damit kann eine ungültige Auswahl die Sitzung nicht beschädigen, während ein
+Programmierfehler weiterhin sichtbar bleibt und nicht wie eine falsche
+Benutzereingabe aussieht.

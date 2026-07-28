@@ -382,3 +382,35 @@ gesetztem Server-Logpfad automatisch eine abgeleitete Bot-Logdatei.
 Die GUI führt nur `presentation_elapsed_frames`: die seit dem Beginn des
 aktuellen `PresentationStep` verstrichenen Frames. Ein neuer Step setzt den
 Zähler auf null. Ein zusätzlicher globaler Render-Frame-Zähler existiert nicht.
+
+---
+
+## Fehlergrenzen
+
+Erwartete Eingabe- und Protokollfehler werden von unerwarteten Programmierfehlern
+getrennt behandelt.
+
+Auf der Serverseite steht `ClientRequestRejected` für Fehler, die sicher an den
+anfragenden Client gemeldet werden dürfen, beispielsweise:
+
+- ungültiger Sitzplatz
+- doppelter oder leerer Anzeigename
+- Spielstart mit unvollständiger Lobby
+- Karte oder Reihe, die im aktuellen Zustand nicht gewählt werden darf
+
+`LocalServer.handle_client_message()` fängt ausschließlich diese Fachausnahme.
+`TypeError`, `RuntimeError` und andere unerwartete Fehler werden nicht als
+`LobbyActionRejected` getarnt. Die äußere Netzwerkgrenze protokolliert solche
+Fehler mit Stacktrace und schließt die betroffene Verbindung, ohne interne
+Details an den Client zu senden.
+
+Für lokale Client-Aktionen gilt dasselbe Prinzip: Erwartete
+Validierungsfehler (`ValueError`) werden als lokale Meldung zurückgegeben.
+Unerwartete Fehler dürfen bis zur Infrastrukturgrenze propagieren.
+
+Transportgrenzen in GUI und Netzwerk dürfen breit fangen, weil dort ein
+Thread, eine Verbindung oder ein Shutdown-Pfad geschützt werden muss. Ein
+breiter Catch ist an diesen Stellen nur zulässig, wenn der Fehler mit
+Stacktrace geloggt und dem Benutzer lediglich eine generische Meldung gezeigt
+wird. Die defensiven Übersetzungen in `protocol/framing.py` bleiben davon
+unberührt.

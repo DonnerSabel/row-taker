@@ -156,12 +156,19 @@ def _serve_connection(conn: socket.socket, network_server: NetworkServer, endpoi
                 logger.info(f"client disconnected while receiving: client_id={client_id}")
                 break
             except (ProtocolError, TransportError) as exc:
-                logger.info(f"client transport error: client_id={client_id} error={type(exc).__name__}: {exc}")
+                logger.info(
+                    "client transport error: client_id=%s error=%s: %s",
+                    client_id,
+                    type(exc).__name__,
+                    exc,
+                )
                 break
             client_id = network_server.handle_client_message(client_id, message)
             if isinstance(message, LeaveSession):
                 logger.info(f"client requested leave: client_id={client_id}")
                 break
+    except Exception:
+        logger.exception("unexpected server error while handling client_id=%s", client_id)
     finally:
         network_server.remove_connection(client_id)
 

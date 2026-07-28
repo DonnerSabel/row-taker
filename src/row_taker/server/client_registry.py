@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from row_taker.server.errors import ClientRequestRejected
 from row_taker.server.participants import Participant
 
 
@@ -50,11 +51,11 @@ class ClientRegistry:
     ) -> str:
         value = display_name.strip()
         if not value:
-            raise ValueError("display name must not be empty")
+            raise ClientRequestRejected("display name must not be empty")
         normalized = value.casefold()
         for existing_client_id, entry in self.records.items():
             if exclude_client_id is not None and existing_client_id == exclude_client_id:
                 continue
             if entry.participant.display_name.strip().casefold() == normalized:
-                raise ValueError(f"duplicate participant display name: {value!r}")
+                raise ClientRequestRejected(f"duplicate participant display name: {value!r}")
         return value

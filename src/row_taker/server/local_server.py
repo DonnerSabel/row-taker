@@ -6,6 +6,11 @@ from dataclasses import dataclass, field, replace
 
 from row_taker.engine.game import setup_game
 from row_taker.engine.game.models import PlayerID
+from row_taker.engine.game.phases import Phase
+from row_taker.engine.game.player_state_ops import (
+    validate_submit_card,
+    validate_submit_row_choice,
+)
 from row_taker.engine.game.state import GameState, PublicState
 from row_taker.engine.lobby.rules import (
     assign_client_to_seat,
@@ -37,6 +42,7 @@ from row_taker.protocol.messages import (
 )
 from row_taker.server.bot_process_handle import BotProcessHandle
 from row_taker.server.client_registry import ClientRegistry
+from row_taker.server.errors import ClientRequestRejected
 from row_taker.server.lobby_view import build_lobby_state_updated, build_lobby_view
 from row_taker.server.match_participants import build_match_participants
 from row_taker.server.participants import Participant, ParticipantKind, ParticipantLocation
@@ -135,25 +141,29 @@ class LocalServer:
                 self._forward_game_message(client_id, message)
                 return None
             raise TypeError(f"unsupported client message type: {type(message)!r}")
-        except Exception as exc:
+        except ClientRequestRejected as exc:
+            self._reject_client_request(reply_target, str(exc))
+            return None
+
+    def _reject_client_request(self, target_client_id: str, message: str) -> None:
+        self.outbox.append(
+            OutgoingEnvelope(
+                LobbyActionRejected(message=message),
+                target_client_id=target_client_id,
+            )
+        )
+        if self.active_match is None:
             self.outbox.append(
                 OutgoingEnvelope(
-                    LobbyActionRejected(message=str(exc)), target_client_id=reply_target
+                    build_lobby_state_updated(
+                        self.lobby_state,
+                        self.registry,
+                        self._pending_bot_display_names(),
+                        server_endpoint=self._server_endpoint_display(),
+                    ),
+                    target_client_id=target_client_id,
                 )
             )
-            if self.active_match is None:
-                self.outbox.append(
-                    OutgoingEnvelope(
-                        build_lobby_state_updated(
-                            self.lobby_state,
-                            self.registry,
-                            self._pending_bot_display_names(),
-                            server_endpoint=self._server_endpoint_display(),
-                        ),
-                        target_client_id=reply_target,
-                    )
-                )
-            return None
 
     def drain_outbox(self) -> list[OutgoingEnvelope]:
         drained = list(self.outbox)
@@ -174,11 +184,11 @@ class LocalServer:
     def _handle_join_lobby(self, client_id: str, message: JoinLobby) -> str | None:
         if message.requested_client_id is not None:
             if self.active_match is not None:
-                raise ValueError("cannot join after game start")
+                raise ClientRequestRejected("cannot join after game start")
             requested_client_id = message.requested_client_id.strip()
             pending = self._pending_bot_starts.get(requested_client_id)
             if pending is None:
-                raise ValueError("unexpected requested client id")
+                raise ClientRequestRejected("unexpected requested client id")
             endpoint_display = self._connection_endpoints.pop(client_id, None)
             self._connection_endpoints[requested_client_id] = endpoint_display
             self.registry.register_participant(
@@ -204,7 +214,7 @@ class LocalServer:
             return requested_client_id
 
         if self.active_match is not None or self._start_in_progress:
-            raise ValueError("cannot join after game start")
+            raise ClientRequestRejected("cannot join after game start")
         display_name = message.display_name.strip()
         self.registry.register_participant(
             Participant(
@@ -223,7 +233,7 @@ class LocalServer:
 
     def _handle_set_display_name(self, client_id: str, message: SetDisplayName) -> None:
         if self.active_match is not None or self._start_in_progress:
-            raise ValueError("cannot change display name after game start")
+            raise ClientRequestRejected("cannot change display name after game start")
         self._assert_known_client(client_id)
         old_name = self.registry.get_participant(client_id).display_name
         self.registry.set_display_name(client_id, message.display_name)
@@ -235,7 +245,8 @@ class LocalServer:
 
     def _handle_assign_seat(self, message: AssignSeatToClient) -> None:
         if self.active_match is not None or self._start_in_progress:
-            raise ValueError("cannot edit seats after game start")
+            raise ClientRequestRejected("cannot edit seats after game start")
+        self._validate_seat_index(message.seat_index)
         self._assert_known_client(message.target_client_id)
         self._pending_bot_seats.pop(message.seat_index, None)
         self.lobby_state = assign_client_to_seat(
@@ -248,7 +259,8 @@ class LocalServer:
 
     def _handle_create_local_bot(self, message: CreateLocalBotOnSeat) -> None:
         if self.active_match is not None or self._start_in_progress:
-            raise ValueError("cannot edit seats after game start")
+            raise ClientRequestRejected("cannot edit seats after game start")
+        self._validate_seat_index(message.seat_index)
         display_name = self._validate_pending_bot_display_name(message.display_name)
         current_occupant = self.lobby_state.occupant_client_id_for_seat(message.seat_index)
         if current_occupant is not None:
@@ -265,7 +277,8 @@ class LocalServer:
 
     def _handle_clear_seat(self, message: ClearSeat) -> None:
         if self.active_match is not None or self._start_in_progress:
-            raise ValueError("cannot edit seats after game start")
+            raise ClientRequestRejected("cannot edit seats after game start")
+        self._validate_seat_index(message.seat_index)
         self._pending_bot_seats.pop(message.seat_index, None)
         self.lobby_state = clear_seat(self.lobby_state, message.seat_index)
         self._log(f"seat cleared: seat={message.seat_index}")
@@ -273,14 +286,14 @@ class LocalServer:
 
     def _handle_start_game(self) -> None:
         if self.active_match is not None or self._start_in_progress:
-            raise ValueError("game already started")
+            raise ClientRequestRejected("game already started")
         if not self._can_start_game_with_pending_bots():
-            raise ValueError("cannot start game without full valid lobby configuration")
+            raise ClientRequestRejected("cannot start game without full valid lobby configuration")
         if not self._pending_bot_seats:
             self._start_match_now()
             return
         if self.server_handle is None:
-            raise ValueError("cannot start local bots without server handle")
+            raise ClientRequestRejected("cannot start local bots without server handle")
         self._start_in_progress = True
         self._log("starting game: spawning pending local bots")
         for seat_index, spec in sorted(self._pending_bot_seats.items()):
@@ -330,12 +343,39 @@ class LocalServer:
 
     def _forward_game_message(self, client_id: str, message: SubmitCard | SubmitRowChoice) -> None:
         if self.active_match is None:
-            raise ValueError("game message received before game start")
+            raise ClientRequestRejected("game message received before game start")
         expected_player_id = self.client_to_player_id.get(client_id)
         if expected_player_id is None:
-            raise ValueError("client is not assigned to a player")
+            raise ClientRequestRejected("client is not assigned to a player")
+        self._validate_game_message(expected_player_id, message)
         self.active_match.handle_client_message(expected_player_id, message)
         self._drive_match_until_idle()
+
+    def _validate_game_message(
+        self,
+        player_id: PlayerID,
+        message: SubmitCard | SubmitRowChoice,
+    ) -> None:
+        if self.active_match is None:
+            raise RuntimeError("cannot validate a game message without an active match")
+
+        player_state = self.active_match.build_player_state_for(player_id)
+        try:
+            if isinstance(message, SubmitCard):
+                player_state.validate_phase(Phase.CHOOSE_CARD)
+                if player_id in self.active_match.state.selected_cards:
+                    raise ValueError(f"player {player_id!r} has already selected a card")
+                validate_submit_card(player_state, message.card_value)
+                return
+
+            player_state.validate_phase(Phase.CHOOSE_ROW)
+            if player_state.phase_info.active_player_id != player_id:
+                raise ValueError(
+                    "row choice requested for a different active player"
+                )
+            validate_submit_row_choice(player_state, message.row_id)
+        except ValueError as exc:
+            raise ClientRequestRejected(str(exc)) from exc
 
     def _drive_match_until_idle(self) -> None:
         if self.active_match is None:
@@ -553,9 +593,13 @@ class LocalServer:
             handle.close()
             logger.debug("closed running bot process: client_id=%s returncode=%s", client_id, handle.poll())
 
+    def _validate_seat_index(self, seat_index: int) -> None:
+        if not 0 <= seat_index < self.lobby_state.seat_count:
+            raise ClientRequestRejected(f"seat index out of range: {seat_index}")
+
     def _assert_known_client(self, client_id: str) -> None:
         if not self.registry.has(client_id):
-            raise ValueError(f"unknown client_id: {client_id!r}")
+            raise ClientRequestRejected(f"unknown client_id: {client_id!r}")
 
     def _build_session_end_message(
         self,
