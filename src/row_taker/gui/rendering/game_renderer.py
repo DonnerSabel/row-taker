@@ -20,7 +20,7 @@ from row_taker.gui.rendering.game_hud_renderer import (
 from row_taker.gui.theme import DEFAULT_THEME
 
 PALETTE = DEFAULT_THEME.palette
-SIDEBAR_DEBUG_BORDER_WIDTH = 3
+SIDEBAR_BORDER_WIDTH = 3
 
 
 def render_game_screen(
@@ -94,27 +94,25 @@ def render_game_screen(
         presentation_clock,
     )
 
-    # Keep this last while the new layout is being developed: anything that
-    # escapes the sidebar remains visible as an overflow over the frame.
-    _draw_sidebar_debug_frame(screen, geometry.sidebar_rect)
+    # Draw the boundary last so accidental overflows remain immediately visible.
+    _draw_sidebar_frame(screen, geometry.sidebar_rect)
 
 
 def _draw_game_background(
     screen: pygame.Surface,
     geometry: BoardGeometry,
 ) -> None:
-    """Draw the temporary artwork-independent game background.
+    """Draw the artwork-independent game background.
 
-    The polished ``board.png`` no longer matches the widened sidebar. Until a
-    responsive background design exists, flat fills make the new layout easy
-    to inspect without coupling geometry back to artwork.
+    Flat fills keep geometry independent from a fixed-size background image.
+    A later responsive design can replace these fills without changing layout.
     """
 
     screen.fill(PALETTE.board_fallback)
     pygame.draw.rect(screen, PALETTE.panel_fill_strong, geometry.sidebar_rect)
 
 
-def _draw_sidebar_debug_frame(
+def _draw_sidebar_frame(
     screen: pygame.Surface,
     sidebar_rect: pygame.Rect,
 ) -> None:
@@ -124,5 +122,5 @@ def _draw_sidebar_debug_frame(
         screen,
         PALETTE.text_primary,
         sidebar_rect,
-        width=SIDEBAR_DEBUG_BORDER_WIDTH,
+        width=SIDEBAR_BORDER_WIDTH,
     )

@@ -6,21 +6,6 @@ import pygame
 
 
 @dataclass(frozen=True, slots=True)
-class BoardRegionRatios:
-    """Relative rectangles for the current board.png.
-
-    All values are relative to the full window:
-    x, y, width, height.
-
-    These are intentionally grouped here so the artwork alignment can be
-    adjusted without touching rendering or game logic.
-    """
-
-    main_play: tuple[float, float, float, float] = (0.018, 0.066, 0.780, 0.784)
-    stats: tuple[float, float, float, float] = (0.819, 0.046, 0.155, 0.782)
-
-
-@dataclass(frozen=True, slots=True)
 class BoardLayoutTuning:
     """Fine tuning for derived board geometry.
 
@@ -28,17 +13,14 @@ class BoardLayoutTuning:
     makes manual tuning from debug screenshots much easier.
     """
 
-    regions: BoardRegionRatios = BoardRegionRatios()
-
-    # Space between row area and opponent area.
-    main_gap_min_px: int = 6
-    main_gap_width_ratio: float = 0.006
-
-    # Width of the opponent strip inside the large upper-left play field.
-    opponent_area_empty_width_ratio: float = 0.11
-    opponent_area_filled_width_ratio: float = 0.19
-    opponent_area_min_width_px: int = 128
-    opponent_area_max_width_px: int = 190
+    # Rows occupy the upper part of the play area. The margins are independent
+    # of any background artwork and leave a clear gap above the hand cards.
+    row_area_horizontal_margin_min_px: int = 6
+    row_area_horizontal_margin_width_ratio: float = 0.008
+    row_area_top_margin_min_px: int = 28
+    row_area_top_margin_height_ratio: float = 0.050
+    row_hand_gap_min_px: int = 22
+    row_hand_gap_height_ratio: float = 0.030
 
     # Distance between the four row columns.
     row_column_gap_min_px: int = 5
@@ -69,30 +51,7 @@ class BoardLayoutTuning:
     # Increase this value to move hand cards down. Decrease it to move them up.
     hand_card_top_offset_ratio: float = 0.05
 
-    # Staged opponent cards, shown left of the opponent circles.
-    staged_card_height_per_player_ratio: float = 0.38
-    staged_card_opponent_area_width_ratio: float = 0.36
-    staged_card_min_width_px: int = 44
-    staged_card_max_width_px: int = 84
-
-    # Opponent circles.
-    opponent_circle_height_per_player_ratio: float = 0.38
-    opponent_circle_min_diameter_px: int = 30
-    opponent_circle_max_diameter_px: int = 58
-    opponent_slot_vertical_margin_ratio: float = 0.025
-    opponent_slot_horizontal_margin_ratio: float = 0.055
-    opponent_slot_min_margin_px: int = 8
-
-    # Status/overlay area inside stats_rect.
-    overlay_margin_x_ratio: float = 0.055
-    overlay_margin_y_ratio: float = 0.035
-    overlay_min_margin_px: int = 8
-    overlay_height_ratio: float = 0.155
-    overlay_min_height_px: int = 86
-
-    # Future game-screen split. These values no longer depend on board.png.
-    # Patch 1 computes the new geometry alongside the legacy regions so the
-    # current renderers remain unchanged until the following patches adopt it.
+    # Artwork-independent split between play area and sidebar.
     content_margin_min_px: int = 12
     content_margin_short_side_ratio: float = 0.018
     sidebar_gap_min_px: int = 10
@@ -168,27 +127,12 @@ class PlayerTileGeometry:
 
 
 @dataclass(frozen=True, slots=True)
-class OpponentSlotGeometry:
-    circle_center: tuple[int, int]
-    circle_radius: int
-    staged_card: CardPlacement
-
-    @property
-    def circle_rect(self) -> pygame.Rect:
-        size = self.circle_radius * 2
-        rect = pygame.Rect(0, 0, size, size)
-        rect.center = self.circle_center
-        return rect
-
-
-@dataclass(frozen=True, slots=True)
 class BoardGeometry:
     window_rect: pygame.Rect
-
-    # Artwork-independent game-screen split. The hand has already migrated to
-    # this geometry; later patches move the remaining renderers into it.
     play_area_rect: pygame.Rect
+    row_area_rect: pygame.Rect
     hand_rect: pygame.Rect
+
     sidebar_rect: pygame.Rect
     sidebar_header_rect: pygame.Rect
     opponent_list_rect: pygame.Rect
@@ -197,21 +141,9 @@ class BoardGeometry:
     opponent_tiles: tuple[PlayerTileGeometry, ...]
     own_player_tile: PlayerTileGeometry
 
-    # Remaining legacy visual regions from board.png. They stay available
-    # until the following layout patches migrate their renderers.
-    main_play_rect: pygame.Rect
-    row_area_rect: pygame.Rect
-    opponent_area_rect: pygame.Rect
-    stats_rect: pygame.Rect
-
-    # Derived geometry.
     row_columns: tuple[pygame.Rect, ...]
-    opponent_slots: tuple[OpponentSlotGeometry, ...]
-
     row_card_size: tuple[int, int]
     hand_card_size: tuple[int, int]
-    staged_card_size: tuple[int, int]
-    overlay_rect: pygame.Rect
 
 
 def compute_board_geometry(
@@ -222,10 +154,9 @@ def compute_board_geometry(
     opponent_count: int,
     tuning: BoardLayoutTuning = DEFAULT_BOARD_LAYOUT,
 ) -> BoardGeometry:
-    """Compute all scalable board regions."""
+    """Compute the complete artwork-independent game-screen geometry."""
 
     window_rect = pygame.Rect(0, 0, window_size[0], window_size[1])
-
     (
         play_area_rect,
         sidebar_rect,
@@ -234,6 +165,12 @@ def compute_board_geometry(
         presentation_rect,
         own_player_rect,
     ) = _game_screen_regions(window_rect, tuning)
+
+    hand_rect = _play_area_hand_rect(play_area_rect, tuning)
+    row_area_rect = _play_area_row_rect(play_area_rect, hand_rect, tuning)
+    rows = max(1, row_count)
+    row_columns = _row_columns(row_area_rect, rows, tuning)
+
     player_card_size = _player_tile_card_size(sidebar_rect, tuning)
     opponent_tiles = _opponent_tiles(
         opponent_list_rect,
@@ -247,49 +184,10 @@ def compute_board_geometry(
         tuning,
     )
 
-    main_play_rect = _relative_rect(window_rect, tuning.regions.main_play)
-    stats_rect = _relative_rect(window_rect, tuning.regions.stats)
-    hand_rect = _play_area_hand_rect(play_area_rect, tuning)
-
-    opponent_area_width = _opponent_area_width(main_play_rect, opponent_count, tuning)
-    gap = max(tuning.main_gap_min_px, round(window_rect.width * tuning.main_gap_width_ratio))
-
-    opponent_area_rect = pygame.Rect(
-        main_play_rect.right - opponent_area_width,
-        main_play_rect.top,
-        opponent_area_width,
-        main_play_rect.height,
-    )
-
-    # The rows still keep their established vertical tuning, but their
-    # interactive columns must obey the artwork-independent play/sidebar
-    # split. In particular, wide windows must not let the fourth row target
-    # extend underneath the sidebar.
-    legacy_row_right = main_play_rect.right - opponent_area_width - gap
-    row_left = max(main_play_rect.left, play_area_rect.left)
-    row_top = max(main_play_rect.top, play_area_rect.top)
-    row_right = min(legacy_row_right, play_area_rect.right)
-    row_bottom = min(main_play_rect.bottom, hand_rect.top - gap)
-    row_area_rect = pygame.Rect(
-        row_left,
-        row_top,
-        max(1, row_right - row_left),
-        max(1, row_bottom - row_top),
-    )
-
-    rows = max(1, row_count)
-    row_columns = _row_columns(row_area_rect, rows, tuning)
-
-    row_card_size = _row_card_size(row_columns, rows, tuning)
-    hand_card_size = _hand_card_size(hand_rect, hand_card_count, tuning)
-    staged_card_size = _staged_card_size(opponent_area_rect, opponent_count, tuning)
-    opponent_slots = _opponent_slots(opponent_area_rect, opponent_count, staged_card_size, tuning)
-
-    overlay_rect = _overlay_rect(stats_rect, tuning)
-
     return BoardGeometry(
         window_rect=window_rect,
         play_area_rect=play_area_rect,
+        row_area_rect=row_area_rect,
         hand_rect=hand_rect,
         sidebar_rect=sidebar_rect,
         sidebar_header_rect=sidebar_header_rect,
@@ -298,16 +196,9 @@ def compute_board_geometry(
         own_player_rect=own_player_rect,
         opponent_tiles=opponent_tiles,
         own_player_tile=own_player_tile,
-        main_play_rect=main_play_rect,
-        row_area_rect=row_area_rect,
-        opponent_area_rect=opponent_area_rect,
-        stats_rect=stats_rect,
         row_columns=row_columns,
-        opponent_slots=opponent_slots,
-        row_card_size=row_card_size,
-        hand_card_size=hand_card_size,
-        staged_card_size=staged_card_size,
-        overlay_rect=overlay_rect,
+        row_card_size=_row_card_size(row_columns, rows, tuning),
+        hand_card_size=_hand_card_size(hand_rect, hand_card_count, tuning),
     )
 
 
@@ -379,7 +270,9 @@ def hand_card_placements(
     total_width = card_width + (count - 1) * spacing
     first_center_x = geometry.hand_rect.centerx - total_width // 2 + card_width // 2
 
-    card_top = geometry.hand_rect.top + round(geometry.hand_rect.height * tuning.hand_card_top_offset_ratio)
+    card_top = geometry.hand_rect.top + round(
+        geometry.hand_rect.height * tuning.hand_card_top_offset_ratio
+    )
     center_y = card_top + card_height // 2
 
     return tuple(
@@ -414,7 +307,7 @@ def _game_screen_regions(
     window_rect: pygame.Rect,
     tuning: BoardLayoutTuning,
 ) -> tuple[pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect]:
-    """Return the future board/sidebar split independently of board.png."""
+    """Return the play/sidebar split and the prepared sidebar sections."""
 
     content_margin = max(
         tuning.content_margin_min_px,
@@ -535,6 +428,37 @@ def _play_area_hand_rect(
     )
 
 
+def _play_area_row_rect(
+    play_area_rect: pygame.Rect,
+    hand_rect: pygame.Rect,
+    tuning: BoardLayoutTuning,
+) -> pygame.Rect:
+    """Return the row area above the hand, entirely inside the play area."""
+
+    horizontal_margin = max(
+        tuning.row_area_horizontal_margin_min_px,
+        round(play_area_rect.width * tuning.row_area_horizontal_margin_width_ratio),
+    )
+    top_margin = max(
+        tuning.row_area_top_margin_min_px,
+        round(play_area_rect.height * tuning.row_area_top_margin_height_ratio),
+    )
+    hand_gap = max(
+        tuning.row_hand_gap_min_px,
+        round(play_area_rect.height * tuning.row_hand_gap_height_ratio),
+    )
+    left = play_area_rect.left + horizontal_margin
+    right = play_area_rect.right - horizontal_margin
+    top = play_area_rect.top + top_margin
+    bottom = hand_rect.top - hand_gap
+    return pygame.Rect(
+        left,
+        top,
+        max(1, right - left),
+        max(1, bottom - top),
+    )
+
+
 def _player_tile_card_size(
     sidebar_rect: pygame.Rect,
     tuning: BoardLayoutTuning,
@@ -574,9 +498,7 @@ def _opponent_tiles(
         center_ys = [round(first_center_y + index * step) for index in range(count)]
 
     boundaries = [opponent_list_rect.top]
-    boundaries.extend(
-        (center_ys[index - 1] + center_ys[index]) // 2 for index in range(1, count)
-    )
+    boundaries.extend((center_ys[index - 1] + center_ys[index]) // 2 for index in range(1, count))
     boundaries.append(opponent_list_rect.bottom)
 
     tiles: list[PlayerTileGeometry] = []
@@ -645,22 +567,14 @@ def _own_player_tile(
     )
 
 
-def _relative_rect(base: pygame.Rect, ratios: tuple[float, float, float, float]) -> pygame.Rect:
-    x, y, width, height = ratios
-    return pygame.Rect(
-        base.left + round(base.width * x),
-        base.top + round(base.height * y),
-        round(base.width * width),
-        round(base.height * height),
-    )
-
-
 def _row_columns(
     row_area_rect: pygame.Rect,
     row_count: int,
     tuning: BoardLayoutTuning,
 ) -> tuple[pygame.Rect, ...]:
-    gap = max(tuning.row_column_gap_min_px, round(row_area_rect.width * tuning.row_column_gap_ratio))
+    gap = max(
+        tuning.row_column_gap_min_px, round(row_area_rect.width * tuning.row_column_gap_ratio)
+    )
     column_width = max(72, (row_area_rect.width - (row_count - 1) * gap) // row_count)
 
     return tuple(
@@ -671,26 +585,6 @@ def _row_columns(
             row_area_rect.height,
         )
         for index in range(row_count)
-    )
-
-
-def _opponent_area_width(
-    main_play_rect: pygame.Rect,
-    opponent_count: int,
-    tuning: BoardLayoutTuning,
-) -> int:
-    if opponent_count <= 0:
-        return max(
-            tuning.opponent_area_min_width_px,
-            round(main_play_rect.width * tuning.opponent_area_empty_width_ratio),
-        )
-
-    return max(
-        tuning.opponent_area_min_width_px,
-        min(
-            round(main_play_rect.width * tuning.opponent_area_filled_width_ratio),
-            tuning.opponent_area_max_width_px,
-        ),
     )
 
 
@@ -747,121 +641,6 @@ def _hand_card_size(
     )
 
     return (width, round(width * 1.5))
-
-
-def _staged_card_size(
-    opponent_area_rect: pygame.Rect,
-    opponent_count: int,
-    tuning: BoardLayoutTuning,
-) -> tuple[int, int]:
-    count = max(1, opponent_count)
-
-    available_height_per_player = opponent_area_rect.height / count
-    width_by_height = round(available_height_per_player * tuning.staged_card_height_per_player_ratio)
-    width_by_area = round(opponent_area_rect.width * tuning.staged_card_opponent_area_width_ratio)
-    width = min(
-        tuning.staged_card_max_width_px,
-        max(tuning.staged_card_min_width_px, min(width_by_height, width_by_area)),
-    )
-
-    return (width, round(width * 1.5))
-
-
-def _opponent_slots(
-    opponent_area_rect: pygame.Rect,
-    opponent_count: int,
-    staged_card_size: tuple[int, int],
-    tuning: BoardLayoutTuning,
-) -> tuple[OpponentSlotGeometry, ...]:
-    count = max(0, opponent_count)
-    if count == 0:
-        return ()
-
-    circle_radius = _opponent_circle_radius(opponent_area_rect, count, tuning)
-    staged_width, staged_height = staged_card_size
-
-    vertical_margin = max(
-        10,
-        circle_radius + 2,
-        staged_height // 2 + 2,
-        round(opponent_area_rect.height * tuning.opponent_slot_vertical_margin_ratio),
-    )
-    usable_height = max(1, opponent_area_rect.height - 2 * vertical_margin)
-
-    if count == 1:
-        center_ys = [opponent_area_rect.centery]
-    else:
-        step = usable_height / (count - 1)
-        center_ys = [
-            round(opponent_area_rect.top + vertical_margin + index * step)
-            for index in range(count)
-        ]
-
-    horizontal_margin = max(
-        tuning.opponent_slot_min_margin_px,
-        round(opponent_area_rect.width * tuning.opponent_slot_horizontal_margin_ratio),
-    )
-
-    circle_center_x = opponent_area_rect.right - circle_radius - horizontal_margin
-    circle_center_x = _clamp(
-        circle_center_x,
-        opponent_area_rect.left + circle_radius,
-        opponent_area_rect.right - circle_radius,
-    )
-
-    staged_center_x = circle_center_x - circle_radius - horizontal_margin - staged_width // 2
-    staged_center_x = _clamp(
-        staged_center_x,
-        opponent_area_rect.left + staged_width // 2,
-        opponent_area_rect.right - staged_width // 2,
-    )
-
-    return tuple(
-        OpponentSlotGeometry(
-            circle_center=(circle_center_x, center_y),
-            circle_radius=circle_radius,
-            staged_card=CardPlacement(
-                center=(staged_center_x, center_y),
-                size=staged_card_size,
-            ),
-        )
-        for center_y in center_ys
-    )
-
-
-def _opponent_circle_radius(
-    opponent_area_rect: pygame.Rect,
-    opponent_count: int,
-    tuning: BoardLayoutTuning,
-) -> int:
-    count = max(1, opponent_count)
-    available_height_per_player = opponent_area_rect.height / count
-    diameter = min(
-        tuning.opponent_circle_max_diameter_px,
-        max(
-            tuning.opponent_circle_min_diameter_px,
-            round(available_height_per_player * tuning.opponent_circle_height_per_player_ratio),
-        ),
-    )
-    return diameter // 2
-
-
-def _overlay_rect(stats_rect: pygame.Rect, tuning: BoardLayoutTuning) -> pygame.Rect:
-    margin_x = max(
-        tuning.overlay_min_margin_px,
-        round(stats_rect.width * tuning.overlay_margin_x_ratio),
-    )
-    margin_y = max(
-        tuning.overlay_min_margin_px,
-        round(stats_rect.height * tuning.overlay_margin_y_ratio),
-    )
-
-    return pygame.Rect(
-        stats_rect.left + margin_x,
-        stats_rect.top + margin_y,
-        max(1, stats_rect.width - 2 * margin_x),
-        max(tuning.overlay_min_height_px, round(stats_rect.height * tuning.overlay_height_ratio)),
-    )
 
 
 def _clamp(value: int, lower: int, upper: int) -> int:

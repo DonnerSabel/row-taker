@@ -56,9 +56,7 @@ def test_prepare_scenario_frame_uses_real_production_frame(
 
 
 def test_game_render_uses_real_game_frame_and_production_targets() -> None:
-    rendered = render_scenario_frame(
-        get_scenario("choose-card"), presentation_elapsed_frames=7
-    )
+    rendered = render_scenario_frame(get_scenario("choose-card"), presentation_elapsed_frames=7)
 
     assert isinstance(rendered.prepared_screen, GameFrame)
     assert rendered.prepared_screen.presentation_elapsed_frames == 7
@@ -168,3 +166,38 @@ def test_render_rejects_surface_with_wrong_size() -> None:
             size=(1600, 900),
             surface=pygame.Surface((1280, 720)),
         )
+
+
+@pytest.mark.parametrize("size", ((980, 720), (1280, 720)))
+@pytest.mark.parametrize(
+    "scenario_name",
+    (
+        "five-opponents",
+        "five-opponents-revealed",
+        "five-opponents-active",
+        "own-player-active",
+        "own-card-revealed",
+        "presentation-click-required",
+        "long-names-five-opponents",
+    ),
+)
+def test_new_sidebar_scenarios_render_at_compact_sizes(
+    scenario_name: str,
+    size: tuple[int, int],
+) -> None:
+    scenario = get_scenario(scenario_name)
+    frame = 16 if 16 in scenario.interesting_frames else scenario.interesting_frames[0]
+    rendered = render_scenario_frame(
+        scenario,
+        size=size,
+        presentation_elapsed_frames=frame,
+    )
+
+    assert isinstance(rendered.prepared_screen, GameFrame)
+    geometry = rendered.prepared_screen.geometry
+    assert rendered.surface.get_size() == size
+    assert geometry.play_area_rect.right < geometry.sidebar_rect.left
+    assert all(
+        geometry.sidebar_rect.contains(tile.card_placement.rect) for tile in geometry.opponent_tiles
+    )
+    assert geometry.sidebar_rect.contains(geometry.own_player_tile.card_placement.rect)

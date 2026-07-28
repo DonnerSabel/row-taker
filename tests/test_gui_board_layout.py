@@ -71,8 +71,7 @@ def test_five_opponent_tiles_keep_text_separate_and_cards_inside_sidebar(
 
     card_rects = [tile.card_placement.rect for tile in geometry.opponent_tiles]
     assert any(
-        upper.colliderect(lower)
-        for upper, lower in zip(card_rects, card_rects[1:], strict=False)
+        upper.colliderect(lower) for upper, lower in zip(card_rects, card_rects[1:], strict=False)
     )
 
 
@@ -103,7 +102,7 @@ def test_own_player_tile_has_card_and_info_inside_own_section() -> None:
     assert own_tile.card_placement.rect.right < own_tile.info_rect.left
 
 
-def test_remaining_legacy_geometry_stays_available_during_incremental_migration() -> None:
+def test_rows_and_hand_use_only_the_artwork_independent_play_area() -> None:
     geometry = compute_board_geometry(
         (1280, 720),
         row_count=4,
@@ -111,11 +110,10 @@ def test_remaining_legacy_geometry_stays_available_during_incremental_migration(
         opponent_count=3,
     )
 
-    assert geometry.main_play_rect.width > 0
-    assert geometry.stats_rect.width > 0
-    assert geometry.hand_rect.width > 0
-    assert len(geometry.opponent_slots) == 3
-    assert geometry.overlay_rect.width > 0
+    assert geometry.play_area_rect.contains(geometry.row_area_rect)
+    assert geometry.play_area_rect.contains(geometry.hand_rect)
+    assert geometry.row_area_rect.bottom < geometry.hand_rect.top
+    assert all(geometry.row_area_rect.contains(column) for column in geometry.row_columns)
 
 
 @pytest.mark.parametrize(

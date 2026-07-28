@@ -33,9 +33,7 @@ def test_card_module_has_no_refactor_compatibility_api() -> None:
 
 
 def test_public_visual_builder_has_no_test_override() -> None:
-    assert "public_state_override" not in signature(
-        build_game_visual_state
-    ).parameters
+    assert "public_state_override" not in signature(build_game_visual_state).parameters
 
 
 def test_gui_app_selects_frames_with_client_mode_enum(monkeypatch) -> None:
@@ -57,10 +55,29 @@ def test_gui_app_selects_frames_with_client_mode_enum(monkeypatch) -> None:
 
 def test_gui_source_contains_no_removed_cleanup_names() -> None:
     root = Path("src/row_taker/gui")
-    source = "\n".join(
-        path.read_text(encoding="utf-8") for path in root.rglob("*.py")
-    )
+    source = "\n".join(path.read_text(encoding="utf-8") for path in root.rglob("*.py"))
 
     assert "CardSprite" not in source
     assert "public_state_override" not in source
     assert ".client_mode.value" not in source
+
+
+def test_game_layout_has_no_background_artwork_compatibility_geometry() -> None:
+    layout_source = Path("src/row_taker/gui/board_layout.py").read_text(encoding="utf-8")
+    assets_source = Path("src/row_taker/gui/assets.py").read_text(encoding="utf-8")
+    debug_source = Path("src/row_taker/gui/debug_layout.py").read_text(encoding="utf-8")
+
+    for removed_name in (
+        "BoardRegionRatios",
+        "OpponentSlotGeometry",
+        "main_play_rect",
+        "opponent_area_rect",
+        "stats_rect",
+        "opponent_slots",
+        "overlay_rect",
+        "staged_card_size",
+    ):
+        assert removed_name not in layout_source
+
+    assert "scaled_board_image_full" not in assets_source
+    assert "board.png" not in debug_source

@@ -24,7 +24,7 @@ def test_render_game_screen_calls_layers_in_visual_order(monkeypatch) -> None:
     monkeypatch.setattr(game_renderer, "player_staged_card_rects", lambda *args: {})
     monkeypatch.setattr(game_renderer, "draw_presentation_card_motion", record("motion"))
     monkeypatch.setattr(game_renderer, "draw_sidebar_status", record("status"))
-    monkeypatch.setattr(game_renderer, "_draw_sidebar_debug_frame", record("frame"))
+    monkeypatch.setattr(game_renderer, "_draw_sidebar_frame", record("frame"))
 
     game_renderer.render_game_screen(
         pygame.Surface((64, 64)),

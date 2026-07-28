@@ -80,7 +80,7 @@ def test_game_renderer_uses_explicit_readable_layer_order() -> None:
         "draw_hand(",
         "draw_presentation_card_motion(",
         "draw_sidebar_status(",
-        "_draw_sidebar_debug_frame(",
+        "_draw_sidebar_frame(",
     )
     positions = tuple(render_body.find(call) for call in calls)
 

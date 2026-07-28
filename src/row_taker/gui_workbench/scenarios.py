@@ -234,9 +234,7 @@ def _waiting_lobby_state() -> ClientState:
                 ("bot-clara", "Clara Bot", ParticipantKind.BOT, None),
                 None,
             ),
-            extra_participants=(
-                ("client-ben", "Ben", ParticipantKind.HUMAN, "192.0.2.12:52144"),
-            ),
+            extra_participants=(("client-ben", "Ben", ParticipantKind.HUMAN, "192.0.2.12:52144"),),
         )
     )
 
@@ -403,8 +401,9 @@ def _revealed_state(
     plays: tuple[tuple[int, int], ...],
     *,
     rows: tuple[Row, ...] | None = None,
+    player_names: tuple[str, ...] = ("Ada", "Ben", "Clara", "Dorian"),
 ) -> ClientState:
-    state = _base_state(rows=rows)
+    state = _base_state(rows=rows, player_names=player_names)
     assert state.public_state is not None
     revealed = CardsRevealed(
         plays=tuple(
@@ -567,6 +566,88 @@ def _overflow_resolved() -> GameWorkbenchScenario:
     )
 
 
+SIX_PLAYER_NAMES = ("Ada", "Ben", "Clara", "Dorian", "Emil", "Fatima")
+SIX_PLAYER_PLAYS = ((0, 44), (1, 62), (2, 71), (3, 86), (4, 90), (5, 100))
+
+
+def _five_opponents() -> GameWorkbenchScenario:
+    return GameWorkbenchScenario(
+        name="five-opponents",
+        description="Maximale Besetzung mit fünf kompakten Gegnerkacheln.",
+        state=_base_state(player_names=SIX_PLAYER_NAMES),
+    )
+
+
+def _five_opponents_revealed() -> GameWorkbenchScenario:
+    return GameWorkbenchScenario(
+        name="five-opponents-revealed",
+        description="Fünf überlappende Gegnerkarten und die eigene Karte sind aufgedeckt.",
+        state=_revealed_state(SIX_PLAYER_PLAYS, player_names=SIX_PLAYER_NAMES),
+        interesting_frames=ANIMATION_FRAMES,
+    )
+
+
+def _five_opponents_active() -> GameWorkbenchScenario:
+    from row_taker.client.presentation_events import PresentationCardPlaced
+
+    state = _advance_to_event(
+        _revealed_state(SIX_PLAYER_PLAYS, player_names=SIX_PLAYER_NAMES),
+        PresentationCardPlaced,
+    )
+    return GameWorkbenchScenario(
+        name="five-opponents-active",
+        description="Maximale Besetzung mit hervorgehobener aktiver Spielerkachel.",
+        state=state,
+        interesting_frames=ANIMATION_FRAMES,
+    )
+
+
+def _own_player_active() -> GameWorkbenchScenario:
+    scenario = _row_choice_required()
+    return GameWorkbenchScenario(
+        name="own-player-active",
+        description="Die eigene Kachel ist während der Reihenwahl aktiv.",
+        state=scenario.state,
+        interesting_frames=scenario.interesting_frames,
+    )
+
+
+def _own_card_revealed() -> GameWorkbenchScenario:
+    return GameWorkbenchScenario(
+        name="own-card-revealed",
+        description="Die eigene aufgedeckte Karte liegt ausschließlich an der eigenen Kachel.",
+        state=_revealed_state(((0, 44),)),
+        interesting_frames=ANIMATION_FRAMES,
+    )
+
+
+def _presentation_click_required() -> GameWorkbenchScenario:
+    scenario = _cards_revealed()
+    return GameWorkbenchScenario(
+        name="presentation-click-required",
+        description="Wartender Präsentationsschritt mit globalem Klickhinweis.",
+        state=scenario.state,
+        interesting_frames=(0,),
+    )
+
+
+def _long_names_five_opponents() -> GameWorkbenchScenario:
+    return GameWorkbenchScenario(
+        name="long-names-five-opponents",
+        description="Maximale Besetzung mit sechs langen Spielernamen.",
+        state=_base_state(
+            player_names=(
+                "Ada mit einem ungewöhnlich langen Namen",
+                "Benedikt-von-der-Testspielrunde",
+                "Clara Beispielspielerin",
+                "Dorian der Unerschrockene",
+                "Emil mit einem ebenfalls sehr langen Namen",
+                "Fatima aus der maximal besetzten Testspielrunde",
+            )
+        ),
+    )
+
+
 def _long_names() -> GameWorkbenchScenario:
     return GameWorkbenchScenario(
         name="long-names",
@@ -606,6 +687,13 @@ _SCENARIO_FACTORIES: dict[ScenarioCategory, dict[str, ScenarioFactory]] = {
         "row-taken": _row_taken,
         "overflow-resolved": _overflow_resolved,
         "long-names": _long_names,
+        "five-opponents": _five_opponents,
+        "five-opponents-revealed": _five_opponents_revealed,
+        "five-opponents-active": _five_opponents_active,
+        "own-player-active": _own_player_active,
+        "own-card-revealed": _own_card_revealed,
+        "presentation-click-required": _presentation_click_required,
+        "long-names-five-opponents": _long_names_five_opponents,
     },
 }
 
@@ -613,11 +701,7 @@ _SCENARIO_FACTORIES: dict[ScenarioCategory, dict[str, ScenarioFactory]] = {
 def scenario_names(category: ScenarioCategory | None = None) -> tuple[str, ...]:
     if category is not None:
         return tuple(_SCENARIO_FACTORIES[category])
-    return tuple(
-        name
-        for factories in _SCENARIO_FACTORIES.values()
-        for name in factories
-    )
+    return tuple(name for factories in _SCENARIO_FACTORIES.values() for name in factories)
 
 
 def get_scenario(name: str) -> WorkbenchScenario:
@@ -630,9 +714,7 @@ def get_scenario(name: str) -> WorkbenchScenario:
 
 
 def scenarios(category: ScenarioCategory | None = None) -> tuple[WorkbenchScenario, ...]:
-    categories = _SCENARIO_FACTORIES if category is None else {category: _SCENARIO_FACTORIES[category]}
-    return tuple(
-        factory()
-        for factories in categories.values()
-        for factory in factories.values()
+    categories = (
+        _SCENARIO_FACTORIES if category is None else {category: _SCENARIO_FACTORIES[category]}
     )
+    return tuple(factory() for factories in categories.values() for factory in factories.values())

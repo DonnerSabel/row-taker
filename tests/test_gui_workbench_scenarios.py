@@ -46,6 +46,13 @@ def test_workbench_scenario_catalog_is_stable_and_grouped() -> None:
         "row-taken",
         "overflow-resolved",
         "long-names",
+        "five-opponents",
+        "five-opponents-revealed",
+        "five-opponents-active",
+        "own-player-active",
+        "own-card-revealed",
+        "presentation-click-required",
+        "long-names-five-opponents",
     )
     assert tuple(scenario.name for scenario in scenarios()) == scenario_names()
 
@@ -135,6 +142,19 @@ def test_row_choice_required_scenario_includes_real_choose_row_request_state() -
     assert scenario.state.pending_action == PendingAction.CHOOSE_ROW
     assert player_state.phase_info.phase == Phase.CHOOSE_ROW
     assert player_state.pending_card_value() == 7
+
+
+def test_maximum_player_scenarios_really_contain_five_opponents() -> None:
+    for name in (
+        "five-opponents",
+        "five-opponents-revealed",
+        "five-opponents-active",
+        "long-names-five-opponents",
+    ):
+        scenario = get_scenario(name)
+        assert isinstance(scenario, GameWorkbenchScenario)
+        assert scenario.state.public_state is not None
+        assert len(scenario.state.public_state.players) == 6
 
 
 def test_unknown_scenario_has_actionable_error() -> None:

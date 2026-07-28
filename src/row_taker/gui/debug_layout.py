@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from functools import lru_cache
-from pathlib import Path
-
 import pygame
 
 from row_taker.gui.board_layout import (
     BoardGeometry,
     CardPlacement,
+    PlayerTileGeometry,
     compute_board_geometry,
     hand_card_placements,
     row_card_placements,
@@ -17,18 +15,22 @@ WINDOW_TITLE = "Row-Taker Layout Debug"
 DEFAULT_SIZE = (1200, 800)
 FPS = 30
 
-COLOR_MAIN = pygame.Color(255, 255, 255)
+COLOR_PLAY_AREA = pygame.Color(255, 255, 255)
 COLOR_ROW_AREA = pygame.Color(0, 235, 255)
-COLOR_OPPONENT_AREA = pygame.Color(255, 210, 0)
-COLOR_STATS = pygame.Color(255, 0, 210)
+COLOR_SIDEBAR = pygame.Color(255, 210, 0)
+COLOR_HEADER = pygame.Color(255, 0, 210)
+COLOR_OPPONENT_LIST = pygame.Color(255, 145, 0)
+COLOR_PRESENTATION = pygame.Color(185, 80, 255)
+COLOR_OWN_PLAYER = pygame.Color(255, 80, 120)
 COLOR_HAND = pygame.Color(70, 255, 70)
-COLOR_OVERLAY = pygame.Color(185, 80, 255)
 COLOR_ROW_COLUMN = pygame.Color(255, 255, 0)
 COLOR_ROW_CARD = pygame.Color(0, 255, 90)
 COLOR_HAND_CARD = pygame.Color(255, 115, 0)
-COLOR_STAGED_CARD = pygame.Color(0, 150, 255)
-COLOR_CIRCLE = pygame.Color(255, 45, 45)
+COLOR_TILE = pygame.Color(0, 150, 255)
+COLOR_TILE_INFO = pygame.Color(130, 220, 255)
 COLOR_TEXT_BG = pygame.Color(0, 0, 0, 180)
+BACKGROUND_COLOR = pygame.Color(24, 72, 48)
+SIDEBAR_COLOR = pygame.Color(24, 34, 48)
 
 
 class LayoutDebugApp:
@@ -88,40 +90,56 @@ class LayoutDebugApp:
         if self._screen is None:
             raise RuntimeError("LayoutDebugApp not initialized")
 
-        width, height = self._screen.get_size()
         geometry = compute_board_geometry(
-            (width, height),
+            self._screen.get_size(),
             row_count=4,
             hand_card_count=self._hand_card_count,
             opponent_count=self._opponent_count,
         )
 
-        self._draw_background(geometry.window_rect)
+        self._draw_background(geometry)
         self._draw_regions(geometry)
         self._draw_row_centers(geometry)
         self._draw_hand_centers(geometry)
-        self._draw_opponent_slots(geometry)
+        self._draw_player_tiles(geometry)
         self._draw_help(geometry)
-
         pygame.display.flip()
 
-    def _draw_background(self, window_rect: pygame.Rect) -> None:
+    def _draw_background(self, geometry: BoardGeometry) -> None:
         if self._screen is None:
             raise RuntimeError("LayoutDebugApp not initialized")
-
-        image = _scaled_board_image(window_rect.width, window_rect.height)
-        if image is None:
-            self._screen.fill((20, 90, 40))
-            return
-        self._screen.blit(image, window_rect.topleft)
+        self._screen.fill(BACKGROUND_COLOR)
+        pygame.draw.rect(self._screen, SIDEBAR_COLOR, geometry.sidebar_rect)
 
     def _draw_regions(self, geometry: BoardGeometry) -> None:
-        self._draw_rect(geometry.main_play_rect, COLOR_MAIN, "main_play_rect", width=3)
+        self._draw_rect(geometry.play_area_rect, COLOR_PLAY_AREA, "play_area_rect", width=3)
         self._draw_rect(geometry.row_area_rect, COLOR_ROW_AREA, "row_area_rect", width=3)
-        self._draw_rect(geometry.opponent_area_rect, COLOR_OPPONENT_AREA, "opponent_area_rect", width=3)
-        self._draw_rect(geometry.stats_rect, COLOR_STATS, "stats_rect", width=3)
         self._draw_rect(geometry.hand_rect, COLOR_HAND, "hand_rect", width=3)
-        self._draw_rect(geometry.overlay_rect, COLOR_OVERLAY, "overlay_rect", width=2)
+        self._draw_rect(geometry.sidebar_rect, COLOR_SIDEBAR, "sidebar_rect", width=3)
+        self._draw_rect(
+            geometry.sidebar_header_rect,
+            COLOR_HEADER,
+            "sidebar_header_rect",
+            width=2,
+        )
+        self._draw_rect(
+            geometry.opponent_list_rect,
+            COLOR_OPPONENT_LIST,
+            "opponent_list_rect",
+            width=2,
+        )
+        self._draw_rect(
+            geometry.presentation_rect,
+            COLOR_PRESENTATION,
+            "presentation_rect",
+            width=2,
+        )
+        self._draw_rect(
+            geometry.own_player_rect,
+            COLOR_OWN_PLAYER,
+            "own_player_rect",
+            width=2,
+        )
 
         for index, column in enumerate(geometry.row_columns):
             self._draw_rect(column, COLOR_ROW_COLUMN, f"row_column[{index}]", width=2)
@@ -138,50 +156,30 @@ class LayoutDebugApp:
                     placement,
                     COLOR_ROW_CARD,
                     f"r{row_index}:{card_index}",
-                    draw_rect=True,
                 )
 
     def _draw_hand_centers(self, geometry: BoardGeometry) -> None:
         placements = hand_card_placements(geometry, card_count=self._hand_card_count)
         for index, placement in enumerate(placements):
-            self._draw_card_placement(
-                placement,
-                COLOR_HAND_CARD,
-                f"h{index}",
-                draw_rect=True,
-            )
+            self._draw_card_placement(placement, COLOR_HAND_CARD, f"h{index}")
 
-    def _draw_opponent_slots(self, geometry: BoardGeometry) -> None:
-        if self._screen is None:
-            raise RuntimeError("LayoutDebugApp not initialized")
+    def _draw_player_tiles(self, geometry: BoardGeometry) -> None:
+        for index, tile in enumerate(geometry.opponent_tiles):
+            self._draw_player_tile(tile, f"opponent[{index}]")
+        self._draw_player_tile(geometry.own_player_tile, "own_player")
 
-        for index, slot in enumerate(geometry.opponent_slots):
-            pygame.draw.circle(self._screen, COLOR_CIRCLE, slot.circle_center, slot.circle_radius, 3)
-            self._draw_cross(slot.circle_center, COLOR_CIRCLE, size=8)
-            self._draw_card_placement(
-                slot.staged_card,
-                COLOR_STAGED_CARD,
-                f"p{index}",
-                draw_rect=True,
-            )
-
-            if self._show_labels:
-                self._draw_label(
-                    f"circle[{index}]",
-                    (slot.circle_center[0] + slot.circle_radius + 4, slot.circle_center[1] - 8),
-                    COLOR_CIRCLE,
-                )
+    def _draw_player_tile(self, tile: PlayerTileGeometry, label: str) -> None:
+        self._draw_rect(tile.tile_rect, COLOR_TILE, label, width=2)
+        self._draw_rect(tile.info_rect, COLOR_TILE_INFO, f"{label}.info", width=1)
+        self._draw_card_placement(tile.card_placement, COLOR_TILE, f"{label}.card")
 
     def _draw_card_placement(
         self,
         placement: CardPlacement,
         color: pygame.Color,
         label: str,
-        *,
-        draw_rect: bool,
     ) -> None:
-        if draw_rect:
-            self._draw_rect(placement.rect, color, label, width=2)
+        self._draw_rect(placement.rect, color, label, width=2)
         self._draw_cross(placement.center, color, size=9)
 
     def _draw_rect(self, rect: pygame.Rect, color: pygame.Color, label: str, *, width: int) -> None:
@@ -220,16 +218,21 @@ class LayoutDebugApp:
             f"Mitspieler: {self._opponent_count}",
             f"Handkarten: {self._hand_card_count}",
             f"Karten/Reihe: {self._row_card_count}",
-            "1-5 Gegner",
-            "H/J Hand +/-",
-            "R/F Reihe +/-",
-            "D Labels",
+            "1-5 Gegner · H/J Hand +/-",
+            "R/F Reihe +/- · D Labels",
             "ESC Ende",
         ]
 
-        rect = geometry.stats_rect.inflate(-14, -14)
+        width = min(330, geometry.play_area_rect.width - 24)
+        height = 12 + len(lines) * 22
+        rect = pygame.Rect(
+            geometry.play_area_rect.left + 12,
+            geometry.play_area_rect.top + 12,
+            max(1, width),
+            height,
+        )
         bg = pygame.Surface(rect.size, pygame.SRCALPHA)
-        bg.fill(pygame.Color(0, 0, 0, 105))
+        bg.fill(pygame.Color(0, 0, 0, 135))
         self._screen.blit(bg, rect)
 
         y = rect.top + 8
@@ -238,8 +241,6 @@ class LayoutDebugApp:
             surface = self._font.render(line, True, color)
             self._screen.blit(surface, (rect.left + 8, y))
             y += 22
-            if y > rect.bottom - 18:
-                break
 
     def _tick(self) -> None:
         if self._clock is None:
@@ -253,26 +254,6 @@ def run() -> int:
 
 def main() -> None:
     raise SystemExit(run())
-
-
-@lru_cache(maxsize=64)
-def _scaled_board_image(width: int, height: int) -> pygame.Surface | None:
-    image = _load_board_image()
-    if image is None:
-        return None
-    return pygame.transform.smoothscale(image, (width, height))
-
-
-@lru_cache(maxsize=1)
-def _load_board_image() -> pygame.Surface | None:
-    image_path = _project_root() / "images" / "board.png"
-    if not image_path.exists():
-        return None
-    return pygame.image.load(str(image_path)).convert_alpha()
-
-
-def _project_root() -> Path:
-    return Path(__file__).resolve().parents[3]
 
 
 if __name__ == "__main__":
