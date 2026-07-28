@@ -21,9 +21,9 @@ def _unsorted_choose_row_state():
     assert state.player_state is not None
     rows = (
         Row(RowID("high"), (Card(90),)),
-        Row(RowID("low"), (Card(12),)),
-        Row(RowID("middle"), (Card(44),)),
-        Row(RowID("upper"), (Card(70),)),
+        Row(RowID("low"), (Card(13),)),
+        Row(RowID("middle"), (Card(45),)),
+        Row(RowID("upper"), (Card(72),)),
     )
     phase_info = replace(
         state.public_state.phase_info,

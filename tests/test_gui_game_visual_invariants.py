@@ -11,26 +11,35 @@ from row_taker.client.presentation_events import (
 )
 from row_taker.gui.game_visual_builder import build_game_visual_state
 from row_taker.gui.game_visual_invariants import (
-    assert_motion_anchors_are_resolvable,
     assert_no_visible_game_card_is_duplicated,
+    assert_player_card_locations_are_consistent,
     assert_selectable_objects_are_visible,
     assert_visual_matches_public_state,
+    assert_visual_state_is_consistent,
 )
-from row_taker.gui.game_visual_state import VisualHandCard
+from row_taker.gui.game_visual_state import (
+    GameVisualStep,
+    PlayerPlayAnchor,
+    RowCardAnchor,
+    VisualHandCard,
+    VisualMovingCard,
+    VisualTransition,
+)
+from row_taker.gui.game_visual_transition import resolve_visual_step
 from row_taker.gui_workbench.scenarios import get_scenario, scenarios
 from row_taker.gui_workbench.timeline import get_timeline
 
 
 @pytest.mark.parametrize("scenario", scenarios("game"), ids=lambda item: item.name)
-def test_all_workbench_scenarios_have_visible_interaction_targets(scenario) -> None:
-    visual_state = build_game_visual_state(
-        scenario.state,
-        last_action_summary="test",
-        presentation_elapsed_frames=16,
-    )
+def test_all_workbench_scenario_frames_are_consistent(scenario) -> None:
+    for frame in scenario.interesting_frames:
+        visual_state = build_game_visual_state(
+            scenario.state,
+            last_action_summary="test",
+            presentation_elapsed_frames=frame,
+        )
 
-    assert_selectable_objects_are_visible(visual_state)
-    assert_motion_anchors_are_resolvable(visual_state)
+        assert_visual_state_is_consistent(visual_state)
 
 
 def test_full_timeline_visual_states_match_their_snapshots() -> None:
@@ -50,8 +59,7 @@ def test_full_timeline_visual_states_match_their_snapshots() -> None:
                 last_action_summary="test",
                 presentation_elapsed_frames=frame,
             )
-            assert_selectable_objects_are_visible(visual_state)
-            assert_motion_anchors_are_resolvable(visual_state)
+            assert_visual_state_is_consistent(visual_state)
             assert_no_visible_game_card_is_duplicated(visual_state)
 
             if presentation_step is None:
@@ -114,12 +122,110 @@ def test_invariant_counts_staged_card_of_own_player() -> None:
     broken = replace(
         state,
         hand=tuple(
-            replace(card, visible=True)
-            if card.card_value == own_player.staged_card_value
-            else card
+            replace(card, visible=True) if card.card_value == own_player.staged_card_value else card
             for card in state.hand
         ),
     )
 
     with pytest.raises(AssertionError, match="duplicated"):
         assert_no_visible_game_card_is_duplicated(broken)
+
+
+def test_invariant_rejects_multiple_active_players() -> None:
+    state = build_game_visual_state(
+        get_scenario("cards-revealed").state,
+        last_action_summary="test",
+    )
+    broken = replace(
+        state,
+        players=tuple(
+            replace(player, emphasis="active") if index < 2 else player
+            for index, player in enumerate(state.players)
+        ),
+    )
+
+    with pytest.raises(AssertionError, match="multiple active players"):
+        assert_player_card_locations_are_consistent(broken)
+
+
+def test_invariant_rejects_card_in_player_tile_and_motion() -> None:
+    state = build_game_visual_state(
+        get_scenario("cards-revealed").state,
+        last_action_summary="test",
+    )
+    player = next(player for player in state.players if player.staged_card_value is not None)
+    card_value = player.staged_card_value
+    assert card_value is not None
+    target_row = state.rows[0]
+    broken = replace(
+        state,
+        moving_cards=(
+            VisualMovingCard(
+                card_value=card_value,
+                source=PlayerPlayAnchor(player.player_id, card_value),
+                target=RowCardAnchor(target_row.row_id, len(target_row.cards)),
+                progress=0.5,
+            ),
+        ),
+    )
+
+    with pytest.raises(AssertionError, match="tile and in motion"):
+        assert_player_card_locations_are_consistent(broken)
+
+
+def test_invariant_rejects_moving_own_card_still_visible_in_hand() -> None:
+    state = build_game_visual_state(
+        get_scenario("cards-revealed").state,
+        last_action_summary="test",
+    )
+    own_player = state.own_player
+    assert own_player is not None
+    card_value = own_player.staged_card_value
+    assert card_value is not None
+    target_row = state.rows[0]
+    broken = replace(
+        state,
+        players=tuple(
+            replace(player, staged_card_value=None)
+            if player.player_id == own_player.player_id
+            else player
+            for player in state.players
+        ),
+        hand=tuple(
+            replace(card, visible=True) if card.card_value == card_value else card
+            for card in state.hand
+        ),
+        moving_cards=(
+            VisualMovingCard(
+                card_value=card_value,
+                source=PlayerPlayAnchor(own_player.player_id, card_value),
+                target=RowCardAnchor(target_row.row_id, len(target_row.cards)),
+                progress=0.5,
+            ),
+        ),
+    )
+
+    with pytest.raises(AssertionError, match="moving own card"):
+        assert_player_card_locations_are_consistent(broken)
+
+
+def test_visual_transition_validates_completed_after_state() -> None:
+    state = build_game_visual_state(
+        get_scenario("choose-card").state,
+        last_action_summary="test",
+    )
+    broken_after = replace(
+        state,
+        players=tuple(
+            replace(player, emphasis="active") if index < 2 else player
+            for index, player in enumerate(state.players)
+        ),
+    )
+    step = GameVisualStep(
+        before=state,
+        after=broken_after,
+        transition=VisualTransition(duration_frames=1),
+    )
+
+    with pytest.raises(AssertionError, match="multiple active players"):
+        resolve_visual_step(step, presentation_elapsed_frames=1)

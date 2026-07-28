@@ -348,7 +348,7 @@ def _base_state(
 ) -> ClientState:
     player_ids = tuple(PlayerID(f"player-{index}") for index in range(len(player_names)))
     own_player_id = player_ids[0]
-    hand = tuple(Card(value) for value in (7, 17, 28, 39, 44, 53, 62, 71, 86, 101))
+    hand = tuple(Card(value) for value in (7, 17, 28, 39, 44, 53, 61, 70, 85, 101))
 
     if rows is None:
         rows = (

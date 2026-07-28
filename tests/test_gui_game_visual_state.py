@@ -40,10 +40,10 @@ def _state_with_rows(rows: tuple[Row, ...]):
 
 def test_builder_sorts_rows_visually_and_preserves_row_ids() -> None:
     rows = (
-        Row(RowID("high"), (Card(70), Card(90))),
-        Row(RowID("low"), (Card(2), Card(12))),
-        Row(RowID("middle"), (Card(20), Card(44))),
-        Row(RowID("middle-b"), (Card(30), Card(44))),
+        Row(RowID("high"), (Card(73), Card(90))),
+        Row(RowID("low"), (Card(2), Card(13))),
+        Row(RowID("middle"), (Card(20), Card(45))),
+        Row(RowID("middle-b"), (Card(30), Card(46))),
     )
     visual_state = build_game_visual_state(
         _state_with_rows(rows),
@@ -57,7 +57,7 @@ def test_builder_sorts_rows_visually_and_preserves_row_ids() -> None:
         RowID("high"),
     ]
     assert {row.row_id for row in visual_state.rows} == {row.row_id for row in rows}
-    assert visual_state.rows[0].card_values == (2, 12)
+    assert visual_state.rows[0].card_values == (2, 13)
 
 
 def test_builder_copies_players_hand_scores_and_revealed_cards() -> None:
@@ -74,9 +74,9 @@ def test_builder_copies_players_hand_scores_and_revealed_cards() -> None:
         39,
         44,
         53,
-        62,
-        71,
-        86,
+        61,
+        70,
+        85,
         101,
     )
     assert {player.player_id: player.staged_card_value for player in visual_state.players} == {

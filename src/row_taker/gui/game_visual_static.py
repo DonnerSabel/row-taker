@@ -7,7 +7,7 @@ from row_taker.client.presentation_events import PresentationCardsRevealed
 from row_taker.client.state import ClientState
 from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game.state import PublicState
-from row_taker.gui.game_visual_invariants import assert_selectable_objects_are_visible
+from row_taker.gui.game_visual_invariants import assert_visual_state_is_consistent
 from row_taker.gui.game_visual_state import (
     GameVisualState,
     RowEmphasis,
@@ -84,7 +84,7 @@ def build_stable_game_visual_state(
         status=status,
         presentation_panel=presentation_panel,
     )
-    assert_selectable_objects_are_visible(visual_state)
+    assert_visual_state_is_consistent(visual_state)
     return visual_state
 
 
