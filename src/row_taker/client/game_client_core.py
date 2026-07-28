@@ -7,8 +7,9 @@ from row_taker.client.core_reducer import apply_ui_action, reduce_server_message
 from row_taker.client.state import (
     ClientState,
     initial_client_state,
-    with_core_updates,
-    with_feedback_updates,
+    mark_transport_closed,
+    record_applied_game_revision,
+    record_received_game_revision,
 )
 from row_taker.client.update import CoreUpdate
 from row_taker.protocol.messages import (
@@ -32,7 +33,7 @@ class GameClientCore:
         self._server_inbox.append(message)
         revision = get_game_message_revision(message)
         if revision is not None:
-            self.state = with_core_updates(self.state, received_game_revision=revision)
+            self.state = record_received_game_revision(self.state, revision)
         return self._drain_server_inbox()
 
     def on_ui_action(self, action: ClientAction) -> CoreUpdate:
@@ -52,8 +53,7 @@ class GameClientCore:
         )
 
     def on_transport_closed(self, message: str) -> CoreUpdate:
-        self.state = with_core_updates(self.state, session_error=message)
-        self.state = with_feedback_updates(self.state, exit_on_ack=False)
+        self.state = mark_transport_closed(self.state, message)
         return CoreUpdate(state=self.state)
 
     def has_pending_presentation(self) -> bool:
@@ -69,7 +69,7 @@ class GameClientCore:
             self.state = reduce_server_message(self.state, message)
             revision = get_game_message_revision(message)
             if revision is not None:
-                self.state = with_core_updates(self.state, applied_game_revision=revision)
+                self.state = record_applied_game_revision(self.state, revision)
             applied.append(message)
         return CoreUpdate(state=self.state, applied_server_messages=tuple(applied))
 

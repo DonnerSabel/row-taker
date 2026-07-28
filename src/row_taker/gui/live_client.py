@@ -17,7 +17,7 @@ from row_taker.client.state import (
     ClientState,
     UiMessage,
     initial_client_state,
-    with_feedback_updates,
+    set_flash_message,
 )
 from row_taker.client.update import CoreUpdate
 from row_taker.protocol.errors import ConnectionClosed
@@ -117,14 +117,14 @@ class LiveGuiClient:
             try:
                 self.transport.send(outbound)
             except Exception:
-                self.core.state = with_feedback_updates(
+                self.core.state = set_flash_message(
                     self.core.state,
-                    flash_message=UiMessage(level="error", text="Senden an den Server fehlgeschlagen."),
+                    UiMessage(level="error", text="Senden an den Server fehlgeschlagen."),
                 )
                 return
 
         if update.local_messages:
-            self.core.state = with_feedback_updates(
+            self.core.state = set_flash_message(
                 self.core.state,
-                flash_message=UiMessage(level="error", text=update.local_messages[-1]),
+                UiMessage(level="error", text=update.local_messages[-1]),
             )

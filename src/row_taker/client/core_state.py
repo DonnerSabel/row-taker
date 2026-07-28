@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.trick_presentation_resolver import TrickPresentationState
+from row_taker.engine.game.models import PlayerID
 from row_taker.engine.game.state import PlayerState, PublicState
 from row_taker.protocol.messages import CardsRevealed, LobbyView
 
@@ -25,7 +26,7 @@ class PendingAction(StrEnum):
 @dataclass(frozen=True, slots=True)
 class ClientCoreState:
     own_client_id: str | None = None
-    own_player_id: str | None = None
+    own_player_id: PlayerID | None = None
     lobby_view: LobbyView | None = None
     public_state: PublicState | None = None
     player_state: PlayerState | None = None

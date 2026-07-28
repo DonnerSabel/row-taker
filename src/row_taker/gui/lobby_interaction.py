@@ -13,9 +13,12 @@ from row_taker.client.actions import (
 from row_taker.client.state import (
     ClientState,
     UiMessage,
+    clear_bot_name_editor,
+    clear_flash_message,
     enter_lobby_submenu,
-    with_feedback_updates,
-    with_navigation_updates,
+    select_bot_name_text,
+    set_bot_name_editor,
+    set_flash_message,
 )
 from row_taker.gui.layout import GuiLayout
 from row_taker.gui.lobby_layout import compute_lobby_panel_layout, row_rects
@@ -134,7 +137,7 @@ def _handle_bot_name_event(
         return ScreenResult(next_state=_append_bot_name_character(state, event.unicode))
     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
         if lobby_targets.bot_name_input_rect is not None and lobby_targets.bot_name_input_rect.collidepoint(event.pos):
-            return ScreenResult(next_state=with_navigation_updates(state, bot_name_selected=True))
+            return ScreenResult(next_state=select_bot_name_text(state))
         return _confirm_bot_name(state)
     return NO_SCREEN_RESULT
 
@@ -198,20 +201,18 @@ def is_editing_bot_name(state: ClientState) -> bool:
 
 def _enter_bot_name_editor(state: ClientState, seat_index: int, initial_name: str | None) -> ClientState:
     next_state = enter_lobby_submenu(state, "bot_name", selected_seat_index=seat_index)
-    next_state = with_feedback_updates(next_state, flash_message=None)
-    return with_navigation_updates(
+    next_state = clear_flash_message(next_state)
+    return set_bot_name_editor(
         next_state,
-        bot_name_text=initial_name or _default_bot_name_for_seat(seat_index),
-        bot_name_selected=True,
+        text=initial_name or _default_bot_name_for_seat(seat_index),
+        selected=True,
     )
 
 
 def _leave_bot_name_editor(state: ClientState) -> ClientState:
     selected = state.navigation_state.selected_seat_index
-    return with_navigation_updates(
-        enter_lobby_submenu(state, "seat_edit", selected_seat_index=selected),
-        bot_name_text="",
-        bot_name_selected=False,
+    return clear_bot_name_editor(
+        enter_lobby_submenu(state, "seat_edit", selected_seat_index=selected)
     )
 
 
@@ -222,15 +223,15 @@ def _append_bot_name_character(state: ClientState, character: str) -> ClientStat
     next_text = character if state.navigation_state.bot_name_selected else current + character
     if len(next_text) > 32:
         return state
-    next_state = with_feedback_updates(state, flash_message=None)
-    return with_navigation_updates(next_state, bot_name_text=next_text, bot_name_selected=False)
+    next_state = clear_flash_message(state)
+    return set_bot_name_editor(next_state, text=next_text, selected=False)
 
 
 def _backspace_bot_name(state: ClientState) -> ClientState:
     current = state.navigation_state.bot_name_text
     next_text = "" if state.navigation_state.bot_name_selected else current[:-1]
-    next_state = with_feedback_updates(state, flash_message=None)
-    return with_navigation_updates(next_state, bot_name_text=next_text, bot_name_selected=False)
+    next_state = clear_flash_message(state)
+    return set_bot_name_editor(next_state, text=next_text, selected=False)
 
 
 def _confirm_bot_name(state: ClientState) -> ScreenResult:
@@ -241,9 +242,9 @@ def _confirm_bot_name(state: ClientState) -> ScreenResult:
     collision = _bot_name_collision(state, name=name, edited_seat_index=seat_index)
     if collision is not None:
         return ScreenResult(
-            next_state=with_feedback_updates(
+            next_state=set_flash_message(
                 state,
-                flash_message=UiMessage(level="error", text=f"Name bereits vergeben: {collision}"),
+                UiMessage(level="error", text=f"Name bereits vergeben: {collision}"),
             )
         )
     return ScreenResult(client_action=ClientActionCreateBot(seat_index=seat_index, name=name))

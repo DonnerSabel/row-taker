@@ -7,10 +7,10 @@ from row_taker.client.core_reducer import reduce_server_message as direct_reduce
 from row_taker.client.game_client_core import GameClientCore
 from row_taker.client.state import (
     ClientState,
+    clear_flash_message,
     enter_ended_mode,
     enter_game_mode,
     enter_lobby_submenu,
-    with_feedback_updates,
 )
 from row_taker.engine.game import build_player_state, setup_game
 
@@ -46,7 +46,7 @@ def apply_user_input(state: ClientState, text: str):
     update = core.on_ui_action(parsed.action)
     state = core.state
     if update.local_messages:
-        state = with_feedback_updates(state, flash_message=None)
+        state = clear_flash_message(state)
         if previous_mode.value == "lobby":
             state = enter_lobby_submenu(state, previous_submenu, seat_index=previous_seat_index)
         elif previous_mode.value == "ended":

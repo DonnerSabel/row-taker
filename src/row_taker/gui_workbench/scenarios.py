@@ -20,7 +20,7 @@ from row_taker.client.state import (
     UiMessage,
     enter_lobby_submenu,
     initial_client_state,
-    with_navigation_updates,
+    set_bot_name_editor,
 )
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import PlayerID, PublicPlayerInfo, Row, RowID
@@ -270,10 +270,10 @@ def _lobby_bot_name_edit() -> LobbyWorkbenchScenario:
         "bot_name",
         selected_seat_index=2,
     )
-    state = with_navigation_updates(
+    state = set_bot_name_editor(
         state,
-        bot_name_text="Clara Bot mit langem Namen",
-        bot_name_selected=True,
+        text="Clara Bot mit langem Namen",
+        selected=True,
     )
     return LobbyWorkbenchScenario(
         name="lobby-bot-name-edit",

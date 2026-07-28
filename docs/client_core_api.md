@@ -103,8 +103,22 @@ beim Rendern hilfreich sein, sollen aber nicht mehr die fuehrende Wahrheit fuer
 Prompt-Bestimmung oder Texteingabe sein.
 
 
-## Stand nach Umbauzug 2
+## Zustandsübergänge
 
-Die CLI leitet nun nicht nur Eingabe und Prompt, sondern auch das Haupt-Rendering primär aus `ClientState` ab. `cli/screens.py` bleibt als abgeleitete View-Projektion erhalten, ist aber nicht mehr die führende Produktionslogik für das Rendering.
+`ClientState` wird nicht über generische `**changes`-Hilfsfunktionen verändert.
+Stattdessen stellt `row_taker.client.state` konkret typisierte Übergänge bereit, zum Beispiel:
 
-Die Tests sind entlang der Architekturgrenzen getrennt in Core-, Frontend- und Render-Tests.
+- `assign_identity(...)`
+- `prepare_game_start(...)`
+- `request_card_choice(...)`
+- `request_row_choice(...)`
+- `set_flash_message(...)` und `clear_flash_message(...)`
+- `request_exit(...)`
+- `set_bot_name_editor(...)`
+
+Dadurch sind erlaubte Felder und Werttypen an der Funktionssignatur sichtbar. Frontends
+verwenden dieselben Transitionen, ohne selbst verschachtelte `dataclasses.replace()`-Aufrufe
+für Core-, Navigation- oder Feedback-Zustände zusammenzustellen.
+
+Die CLI leitet Eingabe, Prompt und Rendering direkt aus `ClientState` ab. Die Tests sind
+entlang der Architekturgrenzen getrennt in Core-, Frontend- und Render-Tests.

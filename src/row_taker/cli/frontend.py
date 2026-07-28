@@ -18,9 +18,12 @@ from row_taker.client.core_state import ClientMode, PendingAction
 from row_taker.client.state import (
     ClientState,
     UiMessage,
+    UiMessageLevel,
+    clear_flash_message,
     enter_lobby_submenu,
     has_pending_presentation,
-    with_feedback_updates,
+    request_exit,
+    set_flash_message,
 )
 
 
@@ -38,12 +41,12 @@ class CliFrontend:
         return clear_flash(state)
 
 
-def set_flash(state: ClientState, level: str, text: str) -> ClientState:
-    return with_feedback_updates(state, flash_message=UiMessage(level=level, text=text))
+def set_flash(state: ClientState, level: UiMessageLevel, text: str) -> ClientState:
+    return set_flash_message(state, UiMessage(level=level, text=text))
 
 
 def clear_flash(state: ClientState) -> ClientState:
-    return with_feedback_updates(state, flash_message=None)
+    return clear_flash_message(state)
 
 
 def parse_text_to_action(state: ClientState, text: str) -> FrontendInputResult:
@@ -51,15 +54,15 @@ def parse_text_to_action(state: ClientState, text: str) -> FrontendInputResult:
 
     if normalized == "X":
         return FrontendInputResult(
-            state=with_feedback_updates(state, should_exit=True, suppress_final_result=True),
+            state=request_exit(state, suppress_final_result=True),
             action=ClientActionLeaveSession(),
         )
 
     if state.session_error is not None:
         if not state.exit_on_ack:
-            return FrontendInputResult(state=with_feedback_updates(state, should_exit=True))
+            return FrontendInputResult(state=request_exit(state))
         if normalized == "":
-            return FrontendInputResult(state=with_feedback_updates(state, should_exit=True))
+            return FrontendInputResult(state=request_exit(state))
         return FrontendInputResult(state=state)
 
     if has_pending_presentation(state):
@@ -71,7 +74,7 @@ def parse_text_to_action(state: ClientState, text: str) -> FrontendInputResult:
         return _parse_lobby_input(state, normalized)
     if state.client_mode == ClientMode.ENDED:
         if normalized == "":
-            return FrontendInputResult(state=with_feedback_updates(state, should_exit=True))
+            return FrontendInputResult(state=request_exit(state))
         return FrontendInputResult(state=state)
     if state.pending_action == PendingAction.CHOOSE_CARD:
         return _parse_game_choose_card(state, normalized)
@@ -96,7 +99,7 @@ def _parse_lobby_input(state: ClientState, text: str) -> FrontendInputResult:
 def _parse_lobby_main(state: ClientState, text: str) -> FrontendInputResult:
     if text == "n":
         next_state = enter_lobby_submenu(state, "rename")
-        next_state = with_feedback_updates(next_state, flash_message=None)
+        next_state = clear_flash_message(next_state)
         return FrontendInputResult(state=next_state)
     if text == "g":
         return FrontendInputResult(state=clear_flash(state), action=ClientActionStartGame())
@@ -105,7 +108,7 @@ def _parse_lobby_main(state: ClientState, text: str) -> FrontendInputResult:
         if state.lobby_view is None or not (0 <= seat_index < state.lobby_view.seat_count):
             return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "main"), "error", "Ungültiger Platz."))
         next_state = enter_lobby_submenu(state, "seat_edit", selected_seat_index=seat_index)
-        next_state = with_feedback_updates(next_state, flash_message=None)
+        next_state = clear_flash_message(next_state)
         return FrontendInputResult(state=next_state)
     return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "main"), "error", "Ungültige Eingabe. Erlaubt sind n, g oder eine Platznummer."))
 
@@ -114,7 +117,7 @@ def _parse_lobby_rename(state: ClientState, text: str) -> FrontendInputResult:
     if text == "":
         return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "rename"), "error", "Der Anzeigename darf nicht leer sein."))
     next_state = enter_lobby_submenu(state, "main")
-    next_state = with_feedback_updates(next_state, flash_message=None)
+    next_state = clear_flash_message(next_state)
     return FrontendInputResult(state=next_state, action=ClientActionRename(text))
 
 
@@ -125,13 +128,13 @@ def _parse_lobby_seat_edit(state: ClientState, text: str, seat_index: int | None
         return FrontendInputResult(state=clear_flash(state), action=ClientActionAssignSelfToSeat(seat_index))
     if text == "b":
         next_state = enter_lobby_submenu(state, "bot_name", selected_seat_index=seat_index)
-        next_state = with_feedback_updates(next_state, flash_message=None)
+        next_state = clear_flash_message(next_state)
         return FrontendInputResult(state=next_state)
     if text == "c":
         return FrontendInputResult(state=clear_flash(state), action=ClientActionClearSeat(seat_index))
     if text == "x":
         next_state = enter_lobby_submenu(state, "main")
-        next_state = with_feedback_updates(next_state, flash_message=None)
+        next_state = clear_flash_message(next_state)
         return FrontendInputResult(state=next_state)
     return FrontendInputResult(state=set_flash(enter_lobby_submenu(state, "seat_edit", selected_seat_index=seat_index), "error", "Ungültige Eingabe. Erlaubt sind m, b, c oder x."))
 
@@ -141,11 +144,11 @@ def _parse_lobby_bot_name(state: ClientState, text: str, seat_index: int | None)
         raise TypeError("bot_name screen requires seat_index")
     if text == "x":
         next_state = enter_lobby_submenu(state, "seat_edit", selected_seat_index=seat_index)
-        next_state = with_feedback_updates(next_state, flash_message=None)
+        next_state = clear_flash_message(next_state)
         return FrontendInputResult(state=next_state)
     display_name = text or f"Bot_{seat_index}"
     next_state = enter_lobby_submenu(state, "main")
-    next_state = with_feedback_updates(next_state, flash_message=None)
+    next_state = clear_flash_message(next_state)
     return FrontendInputResult(state=next_state, action=ClientActionCreateBot(seat_index, display_name))
 
 
