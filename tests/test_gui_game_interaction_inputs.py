@@ -6,7 +6,11 @@ from unittest.mock import Mock
 import pygame
 import pytest
 
-from row_taker.client.actions import ClientActionAdvancePresentation
+from row_taker.client.actions import (
+    ClientActionAdvancePresentation,
+    ClientActionChooseCard,
+    ClientActionChooseRow,
+)
 from row_taker.gui import game_interaction
 from row_taker.gui.game_interaction import (
     GameScreenTargets,
@@ -137,3 +141,159 @@ def test_right_click_does_nothing_during_normal_card_choice() -> None:
     )
 
     assert result is NO_SCREEN_RESULT
+
+
+def test_quit_event_requests_quit_without_prepared_game_state() -> None:
+    result = handle_game_event(
+        pygame.event.Event(pygame.QUIT),
+        visual_state=None,
+        game_targets=None,
+    )
+
+    assert result.request_quit
+
+
+def test_escape_requests_quit_without_prepared_game_state() -> None:
+    result = handle_game_event(
+        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0),
+        visual_state=None,
+        game_targets=None,
+    )
+
+    assert result.request_quit
+
+
+def test_left_click_on_exposed_hand_card_chooses_exactly_that_card() -> None:
+    frame = prepare_scenario_frame(
+        get_scenario("choose-card"),
+        size=(980, 720),
+        mouse_pos=OFFSCREEN_MOUSE_POS,
+    )
+    target = frame.targets.card_targets[0]
+    click_pos = (target.rect.left + 2, target.rect.top + 2)
+
+    result = frame.handle_event(
+        pygame.event.Event(
+            pygame.MOUSEBUTTONDOWN,
+            button=1,
+            pos=click_pos,
+        )
+    )
+
+    assert result.client_action == ClientActionChooseCard(card_value=target.card_value)
+
+
+def test_overlapping_hand_cards_choose_the_visually_frontmost_card() -> None:
+    frame = prepare_scenario_frame(
+        get_scenario("choose-card"),
+        size=(980, 720),
+        mouse_pos=OFFSCREEN_MOUSE_POS,
+    )
+    rear_target, front_target = frame.targets.card_targets[-2:]
+    click_pos = (front_target.rect.left + 2, front_target.rect.top + 2)
+
+    assert rear_target.rect.collidepoint(click_pos)
+    assert front_target.rect.collidepoint(click_pos)
+
+    result = frame.handle_event(
+        pygame.event.Event(
+            pygame.MOUSEBUTTONDOWN,
+            button=1,
+            pos=click_pos,
+        )
+    )
+
+    assert result.client_action == ClientActionChooseCard(card_value=front_target.card_value)
+
+
+def test_each_selectable_row_click_returns_its_stable_row_id() -> None:
+    frame = prepare_scenario_frame(
+        get_scenario("choose-row"),
+        size=(980, 720),
+        mouse_pos=OFFSCREEN_MOUSE_POS,
+    )
+
+    for target in frame.targets.row_targets:
+        result = frame.handle_event(
+            pygame.event.Event(
+                pygame.MOUSEBUTTONDOWN,
+                button=1,
+                pos=target.rect.center,
+            )
+        )
+
+        assert result.client_action == ClientActionChooseRow(row_id=target.row_id)
+
+
+def test_left_click_outside_all_targets_does_nothing_in_normal_play() -> None:
+    frame = prepare_scenario_frame(
+        get_scenario("choose-card"),
+        size=(980, 720),
+        mouse_pos=OFFSCREEN_MOUSE_POS,
+    )
+
+    result = frame.handle_event(
+        pygame.event.Event(
+            pygame.MOUSEBUTTONDOWN,
+            button=1,
+            pos=frame.geometry.sidebar_header_rect.center,
+        )
+    )
+
+    assert result is NO_SCREEN_RESULT
+
+
+def test_middle_click_does_not_advance_waiting_presentation() -> None:
+    frame = prepare_scenario_frame(
+        get_scenario("cards-revealed"),
+        size=(980, 720),
+        mouse_pos=OFFSCREEN_MOUSE_POS,
+    )
+
+    result = frame.handle_event(
+        pygame.event.Event(
+            pygame.MOUSEBUTTONDOWN,
+            button=2,
+            pos=frame.geometry.play_area_rect.center,
+        )
+    )
+
+    assert result is NO_SCREEN_RESULT
+
+
+def test_right_click_does_nothing_during_normal_row_choice() -> None:
+    frame = prepare_scenario_frame(
+        get_scenario("choose-row"),
+        size=(980, 720),
+        mouse_pos=OFFSCREEN_MOUSE_POS,
+    )
+    target = frame.targets.row_targets[0]
+
+    result = frame.handle_event(
+        pygame.event.Event(
+            pygame.MOUSEBUTTONDOWN,
+            button=3,
+            pos=target.rect.center,
+        )
+    )
+
+    assert result is NO_SCREEN_RESULT
+
+
+def test_mouse_button_release_never_triggers_a_game_action() -> None:
+    frame = prepare_scenario_frame(
+        get_scenario("cards-revealed"),
+        size=(980, 720),
+        mouse_pos=OFFSCREEN_MOUSE_POS,
+    )
+
+    result = frame.handle_event(
+        pygame.event.Event(
+            pygame.MOUSEBUTTONUP,
+            button=1,
+            pos=frame.geometry.play_area_rect.center,
+        )
+    )
+
+    assert result is NO_SCREEN_RESULT
+
