@@ -2,18 +2,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from importlib.resources import files
+from io import BytesIO
 from pathlib import Path
 
 import pygame
 
-
-def default_image_dir() -> Path:
-    return Path(__file__).resolve().parents[3] / "images"
+_ASSET_PACKAGE = "row_taker.assets"
+_CARD_DIRECTORY = "cards"
 
 
 @dataclass(frozen=True, slots=True)
 class GuiAssets:
-    image_dir: Path
+    """Load GUI images from package resources or an explicit directory."""
+
+    image_dir: Path | None = None
+
+    @classmethod
+    def from_directory(cls, image_dir: str | Path) -> GuiAssets:
+        return cls(image_dir=Path(image_dir))
 
     def scaled_card_image(self, card_value: int, width: int, height: int) -> pygame.Surface | None:
         return _scaled_card_image(self.image_dir, card_value, width, height)
@@ -22,12 +29,15 @@ class GuiAssets:
         return _scaled_connect_background(self.image_dir, width, height)
 
 
-DEFAULT_GUI_ASSETS = GuiAssets(image_dir=default_image_dir())
+DEFAULT_GUI_ASSETS = GuiAssets()
 
 
 @lru_cache(maxsize=256)
 def _scaled_card_image(
-    image_dir: Path, card_value: int, width: int, height: int
+    image_dir: Path | None,
+    card_value: int,
+    width: int,
+    height: int,
 ) -> pygame.Surface | None:
     image = _load_card_image(image_dir, card_value)
     if image is None:
@@ -36,15 +46,24 @@ def _scaled_card_image(
 
 
 @lru_cache(maxsize=128)
-def _load_card_image(image_dir: Path, card_value: int) -> pygame.Surface | None:
-    image_path = image_dir / f"karte_{card_value:03}.png"
-    if not image_path.exists():
+def _load_card_image(image_dir: Path | None, card_value: int) -> pygame.Surface | None:
+    filename = f"karte_{card_value:03}.png"
+    image_data = _read_asset_bytes(
+        image_dir,
+        external_relative_path=Path(filename),
+        packaged_relative_path=Path(_CARD_DIRECTORY) / filename,
+    )
+    if image_data is None:
         return None
-    return pygame.image.load(str(image_path)).convert_alpha()
+    return pygame.image.load(BytesIO(image_data), filename).convert_alpha()
 
 
 @lru_cache(maxsize=16)
-def _scaled_connect_background(image_dir: Path, width: int, height: int) -> pygame.Surface | None:
+def _scaled_connect_background(
+    image_dir: Path | None,
+    width: int,
+    height: int,
+) -> pygame.Surface | None:
     image = _load_connect_background(image_dir)
     if image is None:
         return None
@@ -52,11 +71,36 @@ def _scaled_connect_background(image_dir: Path, width: int, height: int) -> pyga
 
 
 @lru_cache(maxsize=8)
-def _load_connect_background(image_dir: Path) -> pygame.Surface | None:
-    image_path = image_dir / "connect_bg.png"
-    if not image_path.exists():
+def _load_connect_background(image_dir: Path | None) -> pygame.Surface | None:
+    filename = "connect_bg.png"
+    image_data = _read_asset_bytes(
+        image_dir,
+        external_relative_path=Path(filename),
+        packaged_relative_path=Path(filename),
+    )
+    if image_data is None:
         return None
-    return pygame.image.load(str(image_path)).convert()
+    return pygame.image.load(BytesIO(image_data), filename).convert()
+
+
+def _read_asset_bytes(
+    image_dir: Path | None,
+    *,
+    external_relative_path: Path,
+    packaged_relative_path: Path,
+) -> bytes | None:
+    if image_dir is not None:
+        image_path = image_dir / external_relative_path
+        if not image_path.is_file():
+            return None
+        return image_path.read_bytes()
+
+    resource = files(_ASSET_PACKAGE)
+    for path_part in packaged_relative_path.parts:
+        resource = resource.joinpath(path_part)
+    if not resource.is_file():
+        return None
+    return resource.read_bytes()
 
 
 def _scale_cover(image: pygame.Surface, width: int, height: int) -> pygame.Surface:
