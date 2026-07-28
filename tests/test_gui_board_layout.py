@@ -34,14 +34,13 @@ def test_new_game_regions_fit_inside_the_window(window_size: tuple[int, int]) ->
     for section in (
         geometry.sidebar_header_rect,
         geometry.opponent_list_rect,
-        geometry.presentation_rect,
         geometry.own_player_rect,
     ):
         assert geometry.sidebar_rect.contains(section)
 
     assert geometry.sidebar_header_rect.bottom < geometry.opponent_list_rect.top
-    assert geometry.opponent_list_rect.bottom < geometry.presentation_rect.top
-    assert geometry.presentation_rect.bottom < geometry.own_player_rect.top
+    assert geometry.opponent_list_rect.bottom < geometry.own_player_rect.top
+    assert not hasattr(geometry, "presentation_rect")
 
 
 @pytest.mark.parametrize(

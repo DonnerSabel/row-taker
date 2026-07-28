@@ -10,7 +10,6 @@ from row_taker.client.presentation_events import (
     PresentationRowTaken,
     PresentationTrickFinished,
 )
-from row_taker.client.presentation_text import format_presentation_event
 from row_taker.client.state import ClientState
 from row_taker.engine.game.models import PlayerID, RowID
 from row_taker.engine.game.state import PublicState
@@ -23,13 +22,9 @@ from row_taker.gui.game_visual_state import (
     RowEmphasis,
     VisualCard,
     VisualCardMotion,
-    VisualPresentationPanel,
     VisualTransition,
 )
-from row_taker.gui.game_visual_static import (
-    build_stable_game_visual_state,
-    current_cards_revealed_event,
-)
+from row_taker.gui.game_visual_static import build_stable_game_visual_state
 
 CARD_PLACEMENT_DURATION_FRAMES = 32
 ROW_REPLACEMENT_DURATION_FRAMES = 32
@@ -37,8 +32,6 @@ ROW_REPLACEMENT_DURATION_FRAMES = 32
 
 def build_row_choice_visual_state(
     state: ClientState,
-    *,
-    last_action_summary: str,
 ) -> GameVisualState:
     presentation_step = state.current_presentation_step
     if presentation_step is None or not isinstance(
@@ -54,32 +47,20 @@ def build_row_choice_visual_state(
     row_emphasis: dict[RowID, RowEmphasis] = {}
     if isinstance(event, PresentationRowChosen):
         row_emphasis[event.row_id] = "choice"
-        headline = f"{event.player_name} wählt Reihe {event.row_id}"
-    else:
-        headline = f"{event.player_name} muss eine Reihe wählen"
 
-    selected_hand_card_value = (
-        event.card_value if event.player_id == state.own_player_id else None
-    )
+    selected_hand_card_value = event.card_value if event.player_id == state.own_player_id else None
     return build_stable_game_visual_state(
         state,
         public_state=presentation_step.public_state_before,
-        last_action_summary=last_action_summary,
         active_player_id=event.player_id,
         row_emphasis_by_id=row_emphasis,
         staged_card_values_override={event.player_id: event.card_value},
         selected_hand_card_value=selected_hand_card_value,
-        presentation_panel=VisualPresentationPanel(
-            headline=headline,
-            details=_presentation_details(state),
-        ),
     )
 
 
 def build_row_replacement_visual_step(
     state: ClientState,
-    *,
-    last_action_summary: str,
 ) -> GameVisualStep:
     presentation_step = state.current_presentation_step
     if presentation_step is None or not isinstance(
@@ -95,11 +76,9 @@ def build_row_replacement_visual_step(
     if isinstance(event, PresentationRowTaken):
         replacement_card_value = event.replacement_card_value
         emphasis: RowEmphasis = "taken"
-        headline = f"{event.player_name} nimmt Reihe {event.row_id}"
     else:
         replacement_card_value = event.card_value
         emphasis = "overflow"
-        headline = f"Overflow: {event.player_name} nimmt Reihe {event.row_id}"
 
     completed_cards = _completed_card_values_by_player(state)
     hidden_player_ids = frozenset((*completed_cards, event.player_id))
@@ -110,10 +89,6 @@ def build_row_replacement_visual_step(
             (event.player_id, replacement_card_value),
         )
         if player_id == state.own_player_id
-    )
-    panel = VisualPresentationPanel(
-        headline=headline,
-        details=_presentation_details(state),
     )
     row_emphasis = {event.row_id: emphasis}
     taken_cards = _visual_cards_for_row(
@@ -130,26 +105,22 @@ def build_row_replacement_visual_step(
     after = build_stable_game_visual_state(
         state,
         public_state=presentation_step.public_state_after,
-        last_action_summary=last_action_summary,
         hidden_staged_player_ids=hidden_player_ids,
         hidden_hand_card_values=hidden_hand_card_values,
         active_player_id=event.player_id,
         row_emphasis_by_id=row_emphasis,
         taken_cards_by_row_id=taken_cards_by_row_id,
-        presentation_panel=panel,
     )
     visual_row_order = tuple(row.row_id for row in after.rows)
     before = build_stable_game_visual_state(
         state,
         public_state=presentation_step.public_state_before,
-        last_action_summary=last_action_summary,
         hidden_staged_player_ids=hidden_player_ids,
         hidden_hand_card_values=hidden_hand_card_values,
         active_player_id=event.player_id,
         row_emphasis_by_id=row_emphasis,
         taken_cards_by_row_id=taken_cards_by_row_id,
         visual_row_order=visual_row_order,
-        presentation_panel=panel,
     )
 
     assert_visual_matches_public_state(before, presentation_step.public_state_before)
@@ -191,25 +162,21 @@ def build_row_replacement_visual_step(
 
 def build_finished_visual_state(
     state: ClientState,
-    *,
-    last_action_summary: str,
 ) -> GameVisualState:
     presentation_step = state.current_presentation_step
     if presentation_step is None or not isinstance(
         presentation_step.event,
-        PresentationTrickFinished
-        | PresentationRoundFinished
-        | PresentationGameFinished,
+        PresentationTrickFinished | PresentationRoundFinished | PresentationGameFinished,
     ):
         raise ValueError("current presentation step is not a finish event")
 
     event = presentation_step.event
-    if isinstance(event, PresentationTrickFinished):
-        headline = "Stich beendet"
-    elif isinstance(event, PresentationRoundFinished):
-        headline = "Runde beendet"
+    if isinstance(event, PresentationRoundFinished):
+        status_message = "Runde beendet"
+    elif isinstance(event, PresentationGameFinished):
+        status_message = "Spiel beendet"
     else:
-        headline = "Spiel beendet"
+        status_message = None
 
     completed_cards = _completed_card_values_by_player(state)
     hidden_player_ids = frozenset(completed_cards)
@@ -221,13 +188,10 @@ def build_finished_visual_state(
     visual_state = build_stable_game_visual_state(
         state,
         public_state=presentation_step.public_state_after,
-        last_action_summary=last_action_summary,
         hidden_staged_player_ids=hidden_player_ids,
         hidden_hand_card_values=hidden_hand_card_values,
-        presentation_panel=VisualPresentationPanel(
-            headline=headline,
-            details=_presentation_details(state),
-        ),
+        status_message=status_message,
+        status_message_level="info",
     )
     assert_visual_matches_public_state(
         visual_state,
@@ -241,16 +205,11 @@ def _visual_cards_for_row(
     row_id: RowID,
 ) -> tuple[VisualCard, ...]:
     row = public_state.rows[public_state.get_row_index(row_id)]
-    return tuple(
-        VisualCard(card_value=card.value, bullheads=card.bullheads)
-        for card in row.cards
-    )
+    return tuple(VisualCard(card_value=card.value, bullheads=card.bullheads) for card in row.cards)
 
 
 def build_card_placed_visual_step(
     state: ClientState,
-    *,
-    last_action_summary: str,
 ) -> GameVisualStep:
     presentation_step = state.current_presentation_step
     if presentation_step is None or not isinstance(
@@ -270,33 +229,25 @@ def build_card_placed_visual_step(
         )
         if player_id == state.own_player_id
     )
-    panel = VisualPresentationPanel(
-        headline=f"{event.player_name} legt {event.card_value}",
-        details=_presentation_details(state),
-    )
     row_emphasis = {event.row_id: "placed"}
 
     after = build_stable_game_visual_state(
         state,
         public_state=presentation_step.public_state_after,
-        last_action_summary=last_action_summary,
         hidden_staged_player_ids=hidden_player_ids,
         hidden_hand_card_values=hidden_hand_card_values,
         active_player_id=event.player_id,
         row_emphasis_by_id=row_emphasis,
-        presentation_panel=panel,
     )
     visual_row_order = tuple(row.row_id for row in after.rows)
     before = build_stable_game_visual_state(
         state,
         public_state=presentation_step.public_state_before,
-        last_action_summary=last_action_summary,
         hidden_staged_player_ids=hidden_player_ids,
         hidden_hand_card_values=hidden_hand_card_values,
         active_player_id=event.player_id,
         row_emphasis_by_id=row_emphasis,
         visual_row_order=visual_row_order,
-        presentation_panel=panel,
     )
 
     assert_visual_matches_public_state(before, presentation_step.public_state_before)
@@ -342,23 +293,3 @@ def _completed_card_values_by_player(state: ClientState) -> dict[PlayerID, int]:
         elif isinstance(event, PresentationRowTaken):
             completed[event.player_id] = event.replacement_card_value
     return completed
-
-
-def build_cards_revealed_panel(
-    state: ClientState,
-) -> VisualPresentationPanel | None:
-    event = current_cards_revealed_event(state)
-    if event is None:
-        return None
-
-    return VisualPresentationPanel(
-        headline="Karten aufgedeckt",
-        details=_presentation_details(state),
-    )
-
-
-def _presentation_details(state: ClientState) -> tuple[str, ...]:
-    return tuple(
-        format_presentation_event(step.event)
-        for step in state.pending_presentation_steps[:3]
-    )

@@ -5,7 +5,7 @@ from collections.abc import Mapping
 import pygame
 
 from row_taker.engine.game.models import PlayerID
-from row_taker.gui.animation import AnimationClock, lerp_rect
+from row_taker.gui.animation import lerp_rect
 from row_taker.gui.assets import GuiAssets
 from row_taker.gui.board_layout import BoardGeometry, row_card_placements
 from row_taker.gui.card import GuiCard
@@ -14,11 +14,9 @@ from row_taker.gui.game_visual_state import (
     PlayerPlayAnchor,
     RowCardAnchor,
     VisualMovingCard,
-    VisualPresentationPanel,
 )
 from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui.theme import DEFAULT_THEME
-from row_taker.gui.widgets import draw_overlay_panel
 
 THEME = DEFAULT_THEME
 PALETTE = THEME.palette
@@ -140,49 +138,6 @@ def _draw_moving_card(
     )
 
 
-def draw_presentation_panel(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    rect: pygame.Rect,
-    panel: VisualPresentationPanel,
-    animation_clock: AnimationClock,
-) -> None:
-    """Draw the text-only panel in the prepared sidebar rectangle."""
-
-    events_rect = rect
-    _draw_overlay_box(screen, events_rect)
-    _draw_presentation_accent(screen, events_rect, animation_clock)
-
-    drawer.draw_text(
-        screen,
-        panel.headline,
-        (events_rect.left + 12, events_rect.top + 10),
-        role="small",
-        color=animation_clock.pulsed_color(
-            PALETTE.accent,
-            PALETTE.accent_hover,
-            period_frames=72,
-        ),
-    )
-
-    text_top = events_rect.top + 34
-    lines = list(panel.details[:2])
-    if lines:
-        text_rect = pygame.Rect(
-            events_rect.left + 12,
-            text_top,
-            events_rect.width - 24,
-            max(1, events_rect.bottom - text_top - 6),
-        )
-        drawer.draw_wrapped_lines(
-            screen,
-            lines,
-            text_rect,
-            role="tiny",
-            color=PALETTE.text_primary,
-        )
-
-
 def _draw_motion_path(
     screen: pygame.Surface,
     start: tuple[int, int],
@@ -198,33 +153,3 @@ def _draw_motion_path(
     local_end = (end[0] - left + 4, end[1] - top + 4)
     pygame.draw.line(surface, color, local_start, local_end, width=2)
     screen.blit(surface, (left - 4, top - 4))
-
-
-def _draw_presentation_accent(
-    screen: pygame.Surface,
-    rect: pygame.Rect,
-    animation_clock: AnimationClock,
-) -> None:
-    accent_rect = pygame.Rect(rect.left + 10, rect.top + 7, 4, rect.height - 14)
-    accent_color = animation_clock.pulsed_color(
-        PALETTE.accent,
-        PALETTE.accent_hover,
-        period_frames=72,
-    )
-    accent_color.a = animation_clock.pulse_alpha(
-        period_frames=72,
-        low=120,
-        high=235,
-    )
-    accent_surface = pygame.Surface(accent_rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(
-        accent_surface,
-        accent_color,
-        accent_surface.get_rect(),
-        border_radius=3,
-    )
-    screen.blit(accent_surface, accent_rect)
-
-
-def _draw_overlay_box(screen: pygame.Surface, rect: pygame.Rect) -> None:
-    draw_overlay_panel(screen, rect, theme=THEME)

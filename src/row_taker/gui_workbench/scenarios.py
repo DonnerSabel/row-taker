@@ -74,7 +74,6 @@ class GameWorkbenchScenario:
     state: ClientState
     default_size: tuple[int, int] = DEFAULT_SIZE
     interesting_frames: tuple[int, ...] = (0,)
-    last_action_summary: str = "GUI-Workbench: deterministisches Szenario."
 
 
 WorkbenchScenario = ConnectWorkbenchScenario | LobbyWorkbenchScenario | GameWorkbenchScenario

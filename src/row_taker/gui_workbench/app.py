@@ -34,7 +34,6 @@ class RenderedWorkbenchFrame:
     prepared_screen: PreparedScreen
 
 
-
 def prepare_headless_pygame() -> None:
     """Prepare SDL for PNG rendering when no graphical session is available."""
 
@@ -47,7 +46,6 @@ def prepare_headless_pygame() -> None:
     pygame.init()
     if pygame.display.get_surface() is None:
         pygame.display.set_mode((1, 1), pygame.HIDDEN)
-
 
 
 def prepare_scenario_frame(
@@ -82,7 +80,6 @@ def prepare_scenario_frame(
                 layout=layout,
                 state=scenario.state,
                 presentation_elapsed_frames=presentation_elapsed_frames,
-                last_action_summary=scenario.last_action_summary,
                 mouse_pos=mouse_pos,
             )
 
@@ -122,7 +119,6 @@ def render_scenario_frame(
     )
 
 
-
 def save_scenario_frame(
     scenario: WorkbenchScenario,
     output_path: Path,
@@ -142,7 +138,6 @@ def save_scenario_frame(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     pygame.image.save(rendered.surface, str(output_path))
     return output_path
-
 
 
 def save_scenario_frames(
@@ -168,7 +163,6 @@ def save_scenario_frames(
         )
         for frame in selected_frames
     )
-
 
 
 def save_timeline_frames(
@@ -297,8 +291,7 @@ class WorkbenchApp:
     def _save_current_frame(self, screen: pygame.Surface) -> None:
         self._screenshot_dir.mkdir(parents=True, exist_ok=True)
         output_path = self._screenshot_dir / (
-            f"{self.current_scenario.name}_frame_"
-            f"{self._presentation_elapsed_frames:03d}.png"
+            f"{self.current_scenario.name}_frame_{self._presentation_elapsed_frames:03d}.png"
         )
         pygame.image.save(screen, str(output_path))
         print(output_path.resolve())
@@ -335,8 +328,7 @@ class WorkbenchApp:
         timeline_part = ""
         if self._timeline is not None:
             timeline_part = (
-                f"{self._timeline.name} "
-                f"[{self._timeline_step_index + 1}/{len(self._scenarios)}] | "
+                f"{self._timeline.name} [{self._timeline_step_index + 1}/{len(self._scenarios)}] | "
             )
         return (
             f"Row-Taker GUI-Workbench | {timeline_part}"

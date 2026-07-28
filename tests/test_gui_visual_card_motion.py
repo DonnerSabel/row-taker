@@ -25,7 +25,6 @@ def test_semantic_card_motion_anchors_resolve_to_real_layout(
         layout=compute_layout(*size),
         state=state,
         presentation_elapsed_frames=16,
-        last_action_summary="test",
         mouse_pos=(-1, -1),
     )
     moving_card = frame.visual_state.moving_cards[0]
@@ -70,7 +69,6 @@ def test_opponent_card_motion_starts_at_real_staged_card_slot() -> None:
         layout=compute_layout(1600, 900),
         state=state,
         presentation_elapsed_frames=16,
-        last_action_summary="test",
         mouse_pos=(-1, -1),
     )
     moving_card = frame.visual_state.moving_cards[0]
@@ -96,15 +94,11 @@ def test_own_card_motion_starts_at_own_player_tile() -> None:
         layout=compute_layout(1600, 900),
         state=state,
         presentation_elapsed_frames=16,
-        last_action_summary="test",
         mouse_pos=(-1, -1),
     )
     moving_card = frame.visual_state.moving_cards[0]
     assert moving_card.source.player_id == frame.visual_state.own_player_id
-    assert all(
-        card.card_value != moving_card.source.card_value
-        for card in frame.visual_state.hand
-    )
+    assert all(card.card_value != moving_card.source.card_value for card in frame.visual_state.hand)
 
     resolved = resolve_visual_card_motion_rects(
         frame.geometry,

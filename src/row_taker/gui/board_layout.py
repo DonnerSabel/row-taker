@@ -75,9 +75,6 @@ class BoardLayoutTuning:
     sidebar_header_height_ratio: float = 0.08
     sidebar_header_min_height_px: int = 48
     sidebar_header_max_height_px: int = 70
-    sidebar_presentation_height_ratio: float = 0.18
-    sidebar_presentation_min_height_px: int = 96
-    sidebar_presentation_max_height_px: int = 150
     sidebar_own_player_height_ratio: float = 0.20
     sidebar_own_player_min_height_px: int = 116
     sidebar_own_player_max_height_px: int = 160
@@ -140,7 +137,6 @@ class BoardGeometry:
     sidebar_rect: pygame.Rect
     sidebar_header_rect: pygame.Rect
     opponent_list_rect: pygame.Rect
-    presentation_rect: pygame.Rect
     own_player_rect: pygame.Rect
     opponent_tiles: tuple[PlayerTileGeometry, ...]
     own_player_tile: PlayerTileGeometry
@@ -166,7 +162,6 @@ def compute_board_geometry(
         sidebar_rect,
         sidebar_header_rect,
         opponent_list_rect,
-        presentation_rect,
         own_player_rect,
     ) = _game_screen_regions(window_rect, tuning)
 
@@ -196,7 +191,6 @@ def compute_board_geometry(
         sidebar_rect=sidebar_rect,
         sidebar_header_rect=sidebar_header_rect,
         opponent_list_rect=opponent_list_rect,
-        presentation_rect=presentation_rect,
         own_player_rect=own_player_rect,
         opponent_tiles=opponent_tiles,
         own_player_tile=own_player_tile,
@@ -364,18 +358,13 @@ def _game_screen_regions(
         tuning.sidebar_header_min_height_px,
         tuning.sidebar_header_max_height_px,
     )
-    presentation_height = _clamp(
-        round(sidebar_rect.height * tuning.sidebar_presentation_height_ratio),
-        tuning.sidebar_presentation_min_height_px,
-        tuning.sidebar_presentation_max_height_px,
-    )
     own_player_height = _clamp(
         round(sidebar_rect.height * tuning.sidebar_own_player_height_ratio),
         tuning.sidebar_own_player_min_height_px,
         tuning.sidebar_own_player_max_height_px,
     )
 
-    fixed_height = header_height + presentation_height + own_player_height + 3 * section_gap
+    fixed_height = header_height + own_player_height + 2 * section_gap
     opponent_height = max(1, inner_rect.height - fixed_height)
 
     sidebar_header_rect = pygame.Rect(
@@ -390,15 +379,9 @@ def _game_screen_regions(
         inner_rect.width,
         opponent_height,
     )
-    presentation_rect = pygame.Rect(
-        inner_rect.left,
-        opponent_list_rect.bottom + section_gap,
-        inner_rect.width,
-        presentation_height,
-    )
     own_player_rect = pygame.Rect(
         inner_rect.left,
-        presentation_rect.bottom + section_gap,
+        opponent_list_rect.bottom + section_gap,
         inner_rect.width,
         own_player_height,
     )
@@ -408,7 +391,6 @@ def _game_screen_regions(
         sidebar_rect,
         sidebar_header_rect,
         opponent_list_rect,
-        presentation_rect,
         own_player_rect,
     )
 
@@ -550,9 +532,7 @@ def _opponent_tile_height(
         maximum_by_cards = maximum_by_tiles
     else:
         remaining_height = (
-            opponent_list_rect.height
-            - tuning.player_tile_card_top_offset_px
-            - card_height
+            opponent_list_rect.height - tuning.player_tile_card_top_offset_px - card_height
         )
         maximum_by_cards = max(1, remaining_height // (count - 1))
 
@@ -580,9 +560,7 @@ def _own_player_tile(
         own_player_rect.top + tuning.player_tile_inner_margin_px,
         max(
             1,
-            own_player_rect.right
-            - tuning.player_tile_inner_margin_px
-            - info_left,
+            own_player_rect.right - tuning.player_tile_inner_margin_px - info_left,
         ),
         max(
             1,

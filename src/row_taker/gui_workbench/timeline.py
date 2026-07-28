@@ -76,7 +76,6 @@ def _step(
         description=description,
         state=state,
         interesting_frames=frames,
-        last_action_summary=f"Timeline {timeline_name}: {description}",
     )
 
 
@@ -102,7 +101,6 @@ def _frame_for_state(
         layout=compute_layout(*DEFAULT_SIZE),
         state=state,
         presentation_elapsed_frames=0,
-        last_action_summary="Timeline-Erzeugung über den echten GameFrame-Eingabepfad.",
         mouse_pos=mouse_pos,
     )
 

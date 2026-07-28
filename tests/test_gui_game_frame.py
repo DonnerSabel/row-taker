@@ -44,13 +44,11 @@ def test_game_frame_prepares_visual_state_geometry_and_targets_once(monkeypatch)
         layout=layout,
         state=state,
         presentation_elapsed_frames=5,
-        last_action_summary="test",
         mouse_pos=(123, 456),
     )
 
     build_visual_state.assert_called_once_with(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=5,
     )
     compute_geometry.assert_called_once_with(

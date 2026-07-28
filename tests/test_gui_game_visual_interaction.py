@@ -50,7 +50,6 @@ def test_row_targets_follow_visual_order_but_return_stable_row_ids() -> None:
         layout=compute_layout(1600, 900),
         state=_unsorted_choose_row_state(),
         presentation_elapsed_frames=0,
-        last_action_summary="test",
         mouse_pos=(-1, -1),
     )
 

@@ -10,12 +10,12 @@ from row_taker.engine.game.state import PublicState
 from row_taker.gui.game_visual_invariants import assert_visual_state_is_consistent
 from row_taker.gui.game_visual_state import (
     GameVisualState,
+    MessageLevel,
     RowEmphasis,
     VisualCard,
     VisualHandCard,
     VisualInteraction,
     VisualPlayer,
-    VisualPresentationPanel,
     VisualRow,
     VisualStatus,
 )
@@ -25,7 +25,8 @@ def build_stable_game_visual_state(
     state: ClientState,
     *,
     public_state: PublicState | None,
-    last_action_summary: str,
+    status_message: str | None = None,
+    status_message_level: MessageLevel = "normal",
     hidden_staged_player_ids: frozenset[PlayerID] = frozenset(),
     hidden_hand_card_values: frozenset[int] = frozenset(),
     active_player_id: PlayerID | None = None,
@@ -34,7 +35,6 @@ def build_stable_game_visual_state(
     row_emphasis_by_id: Mapping[RowID, RowEmphasis] | None = None,
     taken_cards_by_row_id: Mapping[RowID, tuple[VisualCard, ...]] | None = None,
     visual_row_order: tuple[RowID, ...] | None = None,
-    presentation_panel: VisualPresentationPanel | None = None,
 ) -> GameVisualState:
     revealed_values = _revealed_card_values_by_player(state)
     if staged_card_values_override is not None:
@@ -74,7 +74,8 @@ def build_stable_game_visual_state(
     status = _build_status(
         state,
         public_state=public_state,
-        last_action_summary=last_action_summary,
+        status_message=status_message,
+        status_message_level=status_message_level,
     )
     visual_state = GameVisualState(
         rows=rows,
@@ -82,7 +83,6 @@ def build_stable_game_visual_state(
         hand=hand,
         interaction=interaction,
         status=status,
-        presentation_panel=presentation_panel,
     )
     assert_visual_state_is_consistent(visual_state)
     return visual_state
@@ -229,7 +229,8 @@ def _build_status(
     state: ClientState,
     *,
     public_state: PublicState | None,
-    last_action_summary: str,
+    status_message: str | None = None,
+    status_message_level: MessageLevel = "normal",
 ) -> VisualStatus:
     if public_state is None:
         game_line = "Spielstatus"
@@ -237,8 +238,15 @@ def _build_status(
         game_line = f"Runde {public_state.round_no} · Stich {public_state.trick_no}"
 
     flash = state.flash_message
-    message_line = flash.text if flash is not None else last_action_summary
-    message_level = flash.level if flash is not None else "normal"
+    if flash is not None:
+        message_line = flash.text
+        message_level: MessageLevel = flash.level
+    elif state.session_error is not None:
+        message_line = state.session_error
+        message_level = "error"
+    else:
+        message_line = status_message
+        message_level = status_message_level
 
     return VisualStatus(
         game_line=game_line,

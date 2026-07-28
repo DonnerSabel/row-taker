@@ -14,7 +14,7 @@ from row_taker.gui.rendering.game_hud_renderer import (
     draw_hand,
     draw_opponent_tiles,
     draw_own_player_tile,
-    draw_sidebar_status,
+    draw_sidebar_header,
     player_staged_card_rects,
 )
 from row_taker.gui.theme import DEFAULT_THEME
@@ -86,12 +86,11 @@ def render_game_screen(
             geometry,
         ),
     )
-    draw_sidebar_status(
+    draw_sidebar_header(
         screen,
         drawer,
         geometry,
         visual_state,
-        presentation_clock,
     )
 
     # Draw the boundary last so accidental overflows remain immediately visible.

@@ -34,7 +34,7 @@ def test_game_renderer_is_a_short_orchestrator() -> None:
         "draw_opponent_tiles(",
         "draw_own_player_tile(",
         "draw_presentation_card_motion(",
-        "draw_sidebar_status(",
+        "draw_sidebar_header(",
     ):
         assert call in source
     assert "draw_opponent_slots(" not in source
@@ -79,7 +79,7 @@ def test_game_renderer_uses_explicit_readable_layer_order() -> None:
         "draw_own_player_tile(",
         "draw_hand(",
         "draw_presentation_card_motion(",
-        "draw_sidebar_status(",
+        "draw_sidebar_header(",
         "_draw_sidebar_frame(",
     )
     positions = tuple(render_body.find(call) for call in calls)
@@ -121,16 +121,15 @@ def test_own_player_uses_dedicated_sidebar_tile_instead_of_legacy_stats_field() 
     assert "draw_stats_field(" not in renderer_source
 
 
-def test_presentation_panel_is_text_only_and_has_no_duplicate_card_strip() -> None:
+def test_presentation_box_and_gui_event_narration_are_removed() -> None:
     state_source = _source("game_visual_state.py")
     presentation_source = _source("presentation_renderer.py")
+    presentations_source = _source("game_visual_presentations.py")
 
-    panel_source = state_source.split("class VisualPresentationPanel:", maxsplit=1)[1].split(
-        "class PlayerPlayAnchor:", maxsplit=1
-    )[0]
-    assert "card_values" not in panel_source
-    assert "_draw_presentation_card_strip" not in presentation_source
-    assert "panel.card_values" not in presentation_source
+    assert "VisualPresentationPanel" not in state_source
+    assert "presentation_panel" not in state_source
+    assert "draw_presentation_panel" not in presentation_source
+    assert "format_presentation_event" not in presentations_source
 
 
 def test_player_tiles_render_visual_active_emphasis() -> None:
@@ -143,19 +142,18 @@ def test_player_tiles_render_visual_active_emphasis() -> None:
     assert "for active_layer in (False, True)" in source
 
 
-def test_status_and_presentation_use_only_new_sidebar_regions() -> None:
+def test_status_messages_live_in_own_tile_and_header_uses_only_header_region() -> None:
     hud_source = _source("rendering/game_hud_renderer.py")
     presentation_source = _source("presentation_renderer.py")
     interaction_source = _source("game_interaction.py")
 
     assert "geometry.sidebar_header_rect" in hud_source
-    assert "geometry.presentation_rect" in hud_source
+    assert "geometry.presentation_rect" not in hud_source
     assert "visual_state.status.action_line" in hud_source
+    assert "visual_state.status.message_line" in hud_source
+    assert "def _draw_own_player_tile_text" in hud_source
     assert "geometry.overlay_rect" not in hud_source
-    assert "status.primary_line" not in hud_source
-    assert "status.secondary_line" not in hud_source
-    assert "status.hand_prompt" not in hud_source
-    assert "geometry.stats_rect" not in presentation_source
+    assert "draw_presentation_panel" not in presentation_source
     assert "geometry.presentation_rect" not in interaction_source
 
 

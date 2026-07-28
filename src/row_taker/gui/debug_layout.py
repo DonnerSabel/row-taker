@@ -20,7 +20,6 @@ COLOR_ROW_AREA = pygame.Color(0, 235, 255)
 COLOR_SIDEBAR = pygame.Color(255, 210, 0)
 COLOR_HEADER = pygame.Color(255, 0, 210)
 COLOR_OPPONENT_LIST = pygame.Color(255, 145, 0)
-COLOR_PRESENTATION = pygame.Color(185, 80, 255)
 COLOR_OWN_PLAYER = pygame.Color(255, 80, 120)
 COLOR_HAND = pygame.Color(70, 255, 70)
 COLOR_ROW_COLUMN = pygame.Color(255, 255, 0)
@@ -126,12 +125,6 @@ class LayoutDebugApp:
             geometry.opponent_list_rect,
             COLOR_OPPONENT_LIST,
             "opponent_list_rect",
-            width=2,
-        )
-        self._draw_rect(
-            geometry.presentation_rect,
-            COLOR_PRESENTATION,
-            "presentation_rect",
             width=2,
         )
         self._draw_rect(

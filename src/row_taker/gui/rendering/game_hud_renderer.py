@@ -5,13 +5,11 @@ from collections.abc import Mapping
 import pygame
 
 from row_taker.engine.game.models import PlayerID
-from row_taker.gui.animation import AnimationClock
 from row_taker.gui.assets import GuiAssets
 from row_taker.gui.board_layout import BoardGeometry, hand_card_placements
 from row_taker.gui.card import GuiCard
 from row_taker.gui.game_interaction import GameScreenTargets
 from row_taker.gui.game_visual_state import GameVisualState, MessageLevel
-from row_taker.gui.presentation_renderer import draw_presentation_panel
 from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui.theme import DEFAULT_THEME
 from row_taker.gui.widgets import draw_overlay_panel, draw_panel
@@ -115,14 +113,16 @@ def draw_own_player_tile(
             card_rect=tile.card_placement.rect,
             active=active,
         )
-    _draw_player_tile_text(
+    _draw_own_player_tile_text(
         screen,
         drawer,
         info_rect=tile.info_rect,
         player_name=player.name,
         score=player.score,
         active=active,
-        status_line=visual_state.status.action_line,
+        action_line=visual_state.status.action_line,
+        message_line=visual_state.status.message_line,
+        message_level=visual_state.status.message_level,
     )
 
 
@@ -172,11 +172,9 @@ def _draw_player_tile_text(
     player_name: str,
     score: int,
     active: bool,
-    status_line: str | None = None,
 ) -> None:
     name_role = "small"
     score_role = "tiny"
-    status_role = "tiny"
     name = _fit_text_to_width(
         drawer,
         player_name,
@@ -184,24 +182,10 @@ def _draw_player_tile_text(
         role=name_role,
     )
     score_text = f"{score} Hornochsen"
-    fitted_status = (
-        _fit_text_to_width(
-            drawer,
-            status_line,
-            max_width=info_rect.width,
-            role=status_role,
-        )
-        if status_line is not None
-        else None
-    )
-
     name_font = drawer._font_for_role(name_role)
     score_font = drawer._font_for_role(score_role)
-    status_font = drawer._font_for_role(status_role)
     line_gap = 3
     content_height = name_font.get_linesize() + line_gap + score_font.get_linesize()
-    if fitted_status:
-        content_height += line_gap + status_font.get_linesize()
     top = info_rect.centery - content_height // 2
 
     drawer.draw_text(
@@ -219,13 +203,94 @@ def _draw_player_tile_text(
         role=score_role,
         color=PALETTE.gold,
     )
-    if fitted_status:
-        drawer.draw_text(
+
+
+def _draw_own_player_tile_text(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
+    *,
+    info_rect: pygame.Rect,
+    player_name: str,
+    score: int,
+    active: bool,
+    action_line: str | None,
+    message_line: str | None,
+    message_level: MessageLevel,
+) -> None:
+    """Draw local-player identity, action prompt, and genuine UI messages."""
+
+    name_role = "small"
+    detail_role = "tiny"
+    line_gap = 3
+    name = _fit_text_to_width(
+        drawer,
+        player_name,
+        max_width=info_rect.width,
+        role=name_role,
+    )
+    name_font = drawer._font_for_role(name_role)
+    detail_font = drawer._font_for_role(detail_role)
+
+    fixed_height = name_font.get_linesize() + line_gap + detail_font.get_linesize()
+    text_top = info_rect.top + max(0, (info_rect.height - fixed_height) // 2)
+    if action_line is not None or message_line is not None:
+        text_top = info_rect.top
+
+    drawer.draw_text(
+        screen,
+        name,
+        (info_rect.left, text_top),
+        role=name_role,
+        color=PALETTE.accent_hover if active else PALETTE.text_primary,
+    )
+    score_top = text_top + name_font.get_linesize() + line_gap
+    drawer.draw_text(
+        screen,
+        f"{score} Hornochsen",
+        (info_rect.left, score_top),
+        role=detail_role,
+        color=PALETTE.gold,
+    )
+
+    content_top = score_top + detail_font.get_linesize() + line_gap
+    content_bottom = info_rect.bottom
+    if action_line is not None and content_top < content_bottom:
+        action_rect = pygame.Rect(
+            info_rect.left,
+            content_top,
+            info_rect.width,
+            max(1, content_bottom - content_top),
+        )
+        action_height = drawer.measure_wrapped_lines(
+            [action_line],
+            max_width=action_rect.width,
+            role=detail_role,
+            line_gap=2,
+        )
+        drawer.draw_wrapped_lines(
             screen,
-            fitted_status,
-            (info_rect.left, score_top + score_font.get_linesize() + line_gap),
-            role=status_role,
+            [action_line],
+            action_rect,
+            role=detail_role,
             color=PALETTE.accent,
+            line_gap=2,
+        )
+        content_top += action_height + line_gap
+
+    if message_line is not None and content_top < content_bottom:
+        message_rect = pygame.Rect(
+            info_rect.left,
+            content_top,
+            info_rect.width,
+            max(1, content_bottom - content_top),
+        )
+        drawer.draw_wrapped_lines(
+            screen,
+            [message_line],
+            message_rect,
+            role=detail_role,
+            color=_status_message_color(message_level),
+            line_gap=2,
         )
 
 
@@ -289,33 +354,15 @@ def draw_hand(
         ).draw(screen, drawer=drawer, assets=assets)
 
 
-def draw_sidebar_status(
+def draw_sidebar_header(
     screen: pygame.Surface,
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
     visual_state: GameVisualState,
-    animation_clock: AnimationClock,
 ) -> None:
-    """Draw the final readable status layer inside the new sidebar."""
+    """Draw the global game line at the top of the sidebar."""
 
     _draw_sidebar_header(screen, drawer, geometry, visual_state)
-
-    if visual_state.presentation_panel is not None:
-        draw_presentation_panel(
-            screen,
-            drawer,
-            geometry.presentation_rect,
-            visual_state.presentation_panel,
-            animation_clock,
-        )
-    else:
-        _draw_sidebar_message(
-            screen,
-            drawer,
-            geometry.presentation_rect,
-            visual_state.status.message_line,
-            visual_state.status.message_level,
-        )
 
 
 def _draw_sidebar_header(
@@ -334,32 +381,6 @@ def _draw_sidebar_header(
         (rect.left + 12, text_y),
         role="small",
         color=PALETTE.text_primary,
-    )
-
-
-def _draw_sidebar_message(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    rect: pygame.Rect,
-    message: str | None,
-    level: MessageLevel,
-) -> None:
-    _draw_overlay_box(screen, rect)
-    if not message:
-        return
-
-    content_rect = pygame.Rect(
-        rect.left + 12,
-        rect.top + 10,
-        max(1, rect.width - 24),
-        max(1, rect.height - 20),
-    )
-    drawer.draw_wrapped_lines(
-        screen,
-        (message,),
-        content_rect,
-        role="tiny",
-        color=_status_message_color(level),
     )
 
 

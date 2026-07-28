@@ -38,7 +38,6 @@ class GuiApp:
         self._screen: pygame.Surface | None = None
         self._clock: pygame.time.Clock | None = None
         self._drawer: PrimitiveDrawer | None = None
-        self._last_action_summary = "Noch keine GUI-Aktion."
         self._live_client: LiveGuiClient | None = None
         self._client_state: ClientState | None = None
         self._presentation_step: PresentationStep | None = None
@@ -116,12 +115,9 @@ class GuiApp:
                     layout=layout,
                     state=self._client_state,
                     presentation_elapsed_frames=self._presentation_elapsed_frames,
-                    last_action_summary=self._last_action_summary,
                 )
 
-        raise RuntimeError(
-            f"Unsupported client mode: {self._client_state.client_mode!r}"
-        )
+        raise RuntimeError(f"Unsupported client mode: {self._client_state.client_mode!r}")
 
     def _apply_screen_result(self, result: ScreenResult) -> None:
         if result.request_quit:
@@ -138,7 +134,6 @@ class GuiApp:
 
         if result.next_state is not None:
             self._apply_local_state(result.next_state)
-            self._last_action_summary = "Lokale GUI-Navigation aktualisiert."
             return
 
         if result.client_action is not None:
@@ -175,7 +170,6 @@ class GuiApp:
 
         self._live_client = live_client
         self._client_state = live_client.state
-        self._last_action_summary = f"Verbunden mit {host}:{port} als {display_name}."
 
     def _apply_local_state(self, next_state: ClientState) -> None:
         self._client_state = next_state
@@ -186,16 +180,12 @@ class GuiApp:
     def _apply_client_action(self, action: ClientAction) -> None:
         if self._live_client is None:
             return
-        self._last_action_summary = self._live_client.apply_action(action)
+        self._live_client.apply_action(action)
         self._client_state = self._live_client.state
         self._sync_presentation_clock()
 
     def _sync_presentation_clock(self) -> None:
-        step = (
-            None
-            if self._client_state is None
-            else self._client_state.current_presentation_step
-        )
+        step = None if self._client_state is None else self._client_state.current_presentation_step
         if step is self._presentation_step:
             return
         self._presentation_step = step

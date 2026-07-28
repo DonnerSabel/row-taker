@@ -40,12 +40,10 @@ class GameFrame:
         layout: GuiLayout,
         state: ClientState,
         presentation_elapsed_frames: int,
-        last_action_summary: str,
         mouse_pos: tuple[int, int] | None = None,
     ) -> GameFrame:
         visual_state = build_game_visual_state(
             state,
-            last_action_summary=last_action_summary,
             presentation_elapsed_frames=presentation_elapsed_frames,
         )
         geometry = compute_board_geometry(

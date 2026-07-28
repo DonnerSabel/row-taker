@@ -64,12 +64,6 @@ class VisualStatus:
 
 
 @dataclass(frozen=True, slots=True)
-class VisualPresentationPanel:
-    headline: str
-    details: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
 class PlayerPlayAnchor:
     """Semantic source position of a played card at one player."""
 
@@ -122,7 +116,6 @@ class GameVisualState:
     hand: tuple[VisualHandCard, ...]
     interaction: VisualInteraction
     status: VisualStatus
-    presentation_panel: VisualPresentationPanel | None = None
     moving_cards: tuple[VisualMovingCard, ...] = ()
 
     @property

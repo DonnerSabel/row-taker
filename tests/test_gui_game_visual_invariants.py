@@ -35,7 +35,6 @@ def test_all_workbench_scenario_frames_are_consistent(scenario) -> None:
     for frame in scenario.interesting_frames:
         visual_state = build_game_visual_state(
             scenario.state,
-            last_action_summary="test",
             presentation_elapsed_frames=frame,
         )
 
@@ -56,7 +55,6 @@ def test_full_timeline_visual_states_match_their_snapshots() -> None:
         for frame in timeline_step.interesting_frames:
             visual_state = build_game_visual_state(
                 state,
-                last_action_summary="test",
                 presentation_elapsed_frames=frame,
             )
             assert_visual_state_is_consistent(visual_state)
@@ -75,7 +73,6 @@ def test_full_timeline_visual_states_match_their_snapshots() -> None:
 def test_invariant_rejects_selectable_hidden_hand_card() -> None:
     state = build_game_visual_state(
         get_scenario("choose-card").state,
-        last_action_summary="test",
     )
     hidden_value = next(iter(state.interaction.selectable_card_values))
     broken = replace(
@@ -93,7 +90,6 @@ def test_invariant_rejects_selectable_hidden_hand_card() -> None:
 def test_invariant_rejects_duplicate_visible_card() -> None:
     state = build_game_visual_state(
         get_scenario("choose-card").state,
-        last_action_summary="test",
     )
     row_value = state.rows[0].cards[0]
     broken = replace(
@@ -114,7 +110,6 @@ def test_invariant_rejects_duplicate_visible_card() -> None:
 def test_invariant_counts_staged_card_of_own_player() -> None:
     state = build_game_visual_state(
         get_scenario("cards-revealed").state,
-        last_action_summary="test",
     )
     own_player = state.own_player
     assert own_player is not None
@@ -134,7 +129,6 @@ def test_invariant_counts_staged_card_of_own_player() -> None:
 def test_invariant_rejects_multiple_active_players() -> None:
     state = build_game_visual_state(
         get_scenario("cards-revealed").state,
-        last_action_summary="test",
     )
     broken = replace(
         state,
@@ -151,7 +145,6 @@ def test_invariant_rejects_multiple_active_players() -> None:
 def test_invariant_rejects_card_in_player_tile_and_motion() -> None:
     state = build_game_visual_state(
         get_scenario("cards-revealed").state,
-        last_action_summary="test",
     )
     player = next(player for player in state.players if player.staged_card_value is not None)
     card_value = player.staged_card_value
@@ -176,7 +169,6 @@ def test_invariant_rejects_card_in_player_tile_and_motion() -> None:
 def test_invariant_rejects_moving_own_card_still_visible_in_hand() -> None:
     state = build_game_visual_state(
         get_scenario("cards-revealed").state,
-        last_action_summary="test",
     )
     own_player = state.own_player
     assert own_player is not None
@@ -212,7 +204,6 @@ def test_invariant_rejects_moving_own_card_still_visible_in_hand() -> None:
 def test_visual_transition_validates_completed_after_state() -> None:
     state = build_game_visual_state(
         get_scenario("choose-card").state,
-        last_action_summary="test",
     )
     broken_after = replace(
         state,

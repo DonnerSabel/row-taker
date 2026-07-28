@@ -47,7 +47,6 @@ def test_builder_sorts_rows_visually_and_preserves_row_ids() -> None:
     )
     visual_state = build_game_visual_state(
         _state_with_rows(rows),
-        last_action_summary="test",
     )
 
     assert [row.row_id for row in visual_state.rows] == [
@@ -62,7 +61,7 @@ def test_builder_sorts_rows_visually_and_preserves_row_ids() -> None:
 
 def test_builder_copies_players_hand_scores_and_revealed_cards() -> None:
     state = get_scenario("cards-revealed").state
-    visual_state = build_game_visual_state(state, last_action_summary="test")
+    visual_state = build_game_visual_state(state)
 
     assert visual_state.own_player is not None
     assert visual_state.own_player.player_id == state.own_player_id
@@ -86,7 +85,7 @@ def test_builder_copies_players_hand_scores_and_revealed_cards() -> None:
 
 def test_choose_card_interaction_contains_only_visible_hand_cards() -> None:
     state = get_scenario("choose-card").state
-    visual_state = build_game_visual_state(state, last_action_summary="test")
+    visual_state = build_game_visual_state(state)
 
     assert visual_state.interaction.selectable_card_values == frozenset(
         card.card_value for card in visual_state.visible_hand
@@ -97,7 +96,7 @@ def test_choose_card_interaction_contains_only_visible_hand_cards() -> None:
 
 def test_choose_row_interaction_and_action_line_come_from_client_semantics() -> None:
     state = get_scenario("choose-row").state
-    visual_state = build_game_visual_state(state, last_action_summary="test")
+    visual_state = build_game_visual_state(state)
 
     assert visual_state.interaction.selectable_card_values == frozenset()
     assert visual_state.interaction.selectable_row_ids == frozenset(
@@ -108,7 +107,7 @@ def test_choose_row_interaction_and_action_line_come_from_client_semantics() -> 
 
 def test_presentation_interaction_suppresses_game_choices() -> None:
     state = get_scenario("cards-revealed").state
-    visual_state = build_game_visual_state(state, last_action_summary="test")
+    visual_state = build_game_visual_state(state)
 
     assert state.pending_action == PendingAction.CHOOSE_CARD
     assert visual_state.interaction.selectable_card_values == frozenset()
@@ -128,12 +127,28 @@ def test_status_text_and_message_level_are_built_before_rendering() -> None:
     )
     visual_state = build_game_visual_state(
         state,
-        last_action_summary="wird durch Flash ersetzt",
     )
 
     assert visual_state.status.game_line == "Runde 2 · Stich 4"
     assert visual_state.status.action_line == "Karte auswählen"
     assert visual_state.status.message_line == "Ungültige Karte"
+    assert visual_state.status.message_level == "error"
+
+
+def test_session_error_is_shown_as_error_message_in_own_player_status() -> None:
+    state = get_scenario("choose-card").state
+    state = replace(
+        state,
+        core_state=replace(
+            state.core_state,
+            session_error="Verbindung unterbrochen",
+        ),
+    )
+
+    visual_state = build_game_visual_state(state)
+
+    assert visual_state.status.action_line == "Karte auswählen"
+    assert visual_state.status.message_line == "Verbindung unterbrochen"
     assert visual_state.status.message_level == "error"
 
 
@@ -152,7 +167,6 @@ def test_stable_builder_uses_supplied_public_state_without_changing_hand() -> No
     visual_state = build_stable_game_visual_state(
         state,
         public_state=override,
-        last_action_summary="test",
     )
 
     assert tuple(row.row_id for row in visual_state.rows) == (RowID("override"),)
@@ -163,13 +177,13 @@ def test_stable_builder_uses_supplied_public_state_without_changing_hand() -> No
     assert len(visual_state.hand) == len(state.player_state.hand)
 
 
-def test_cards_revealed_panel_and_own_card_staging_live_in_visual_state() -> None:
+def test_cards_revealed_use_player_tiles_without_gui_event_narration() -> None:
     state = get_scenario("cards-revealed").state
-    visual_state = build_game_visual_state(state, last_action_summary="test")
+    visual_state = build_game_visual_state(state)
 
-    assert visual_state.presentation_panel is not None
-    assert visual_state.presentation_panel.headline == "Karten aufgedeckt"
-    assert len(visual_state.presentation_panel.details) == 3
+    assert not hasattr(visual_state, "presentation_panel")
+    assert visual_state.status.action_line == "Klicken zum Fortfahren"
+    assert visual_state.status.message_line is None
 
     own_player = visual_state.own_player
     assert own_player is not None
@@ -188,17 +202,14 @@ def test_card_placed_uses_before_and_after_snapshots_with_one_motion() -> None:
 
     before = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=0,
     )
     middle = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=16,
     )
     after = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=32,
     )
 
@@ -232,8 +243,8 @@ def test_card_placed_uses_before_and_after_snapshots_with_one_motion() -> None:
         own_card = next(card for card in middle.hand if card.card_value == event.card_value)
         assert own_card.visible is False
 
-    assert middle.presentation_panel is not None
-    assert middle.presentation_panel.headline == f"{event.player_name} legt {event.card_value}"
+    assert not hasattr(middle, "presentation_panel")
+    assert middle.status.message_line is None
 
 
 def test_completed_card_placement_stays_hidden_in_following_step() -> None:
@@ -249,7 +260,6 @@ def test_completed_card_placement_stays_hidden_in_following_step() -> None:
 
     visual_state = build_game_visual_state(
         following,
-        last_action_summary="test",
         presentation_elapsed_frames=0,
     )
     completed_player = next(
@@ -307,12 +317,10 @@ def test_card_placed_keeps_target_row_in_final_visual_column() -> None:
 
     before = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=0,
     )
     after = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=32,
     )
 
@@ -334,10 +342,10 @@ def test_row_choice_required_lives_in_visual_state() -> None:
     assert isinstance(current_step.event, PresentationRowChoiceRequired)
     event = current_step.event
 
-    visual_state = build_game_visual_state(state, last_action_summary="test")
+    visual_state = build_game_visual_state(state)
 
-    assert visual_state.presentation_panel is not None
-    assert visual_state.presentation_panel.headline == f"{event.player_name} muss eine Reihe wählen"
+    assert not hasattr(visual_state, "presentation_panel")
+    assert visual_state.status.message_line is None
     assert visual_state.interaction.can_advance_presentation is True
     assert all(row.emphasis == "none" for row in visual_state.rows)
 
@@ -359,13 +367,10 @@ def test_row_chosen_lives_in_visual_state_and_marks_stable_row_id() -> None:
     assert isinstance(current_step.event, PresentationRowChosen)
     event = current_step.event
 
-    visual_state = build_game_visual_state(state, last_action_summary="test")
+    visual_state = build_game_visual_state(state)
 
-    assert visual_state.presentation_panel is not None
-    assert (
-        visual_state.presentation_panel.headline
-        == f"{event.player_name} wählt Reihe {event.row_id}"
-    )
+    assert not hasattr(visual_state, "presentation_panel")
+    assert visual_state.status.message_line is None
     assert visual_state.interaction.can_advance_presentation is True
 
     chosen_row = visual_state.row_by_id(event.row_id)
@@ -389,17 +394,14 @@ def test_row_taken_uses_snapshot_scores_row_replacement_and_one_motion() -> None
 
     before = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=0,
     )
     middle = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=16,
     )
     after = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=32,
     )
 
@@ -450,8 +452,8 @@ def test_row_taken_uses_snapshot_scores_row_replacement_and_one_motion() -> None
         )
         assert own_card.visible is False
 
-    assert middle.presentation_panel is not None
-    assert middle.presentation_panel.headline == f"{event.player_name} nimmt Reihe {event.row_id}"
+    assert not hasattr(middle, "presentation_panel")
+    assert middle.status.message_line is None
 
 
 def test_row_taken_keeps_replaced_row_in_one_visual_column() -> None:
@@ -462,12 +464,10 @@ def test_row_taken_keeps_replaced_row_in_one_visual_column() -> None:
 
     before = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=0,
     )
     after = build_game_visual_state(
         state,
-        last_action_summary="test",
         presentation_elapsed_frames=32,
     )
 
