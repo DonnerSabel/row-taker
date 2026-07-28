@@ -50,34 +50,43 @@ def draw_opponent_tiles(
     """Draw compact opponent tiles in the artwork-independent sidebar."""
 
     opponents = visual_state.opponents
-    prepared = tuple(
-        zip(opponents, geometry.opponent_tiles, strict=False)
-    )
+    prepared = tuple(zip(opponents, geometry.opponent_tiles, strict=False))
 
     # Draw all tile backgrounds first. Cards are a separate layer because
     # neighbouring cards may intentionally overlap vertically.
-    for _player, tile in prepared:
-        _draw_player_tile_background(screen, tile.tile_rect)
-
     for player, tile in prepared:
-        if player.staged_card_value is None:
-            continue
-        GuiCard.from_card_value(
-            player.staged_card_value,
-            tile.card_placement.rect,
-        ).draw(
+        _draw_player_tile_background(
             screen,
-            drawer=drawer,
-            assets=assets,
+            tile.tile_rect,
+            active=player.emphasis == "active",
         )
 
+    # Draw inactive staged cards in player order, then active cards once more
+    # on top. The cards intentionally overlap vertically, so an active card
+    # must not lose its highlight behind a neighbouring card.
+    for active_layer in (False, True):
+        for player, tile in prepared:
+            active = player.emphasis == "active"
+            if active != active_layer or player.staged_card_value is None:
+                continue
+            _draw_staged_card(
+                screen,
+                drawer,
+                assets,
+                card_value=player.staged_card_value,
+                card_rect=tile.card_placement.rect,
+                active=active,
+            )
+
     for player, tile in prepared:
+        active = player.emphasis == "active"
         _draw_player_tile_text(
             screen,
             drawer,
             info_rect=tile.info_rect,
             player_name=player.name,
             score=player.score,
+            active=active,
         )
 
 
@@ -95,15 +104,16 @@ def draw_own_player_tile(
         return
 
     tile = geometry.own_player_tile
-    _draw_player_tile_background(screen, tile.tile_rect)
+    active = player.emphasis == "active"
+    _draw_player_tile_background(screen, tile.tile_rect, active=active)
     if player.staged_card_value is not None:
-        GuiCard.from_card_value(
-            player.staged_card_value,
-            tile.card_placement.rect,
-        ).draw(
+        _draw_staged_card(
             screen,
-            drawer=drawer,
-            assets=assets,
+            drawer,
+            assets,
+            card_value=player.staged_card_value,
+            card_rect=tile.card_placement.rect,
+            active=active,
         )
     _draw_player_tile_text(
         screen,
@@ -111,22 +121,45 @@ def draw_own_player_tile(
         info_rect=tile.info_rect,
         player_name=player.name,
         score=player.score,
+        active=active,
     )
 
 
 def _draw_player_tile_background(
     screen: pygame.Surface,
     tile_rect: pygame.Rect,
+    *,
+    active: bool,
 ) -> None:
     draw_panel(
         screen,
         tile_rect.inflate(-2, -4),
         radius=8,
-        fill=PALETTE.panel_fill_soft,
-        border=PALETTE.panel_border,
-        border_width=1,
-        alpha=150,
+        fill=PALETTE.panel_fill if active else PALETTE.panel_fill_soft,
+        border=(PALETTE.panel_border_active if active else PALETTE.panel_border),
+        border_width=3 if active else 1,
+        alpha=220 if active else 150,
         theme=THEME,
+    )
+
+
+def _draw_staged_card(
+    screen: pygame.Surface,
+    drawer: PrimitiveDrawer,
+    assets: GuiAssets,
+    *,
+    card_value: int,
+    card_rect: pygame.Rect,
+    active: bool,
+) -> None:
+    GuiCard.from_card_value(
+        card_value,
+        card_rect,
+        selected=active,
+    ).draw(
+        screen,
+        drawer=drawer,
+        assets=assets,
     )
 
 
@@ -137,6 +170,7 @@ def _draw_player_tile_text(
     info_rect: pygame.Rect,
     player_name: str,
     score: int,
+    active: bool,
 ) -> None:
     name_role = "small"
     score_role = "tiny"
@@ -163,7 +197,7 @@ def _draw_player_tile_text(
         name,
         (info_rect.left, top),
         role=name_role,
-        color=PALETTE.text_primary,
+        color=PALETTE.accent_hover if active else PALETTE.text_primary,
     )
     drawer.draw_text(
         screen,

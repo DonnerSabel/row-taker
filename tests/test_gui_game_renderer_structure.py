@@ -120,3 +120,13 @@ def test_presentation_panel_is_text_only_and_has_no_duplicate_card_strip() -> No
     assert "_draw_presentation_card_strip" not in presentation_source
     assert "panel.card_values" not in presentation_source
 
+
+def test_player_tiles_render_visual_active_emphasis() -> None:
+    source = _source("rendering/game_hud_renderer.py")
+
+    assert 'player.emphasis == "active"' in source
+    assert "PALETTE.panel_border_active if active" in source
+    assert "border_width=3 if active else 1" in source
+    assert "selected=active" in source
+    assert "for active_layer in (False, True)" in source
+

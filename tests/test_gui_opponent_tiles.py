@@ -11,6 +11,8 @@ import pytest
 
 from row_taker.gui.primitives import PrimitiveDrawer
 from row_taker.gui.rendering.game_hud_renderer import (
+    PALETTE,
+    _draw_player_tile_background,
     _fit_text_to_width,
     player_staged_card_rects,
 )
@@ -94,3 +96,52 @@ def test_revealed_own_card_moves_from_hand_to_own_tile() -> None:
     assert frame.geometry.own_player_rect.contains(
         frame.geometry.own_player_tile.card_placement.rect
     )
+
+
+def test_active_player_tile_uses_distinct_border() -> None:
+    tile_rect = pygame.Rect(20, 20, 180, 72)
+    panel_rect = tile_rect.inflate(-2, -4)
+
+    inactive_surface = pygame.Surface((240, 120))
+    _draw_player_tile_background(
+        inactive_surface,
+        tile_rect,
+        active=False,
+    )
+
+    active_surface = pygame.Surface((240, 120))
+    _draw_player_tile_background(
+        active_surface,
+        tile_rect,
+        active=True,
+    )
+
+    border_sample = (panel_rect.centerx, panel_rect.top)
+    assert inactive_surface.get_at(border_sample) == PALETTE.panel_border
+    assert active_surface.get_at(border_sample) == PALETTE.panel_border_active
+
+
+def test_active_player_tile_uses_stronger_background() -> None:
+    tile_rect = pygame.Rect(20, 20, 180, 72)
+    panel_rect = tile_rect.inflate(-2, -4)
+    background = pygame.Color(0, 0, 0)
+
+    inactive_surface = pygame.Surface((240, 120))
+    inactive_surface.fill(background)
+    _draw_player_tile_background(
+        inactive_surface,
+        tile_rect,
+        active=False,
+    )
+
+    active_surface = pygame.Surface((240, 120))
+    active_surface.fill(background)
+    _draw_player_tile_background(
+        active_surface,
+        tile_rect,
+        active=True,
+    )
+
+    fill_sample = panel_rect.center
+    assert active_surface.get_at(fill_sample) != inactive_surface.get_at(fill_sample)
+
