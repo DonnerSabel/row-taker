@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pygame
 
+from row_taker.engine.game.models import RowID
 from row_taker.gui.animation import AnimationClock
 from row_taker.gui.assets import GuiAssets
 from row_taker.gui.board_layout import (
@@ -70,7 +71,7 @@ def _draw_row_column(
     drawer: PrimitiveDrawer,
     rect: pygame.Rect,
     *,
-    row_id: object,
+    row_id: RowID,
     cards: tuple[VisualCard, ...],
     placements: tuple[CardPlacement, ...],
     selectable: bool,

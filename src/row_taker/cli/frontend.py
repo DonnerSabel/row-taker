@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from row_taker.cli.row_display import build_row_display_mapping
 from row_taker.client.actions import (
+    ClientAction,
     ClientActionAdvancePresentation,
     ClientActionAssignSelfToSeat,
     ClientActionChooseCard,
@@ -30,7 +31,7 @@ from row_taker.client.state import (
 @dataclass(frozen=True, slots=True)
 class FrontendInputResult:
     state: ClientState
-    action: object | None = None
+    action: ClientAction | None = None
 
 
 class CliFrontend:

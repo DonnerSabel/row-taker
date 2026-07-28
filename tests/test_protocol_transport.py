@@ -67,3 +67,28 @@ def test_receive_raises_message_decode_error_on_invalid_json() -> None:
     finally:
         client.close()
         right.close()
+
+
+def test_close_is_idempotent_and_exposes_closed_socket_state() -> None:
+    left, right = socket.socketpair()
+    transport = ClientTransport(TcpLineTransport.from_socket(left))
+    try:
+        transport.close()
+        transport.close()
+        with pytest.raises(ConnectionClosed):
+            _ = transport.sock
+    finally:
+        right.close()
+
+
+def test_closed_line_transport_rejects_send_and_receive() -> None:
+    left, right = socket.socketpair()
+    line_transport = TcpLineTransport.from_socket(left)
+    try:
+        line_transport.close()
+        with pytest.raises(ConnectionClosed):
+            line_transport.send_line(b"hello\n")
+        with pytest.raises(ConnectionClosed):
+            line_transport.receive_line()
+    finally:
+        right.close()

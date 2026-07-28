@@ -26,8 +26,8 @@ python -m build --wheel
 python tools/check_wheel.py dist/*.whl
 ```
 
-Der Standardcheck umfasst Bytecode-Kompilierung, Ruff-Lint, Ruff-Formatprüfung
-und die vollständige pytest-Suite.
+Der Standardcheck umfasst Bytecode-Kompilierung, Ruff-Lint, Ruff-Formatprüfung,
+die zentralen typisierten Modulgrenzen mit mypy und die vollständige pytest-Suite.
 
 ## Inhaltliche Leitplanken
 

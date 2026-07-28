@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class TcpLineTransport:
-    sock: socket.socket
-    reader: BinaryIO
-    writer: BinaryIO
+    sock: socket.socket | None
+    reader: BinaryIO | None
+    writer: BinaryIO | None
 
     @classmethod
     def connect(cls, host: str, port: int) -> TcpLineTransport:
@@ -34,6 +34,12 @@ class TcpLineTransport:
     @classmethod
     def from_socket(cls, sock: socket.socket) -> TcpLineTransport:
         return cls(sock=sock, reader=sock.makefile("rb"), writer=sock.makefile("wb"))
+
+    def require_socket(self) -> socket.socket:
+        sock = self.sock
+        if sock is None:
+            raise ConnectionClosed("transport closed")
+        return sock
 
     def send_line(self, data: bytes) -> None:
         writer = self.writer
@@ -66,9 +72,9 @@ class TcpLineTransport:
 
         # Break references first so concurrent cleanup paths cannot race the
         # same objects.
-        self.sock = None  # type: ignore[assignment]
-        self.reader = None  # type: ignore[assignment]
-        self.writer = None  # type: ignore[assignment]
+        self.sock = None
+        self.reader = None
+        self.writer = None
 
         if sock is not None:
             try:
@@ -112,7 +118,7 @@ class ClientTransport:
 
     @property
     def sock(self) -> socket.socket:
-        return self.line_transport.sock
+        return self.line_transport.require_socket()
 
     def send(self, message: ClientToServerMessage) -> None:
         self.line_transport.send_line(encode_client_message(message))
@@ -134,7 +140,7 @@ class ServerTransport:
 
     @property
     def sock(self) -> socket.socket:
-        return self.line_transport.sock
+        return self.line_transport.require_socket()
 
     def send(self, message: ServerToClientMessage) -> None:
         self.line_transport.send_line(encode_server_message(message))

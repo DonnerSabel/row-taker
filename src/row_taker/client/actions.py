@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from row_taker.engine.game.models import RowID
+
 
 class ClientAction:
     pass
@@ -40,7 +42,7 @@ class ClientActionChooseCard(ClientAction):
 
 @dataclass(frozen=True, slots=True)
 class ClientActionChooseRow(ClientAction):
-    row_id: object
+    row_id: RowID
 
 
 @dataclass(frozen=True, slots=True)

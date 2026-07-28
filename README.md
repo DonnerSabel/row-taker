@@ -32,6 +32,7 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ruff check .
 ruff format --check .
+mypy
 pytest -q
 ```
 
@@ -105,6 +106,8 @@ aus **`.venv`** auswählen.
 - `src/row_taker/bots/` – Bot-Clients
 - `src/row_taker/gui_workbench/` – reproduzierbare GUI-Szenen und Timelines
 - `tests/` – Unit-, Architektur- und Render-Tests mit pytest
+- `mypy` – statischer Typecheck für die zentralen typisierten Modulgrenzen
+  Der Typecheck wird bewusst schrittweise erweitert; die aktuell geprüften Dateien sind in `pyproject.toml` aufgeführt.
 - `docs/` – Architektur, Regeln, Workflow und Unterrichtsmaterial
 
 ## Zentrale Datenstrukturen

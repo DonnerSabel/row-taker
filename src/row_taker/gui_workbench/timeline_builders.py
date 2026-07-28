@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Iterable
+from typing import TypeVar
 
 import pygame
 
 from row_taker.client.actions import (
+    ClientAction,
     ClientActionAdvancePresentation,
     ClientActionChooseCard,
     ClientActionChooseRow,
@@ -12,6 +15,7 @@ from row_taker.client.actions import (
 from row_taker.client.game_client_core import GameClientCore
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.client.state import ClientState, initial_client_state
+from row_taker.client.update import CoreUpdate
 from row_taker.engine.game import RulesConfig, setup_game
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import EngineRow, PlayerID, RowID
@@ -27,6 +31,7 @@ from row_taker.hub.match_hub import MatchHub
 from row_taker.protocol.messages import (
     ChooseCardRequested,
     ChooseRowRequested,
+    ServerToClientMessage,
     SubmitCard,
     SubmitRowChoice,
 )
@@ -56,7 +61,7 @@ def _step(
 
 def _deliver_relevant_messages(
     core: GameClientCore,
-    messages: list[object],
+    messages: Iterable[ServerToClientMessage],
     *,
     own_player_id: PlayerID,
 ) -> None:
@@ -80,12 +85,15 @@ def _frame_for_state(
     )
 
 
+ActionT = TypeVar("ActionT", bound=ClientAction)
+
+
 def _apply_click_action(
     core: GameClientCore,
     *,
     position: tuple[int, int],
-    expected_action_type: type,
-):
+    expected_action_type: type[ActionT],
+) -> CoreUpdate:
     frame = _frame_for_state(core.state, mouse_pos=position)
     result = frame.handle_event(
         pygame.event.Event(

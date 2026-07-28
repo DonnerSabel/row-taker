@@ -17,6 +17,6 @@ python -m build --wheel
 python tools/check_wheel.py dist/*.whl
 ```
 
-`tools/run_checks.sh` prüft Bytecode-Kompilierung, Ruff-Lint, Ruff-Formatierung und
-die vollständige pytest-Suite. Der Wheel-Smoke-Test installiert das gebaute Paket
+`tools/run_checks.sh` prüft Bytecode-Kompilierung, Ruff-Lint, Ruff-Formatierung,
+die zentralen typisierten Modulgrenzen mit mypy und die vollständige pytest-Suite. Der Wheel-Smoke-Test installiert das gebaute Paket
 außerhalb des Repositorys und prüft CLI, Server, Workbench und paketierte GUI-Ressourcen.

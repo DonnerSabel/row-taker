@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from contextlib import suppress
+from typing import cast
 
 from row_taker.cli.console import CliConsole, InputAborted
 from row_taker.cli.frontend import CliFrontend, set_flash
 from row_taker.cli.render import build_view
-from row_taker.client.actions import ClientActionAdvancePresentation
+from row_taker.client.actions import ClientAction, ClientActionAdvancePresentation
 from row_taker.client.game_client_core import GameClientCore
 from row_taker.client.state import ClientState, initial_client_state
+from row_taker.client.update import CoreUpdate
 from row_taker.engine.game.state import PublicState
 from row_taker.protocol.errors import ConnectionClosed
-from row_taker.protocol.messages import ServerToClientMessage
+from row_taker.protocol.messages import ClientToServerMessage, ServerToClientMessage
 from row_taker.protocol.transport import ClientTransport
 
 logger = logging.getLogger("row_taker.cli.app")
@@ -26,7 +29,7 @@ class CliApp:
         *,
         interactive: bool = True,
         console_factory: type[CliConsole] = CliConsole,
-        initial_state_factory=initial_client_state,
+        initial_state_factory: Callable[[str | None], ClientState] = initial_client_state,
     ) -> None:
         self.transport = transport
         self.own_client_id = own_client_id
@@ -67,11 +70,11 @@ class CliApp:
                     input_task = asyncio.create_task(console.read_line())
                     input_prompt = current_prompt
 
-                wait_tasks: set[asyncio.Task[object]] = set()
+                wait_tasks: set[asyncio.Future[ServerToClientMessage | str]] = set()
                 if server_task is not None:
-                    wait_tasks.add(server_task)
+                    wait_tasks.add(cast(asyncio.Future[ServerToClientMessage | str], server_task))
                 if input_task is not None:
-                    wait_tasks.add(input_task)
+                    wait_tasks.add(cast(asyncio.Future[ServerToClientMessage | str], input_task))
                 if not wait_tasks:
                     break
                 done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -163,13 +166,15 @@ class CliApp:
             logger.debug("client session cleanup finished")
 
     async def _process_action(
-        self, console: CliConsole, core: GameClientCore, action: object
-    ) -> tuple[ClientState, tuple[object, ...]]:
+        self, console: CliConsole, core: GameClientCore, action: ClientAction
+    ) -> tuple[ClientState, tuple[ClientToServerMessage, ...]]:
         update = core.on_ui_action(action)
         state = await self._apply_update(console, core, update)
         return state, update.outbound_messages
 
-    async def _apply_update(self, console: CliConsole, core: GameClientCore, update) -> ClientState:
+    async def _apply_update(
+        self, console: CliConsole, core: GameClientCore, update: CoreUpdate
+    ) -> ClientState:
         state = core.state
         if update.local_messages:
             state = set_flash(state, "error", update.local_messages[-1])

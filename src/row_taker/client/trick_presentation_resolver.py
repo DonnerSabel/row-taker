@@ -14,6 +14,7 @@ from row_taker.client.presentation_builder import (
 from row_taker.client.presentation_events import PresentationEvent
 from row_taker.client.presentation_steps import PresentationStep
 from row_taker.engine.game.cards import Card
+from row_taker.engine.game.models import RowID
 from row_taker.engine.game.phases import StepAction
 from row_taker.engine.game.public_state_ops import apply_resolution_step
 from row_taker.engine.game.rules import place_card, take_row, target_row_index
@@ -46,7 +47,7 @@ def start_trick_presentation(
     return _advance_until_blocked(initial)
 
 
-def apply_trick_row_choice(state: TrickPresentationState, row_id: int) -> TrickPresentationState:
+def apply_trick_row_choice(state: TrickPresentationState, row_id: RowID) -> TrickPresentationState:
     play = state.pending_row_choice
     if play is None:
         return state

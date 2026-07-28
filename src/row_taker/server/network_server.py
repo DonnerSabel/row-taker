@@ -13,6 +13,7 @@ from row_taker.protocol.messages import (
     IdentityAssigned,
     JoinLobby,
     LeaveSession,
+    ServerToClientMessage,
 )
 from row_taker.protocol.transport import ServerTransport
 from row_taker.server.local_server import LocalServer
@@ -30,7 +31,7 @@ class _Connection:
         with self.write_lock:
             self.transport.send(envelope.message)
 
-    def send_message(self, message: object) -> None:
+    def send_message(self, message: ServerToClientMessage) -> None:
         with self.write_lock:
             self.transport.send(message)
 
@@ -162,10 +163,15 @@ class NetworkServer:
             self._drain_and_dispatch_locked()
 
 
-def _format_endpoint(addr: object) -> str | None:
-    if isinstance(addr, tuple) and len(addr) >= 2:
+SocketAddress = tuple[str, int] | tuple[str, int, int, int] | str | bytes
+
+
+def _format_endpoint(addr: SocketAddress | None) -> str | None:
+    if isinstance(addr, tuple):
         return f"{addr[0]}:{addr[1]}"
-    return None if addr is None else str(addr)
+    if isinstance(addr, bytes):
+        return addr.decode(errors="replace")
+    return addr
 
 
 def _serve_connection(
