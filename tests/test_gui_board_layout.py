@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from row_taker.gui.board_layout import compute_board_geometry, hand_card_placements
+from row_taker.gui.board_layout import (
+    DEFAULT_BOARD_LAYOUT,
+    compute_board_geometry,
+    hand_card_placements,
+)
 
 
 @pytest.mark.parametrize(
@@ -73,6 +77,81 @@ def test_five_opponent_tiles_keep_text_separate_and_cards_inside_sidebar(
     assert any(
         upper.colliderect(lower) for upper, lower in zip(card_rects, card_rects[1:], strict=False)
     )
+
+
+@pytest.mark.parametrize(
+    "window_size",
+    (
+        (980, 720),
+        (1024, 768),
+        (1280, 720),
+        (1600, 900),
+    ),
+)
+@pytest.mark.parametrize("opponent_count", range(1, 6))
+def test_opponent_tiles_have_equal_height_and_fixed_card_offsets(
+    window_size: tuple[int, int],
+    opponent_count: int,
+) -> None:
+    geometry = compute_board_geometry(
+        window_size,
+        row_count=4,
+        hand_card_count=10,
+        opponent_count=opponent_count,
+    )
+
+    tiles = geometry.opponent_tiles
+    assert len({tile.tile_rect.height for tile in tiles}) == 1
+    assert len({tile.tile_rect.width for tile in tiles}) == 1
+    assert tiles[0].tile_rect.height <= DEFAULT_BOARD_LAYOUT.player_tile_preferred_height_px
+
+    for tile in tiles:
+        card_rect = tile.card_placement.rect
+        assert card_rect.left - tile.tile_rect.left == (
+            DEFAULT_BOARD_LAYOUT.player_tile_card_left_offset_px
+        )
+        assert card_rect.top - tile.tile_rect.top == (
+            DEFAULT_BOARD_LAYOUT.player_tile_card_top_offset_px
+        )
+        assert geometry.opponent_list_rect.contains(card_rect)
+
+    for upper, lower in zip(tiles, tiles[1:], strict=False):
+        assert upper.tile_rect.bottom == lower.tile_rect.top
+
+    assert tiles[-1].tile_rect.bottom <= geometry.opponent_list_rect.bottom
+
+
+def test_own_player_card_uses_the_same_fixed_offsets_as_opponents() -> None:
+    geometry = compute_board_geometry(
+        (980, 720),
+        row_count=4,
+        hand_card_count=10,
+        opponent_count=5,
+    )
+    own_tile = geometry.own_player_tile
+    own_card = own_tile.card_placement.rect
+
+    assert own_card.left - own_tile.tile_rect.left == (
+        DEFAULT_BOARD_LAYOUT.player_tile_card_left_offset_px
+    )
+    assert own_card.top - own_tile.tile_rect.top == (
+        DEFAULT_BOARD_LAYOUT.player_tile_card_top_offset_px
+    )
+
+
+def test_few_opponents_do_not_stretch_tiles_to_fill_the_list() -> None:
+    geometry = compute_board_geometry(
+        (980, 720),
+        row_count=4,
+        hand_card_count=10,
+        opponent_count=2,
+    )
+
+    assert all(
+        tile.tile_rect.height == DEFAULT_BOARD_LAYOUT.player_tile_preferred_height_px
+        for tile in geometry.opponent_tiles
+    )
+    assert geometry.opponent_tiles[-1].tile_rect.bottom < geometry.opponent_list_rect.bottom
 
 
 @pytest.mark.parametrize("opponent_count", range(6))

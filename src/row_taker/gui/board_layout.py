@@ -83,6 +83,9 @@ class BoardLayoutTuning:
     sidebar_own_player_max_height_px: int = 160
 
     player_tile_inner_margin_px: int = 6
+    player_tile_preferred_height_px: int = 72
+    player_tile_card_left_offset_px: int = 6
+    player_tile_card_top_offset_px: int = 6
     player_tile_card_width_ratio: float = 0.18
     player_tile_card_min_width_px: int = 64
     player_tile_card_max_width_px: int = 86
@@ -117,8 +120,9 @@ class PlayerTileGeometry:
     """Prepared geometry for one player tile in the new sidebar.
 
     ``tile_rect`` and ``info_rect`` never overlap another player's text area.
-    The card may intentionally extend beyond ``tile_rect`` so neighbouring
-    cards can overlap vertically while remaining inside the sidebar.
+    Every opponent tile in one layout has the same height. The card uses a
+    fixed top-left offset from its tile and may intentionally extend beyond
+    ``tile_rect`` so neighbouring cards can overlap vertically.
     """
 
     tile_rect: pygame.Rect
@@ -482,51 +486,47 @@ def _opponent_tiles(
         return ()
 
     card_width, card_height = card_size
-    inner_margin = tuning.player_tile_inner_margin_px
-    card_center_x = opponent_list_rect.left + inner_margin + card_width // 2
-    info_left = card_center_x + card_width // 2 + tuning.player_tile_card_info_gap_px
-    info_width = max(1, opponent_list_rect.right - inner_margin - info_left)
+    card_left = opponent_list_rect.left + tuning.player_tile_card_left_offset_px
+    info_left = card_left + card_width + tuning.player_tile_card_info_gap_px
+    info_width = max(
+        1,
+        opponent_list_rect.right - tuning.player_tile_inner_margin_px - info_left,
+    )
 
-    if count == 1:
-        center_ys = [opponent_list_rect.centery]
-    else:
-        first_center_y = opponent_list_rect.top + card_height // 2
-        last_center_y = opponent_list_rect.bottom - card_height // 2
-        if last_center_y < first_center_y:
-            first_center_y = last_center_y = opponent_list_rect.centery
-        step = (last_center_y - first_center_y) / (count - 1)
-        center_ys = [round(first_center_y + index * step) for index in range(count)]
-
-    boundaries = [opponent_list_rect.top]
-    boundaries.extend((center_ys[index - 1] + center_ys[index]) // 2 for index in range(1, count))
-    boundaries.append(opponent_list_rect.bottom)
+    tile_height = _opponent_tile_height(
+        opponent_list_rect,
+        opponent_count=count,
+        card_height=card_height,
+        tuning=tuning,
+    )
 
     tiles: list[PlayerTileGeometry] = []
-    for index, center_y in enumerate(center_ys):
-        tile_top = boundaries[index]
-        tile_bottom = boundaries[index + 1]
+    for index in range(count):
         tile_rect = pygame.Rect(
             opponent_list_rect.left,
-            tile_top,
+            opponent_list_rect.top + index * tile_height,
             opponent_list_rect.width,
-            max(1, tile_bottom - tile_top),
-        )
-        info_height = max(
-            1,
-            tile_rect.height - 2 * tuning.player_tile_info_vertical_margin_px,
+            tile_height,
         )
         info_rect = pygame.Rect(
             info_left,
-            tile_rect.centery - info_height // 2,
+            tile_rect.top + tuning.player_tile_info_vertical_margin_px,
             info_width,
-            info_height,
+            max(
+                1,
+                tile_rect.height - 2 * tuning.player_tile_info_vertical_margin_px,
+            ),
         )
+        card_top = tile_rect.top + tuning.player_tile_card_top_offset_px
         tiles.append(
             PlayerTileGeometry(
                 tile_rect=tile_rect,
                 info_rect=info_rect,
                 card_placement=CardPlacement(
-                    center=(card_center_x, center_y),
+                    center=(
+                        card_left + card_width // 2,
+                        card_top + card_height // 2,
+                    ),
                     size=card_size,
                 ),
             )
@@ -535,33 +535,69 @@ def _opponent_tiles(
     return tuple(tiles)
 
 
+def _opponent_tile_height(
+    opponent_list_rect: pygame.Rect,
+    *,
+    opponent_count: int,
+    card_height: int,
+    tuning: BoardLayoutTuning,
+) -> int:
+    """Return one shared tile height while keeping the last card in bounds."""
+
+    count = max(1, opponent_count)
+    maximum_by_tiles = max(1, opponent_list_rect.height // count)
+    if count == 1:
+        maximum_by_cards = maximum_by_tiles
+    else:
+        remaining_height = (
+            opponent_list_rect.height
+            - tuning.player_tile_card_top_offset_px
+            - card_height
+        )
+        maximum_by_cards = max(1, remaining_height // (count - 1))
+
+    return max(
+        1,
+        min(
+            tuning.player_tile_preferred_height_px,
+            maximum_by_tiles,
+            maximum_by_cards,
+        ),
+    )
+
+
 def _own_player_tile(
     own_player_rect: pygame.Rect,
     card_size: tuple[int, int],
     tuning: BoardLayoutTuning,
 ) -> PlayerTileGeometry:
     card_width, card_height = card_size
-    inner_margin = tuning.player_tile_inner_margin_px
-    card_center_x = own_player_rect.left + inner_margin + card_width // 2
-    card_center_y = own_player_rect.centery
-    info_left = card_center_x + card_width // 2 + tuning.player_tile_card_info_gap_px
+    card_left = own_player_rect.left + tuning.player_tile_card_left_offset_px
+    card_top = own_player_rect.top + tuning.player_tile_card_top_offset_px
+    info_left = card_left + card_width + tuning.player_tile_card_info_gap_px
     info_rect = pygame.Rect(
         info_left,
-        own_player_rect.top + inner_margin,
-        max(1, own_player_rect.right - inner_margin - info_left),
-        max(1, own_player_rect.height - 2 * inner_margin),
-    )
-    card_center_y = _clamp(
-        card_center_y,
-        own_player_rect.top + card_height // 2,
-        own_player_rect.bottom - card_height // 2,
+        own_player_rect.top + tuning.player_tile_inner_margin_px,
+        max(
+            1,
+            own_player_rect.right
+            - tuning.player_tile_inner_margin_px
+            - info_left,
+        ),
+        max(
+            1,
+            own_player_rect.height - 2 * tuning.player_tile_inner_margin_px,
+        ),
     )
 
     return PlayerTileGeometry(
         tile_rect=own_player_rect.copy(),
         info_rect=info_rect,
         card_placement=CardPlacement(
-            center=(card_center_x, card_center_y),
+            center=(
+                card_left + card_width // 2,
+                card_top + card_height // 2,
+            ),
             size=card_size,
         ),
     )
