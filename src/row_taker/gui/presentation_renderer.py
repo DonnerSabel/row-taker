@@ -145,10 +145,9 @@ def draw_presentation_panel(
     drawer: PrimitiveDrawer,
     geometry: BoardGeometry,
     panel: VisualPresentationPanel,
-    assets: GuiAssets,
     animation_clock: AnimationClock,
 ) -> None:
-    """Draw the text/card panel for the current presentation step."""
+    """Draw the text-only panel for the current presentation step."""
 
     events_rect = pygame.Rect(
         geometry.stats_rect.left,
@@ -171,18 +170,7 @@ def draw_presentation_panel(
         ),
     )
 
-    if panel.card_values:
-        _draw_presentation_card_strip(
-            screen,
-            drawer,
-            events_rect,
-            card_values=panel.card_values,
-            assets=assets,
-        )
-        text_top = events_rect.top + 74
-    else:
-        text_top = events_rect.top + 34
-
+    text_top = events_rect.top + 34
     lines = list(panel.details[:2])
     if lines:
         text_rect = pygame.Rect(
@@ -241,39 +229,6 @@ def _draw_presentation_accent(
         border_radius=3,
     )
     screen.blit(accent_surface, accent_rect)
-
-
-def _draw_presentation_card_strip(
-    screen: pygame.Surface,
-    drawer: PrimitiveDrawer,
-    rect: pygame.Rect,
-    *,
-    card_values: tuple[int, ...],
-    assets: GuiAssets,
-) -> None:
-    max_cards = min(4, len(card_values))
-    card_width = max(32, min(44, (rect.width - 28) // max(1, max_cards)))
-    card_size = (card_width, round(card_width * 1.5))
-    x = rect.left + 12
-    y = rect.top + 34
-    for value in card_values[:max_cards]:
-        card_rect = pygame.Rect(x, y, card_size[0], card_size[1])
-        GuiCard.from_card_value(value, card_rect, selected=True).draw(
-            screen,
-            drawer=drawer,
-            assets=assets,
-        )
-        x += card_width + 8
-
-    remaining = len(card_values) - max_cards
-    if remaining > 0:
-        drawer.draw_text(
-            screen,
-            f"+{remaining}",
-            (x + 2, y + 18),
-            role="small",
-            color=PALETTE.text_muted,
-        )
 
 
 def _draw_overlay_box(screen: pygame.Surface, rect: pygame.Rect) -> None:

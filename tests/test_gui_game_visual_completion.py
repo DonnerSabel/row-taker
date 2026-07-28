@@ -76,7 +76,6 @@ def test_overflow_uses_before_and_after_snapshots_with_one_motion() -> None:
         middle.presentation_panel.headline
         == f"Overflow: {event.player_name} nimmt Reihe {event.row_id}"
     )
-    assert middle.presentation_panel.card_values == (event.card_value,)
 
 
 @pytest.mark.parametrize(
@@ -108,7 +107,6 @@ def test_finish_events_are_complete_visual_states(event, headline: str) -> None:
 
     assert visual_state.presentation_panel is not None
     assert visual_state.presentation_panel.headline == headline
-    assert visual_state.presentation_panel.card_values == ()
     assert visual_state.interaction.can_advance_presentation is True
     assert visual_state.moving_cards == ()
     assert all(player.staged_card_value is None for player in visual_state.players)

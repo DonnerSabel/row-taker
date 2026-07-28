@@ -61,7 +61,6 @@ def render_game_screen(
         geometry,
         visual_state,
         game_targets,
-        assets,
         presentation_clock,
     )
     draw_opponent_tiles(

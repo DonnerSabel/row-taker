@@ -170,7 +170,6 @@ def test_cards_revealed_panel_and_own_card_staging_live_in_visual_state() -> Non
 
     assert visual_state.presentation_panel is not None
     assert visual_state.presentation_panel.headline == "Karten aufgedeckt"
-    assert visual_state.presentation_panel.card_values == (44, 62, 71, 86)
     assert len(visual_state.presentation_panel.details) == 3
 
     own_player = visual_state.own_player
@@ -240,7 +239,6 @@ def test_card_placed_uses_before_and_after_snapshots_with_one_motion() -> None:
 
     assert middle.presentation_panel is not None
     assert middle.presentation_panel.headline == f"{event.player_name} legt {event.card_value}"
-    assert middle.presentation_panel.card_values == (event.card_value,)
 
 
 def test_completed_card_placement_stays_hidden_in_following_step() -> None:
@@ -351,7 +349,6 @@ def test_row_choice_required_lives_in_visual_state() -> None:
         visual_state.presentation_panel.headline
         == f"{event.player_name} muss eine Reihe wählen"
     )
-    assert visual_state.presentation_panel.card_values == (event.card_value,)
     assert visual_state.interaction.can_advance_presentation is True
     assert all(row.emphasis == "none" for row in visual_state.rows)
 
@@ -382,7 +379,6 @@ def test_row_chosen_lives_in_visual_state_and_marks_stable_row_id() -> None:
         visual_state.presentation_panel.headline
         == f"{event.player_name} wählt Reihe {event.row_id}"
     )
-    assert visual_state.presentation_panel.card_values == (event.card_value,)
     assert visual_state.interaction.can_advance_presentation is True
 
     chosen_row = visual_state.row_by_id(event.row_id)
@@ -480,7 +476,6 @@ def test_row_taken_uses_snapshot_scores_row_replacement_and_one_motion() -> None
         middle.presentation_panel.headline
         == f"{event.player_name} nimmt Reihe {event.row_id}"
     )
-    assert middle.presentation_panel.card_values == (event.replacement_card_value,)
 
 
 def test_row_taken_keeps_replaced_row_in_one_visual_column() -> None:

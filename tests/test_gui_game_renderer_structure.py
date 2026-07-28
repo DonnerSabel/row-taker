@@ -108,3 +108,15 @@ def test_own_player_uses_dedicated_sidebar_tile_instead_of_legacy_stats_field() 
     assert "geometry.own_player_tile" in hud_source
     assert "def draw_stats_field" not in hud_source
     assert "draw_stats_field(" not in renderer_source
+
+def test_presentation_panel_is_text_only_and_has_no_duplicate_card_strip() -> None:
+    state_source = _source("game_visual_state.py")
+    presentation_source = _source("presentation_renderer.py")
+
+    panel_source = state_source.split(
+        "class VisualPresentationPanel:", maxsplit=1
+    )[1].split("class PlayerPlayAnchor:", maxsplit=1)[0]
+    assert "card_values" not in panel_source
+    assert "_draw_presentation_card_strip" not in presentation_source
+    assert "panel.card_values" not in presentation_source
+

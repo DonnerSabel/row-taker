@@ -67,7 +67,6 @@ class VisualStatus:
 class VisualPresentationPanel:
     headline: str
     details: tuple[str, ...]
-    card_values: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -259,7 +259,6 @@ def draw_status_overlay(
     geometry: BoardGeometry,
     visual_state: GameVisualState,
     game_targets: GameScreenTargets,
-    assets: GuiAssets,
     animation_clock: AnimationClock,
 ) -> None:
     """Draw status text, presentation panel, and continue interaction."""
@@ -286,7 +285,6 @@ def draw_status_overlay(
             drawer,
             geometry,
             visual_state.presentation_panel,
-            assets,
             animation_clock,
         )
 

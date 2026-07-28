@@ -72,7 +72,6 @@ def build_row_choice_visual_state(
         presentation_panel=VisualPresentationPanel(
             headline=headline,
             details=_presentation_details(state),
-            card_values=(event.card_value,),
         ),
     )
 
@@ -115,7 +114,6 @@ def build_row_replacement_visual_step(
     panel = VisualPresentationPanel(
         headline=headline,
         details=_presentation_details(state),
-        card_values=(replacement_card_value,),
     )
     row_emphasis = {event.row_id: emphasis}
     taken_cards = _visual_cards_for_row(
@@ -275,7 +273,6 @@ def build_card_placed_visual_step(
     panel = VisualPresentationPanel(
         headline=f"{event.player_name} legt {event.card_value}",
         details=_presentation_details(state),
-        card_values=(event.card_value,),
     )
     row_emphasis = {event.row_id: "placed"}
 
@@ -357,7 +354,6 @@ def build_cards_revealed_panel(
     return VisualPresentationPanel(
         headline="Karten aufgedeckt",
         details=_presentation_details(state),
-        card_values=tuple(play.card_value for play in event.plays),
     )
 
 
