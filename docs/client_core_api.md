@@ -122,3 +122,25 @@ für Core-, Navigation- oder Feedback-Zustände zusammenzustellen.
 
 Die CLI leitet Eingabe, Prompt und Rendering direkt aus `ClientState` ab. Die Tests sind
 entlang der Architekturgrenzen getrennt in Core-, Frontend- und Render-Tests.
+
+
+## Reducer und fachliche Transitionen
+
+Der Reducer ist bewusst nur ein expliziter Dispatcher. Er enthält keine
+Validierungs-, Lobby- oder Präsentationslogik:
+
+```text
+core_reducer.py
+    ├── Servernachricht → server_transitions.py
+    └── ClientAction    → action_transitions.py
+
+presentation_queue.py
+    verwaltet sichtbare und noch ausstehende PresentationStep-Objekte
+```
+
+`server_transitions.py` verarbeitet die fachliche Bedeutung einzelner
+Servernachrichten. `action_transitions.py` validiert lokale Aktionen und liefert
+einen `ActionResult` mit neuem Zustand, optionaler Outbound-Nachricht und
+optionaler lokaler Meldung. Die zentrale `match`-Anweisung bleibt dadurch als
+vollständiges Inhaltsverzeichnis aller unterstützten Eingaben lesbar, ohne eine
+Handler-Registry oder Factory-Klassen einzuführen.

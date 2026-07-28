@@ -96,7 +96,7 @@ aus **`.venv`** auswählen.
 
 - `src/row_taker/engine/` – fachliche Zustände, Regeln und Projektionen
 - `src/row_taker/hub/` – Match-Hub und Message-Orchestrierung
-- `src/row_taker/client/` – gemeinsamer Clientzustand, Reducer und Präsentation
+- `src/row_taker/client/` – Clientzustand, Dispatcher, fachliche Transitionen und Präsentationsqueue
 - `src/row_taker/protocol/` – Nachrichten, Codec, Framing und Transport
 - `src/row_taker/server/` – Lobby, lokale Bots und Netzwerkserver
 - `src/row_taker/cli/` – Terminaldarstellung und CLI-Eingabe

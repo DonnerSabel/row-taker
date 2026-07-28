@@ -4,7 +4,7 @@ import pytest
 
 pygame = pytest.importorskip("pygame")
 
-from row_taker.client.core_reducer import advance_presentation_queue
+from row_taker.client.presentation_queue import advance_presentation_queue
 from row_taker.gui.board_layout import row_card_placements
 from row_taker.gui.layout import compute_layout
 from row_taker.gui.presentation_renderer import resolve_visual_card_motion_rects

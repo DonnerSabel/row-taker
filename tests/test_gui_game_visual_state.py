@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from row_taker.client.core_reducer import advance_presentation_queue
 from row_taker.client.core_state import PendingAction
 from row_taker.client.presentation_events import (
     PresentationCardPlaced,
@@ -10,6 +9,7 @@ from row_taker.client.presentation_events import (
     PresentationRowChosen,
     PresentationRowTaken,
 )
+from row_taker.client.presentation_queue import advance_presentation_queue
 from row_taker.client.state import UiMessage
 from row_taker.engine.game.cards import Card
 from row_taker.engine.game.models import Row, RowID

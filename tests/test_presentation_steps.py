@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from itertools import pairwise
 
-from row_taker.client.core_reducer import advance_presentation_queue, reduce_server_message
+from row_taker.client.core_reducer import reduce_server_message
 from row_taker.client.core_state import ClientCoreState
 from row_taker.client.presentation_events import (
     PresentationCardPlaced,
@@ -13,6 +13,7 @@ from row_taker.client.presentation_events import (
     PresentationRowTaken,
     PresentationTrickFinished,
 )
+from row_taker.client.presentation_queue import advance_presentation_queue
 from row_taker.client.state import ClientState
 from row_taker.client.trick_presentation_resolver import (
     apply_trick_row_choice,

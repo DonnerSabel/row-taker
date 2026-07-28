@@ -4,16 +4,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Literal
 
-from row_taker.client.core_reducer import (
-    advance_presentation_queue,
-    reduce_server_message,
-)
+from row_taker.client.core_reducer import reduce_server_message
 from row_taker.client.core_state import ClientCoreState, ClientMode, PendingAction
 from row_taker.client.presentation_events import (
     PresentationEvent,
     PresentationGameFinished,
     PresentationRoundFinished,
 )
+from row_taker.client.presentation_queue import advance_presentation_queue
 from row_taker.client.presentation_steps import PresentationStep
 from row_taker.client.state import (
     ClientState,

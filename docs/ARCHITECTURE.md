@@ -296,8 +296,9 @@ jeweiligen Produktionsrenderer reproduzierbar prüfen.
 
 Connect-Szenarien liefern ausschließlich einen `ConnectFormState`; Lobby- und
 Spielszenarien liefern echte `ClientState`-Objekte. Für Präsentationsabläufe
-werden die vorhandenen Reducer und der echte lokale Trick-Resolver verwendet,
-sodass nicht parallel eine zweite Darstellungslogik entsteht. Der
+werden der zentrale Reducer-Dispatcher, die fachlichen Transitionen und der echte
+lokale Trick-Resolver verwendet, sodass nicht parallel eine zweite
+Darstellungslogik entsteht. Der
 Workbench-Code darf nur Eingaben der Prepared Frames und das Ausgabeziel
 kontrollieren.
 
